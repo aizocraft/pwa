@@ -5,55 +5,59 @@ import { useState, useRef, useEffect } from "react";
 import Masonry from "@/components/Masonry";
 import Galaxy from "@/components/Galaxy";
 
+// Simplified Project Data
 const projects = [
   {
-    title: "Solar Panel Installation - Residential",
-    location: "Nairobi, Kenya",
+    title: "Solar Installation Showcase",
+    location: "Various Locations",
     category: "Solar Installation",
     images: [
       "/images/solar-image1.jpg",
       "/images/solar-image2.jpg",
       "/images/solar-image3.jpg",
       "/images/solar-image4.jpg",
-      "/images/solar-4.jpg"
+      "/images/solar-4.jpg",
+      "/images/solar.jpg",
     ]
   },
   {
-    title: "Community Borehole Project",
-    location: "Kampala, Uganda",
+    title: "Borehole Drilling Showcase",
+    location: "Various Locations",
     category: "Borehole Drilling",
     images: [
+      // Added new borehole image (assuming the user meant 'borehole_drilling.jpeg' is a new image)
+      "/images/borehole_drilling.jpeg", 
       "/images/borehole-drilling1.jpg",
       "/images/borehole-drilling2.jpg",
       "/images/borehole-drilling3.jpg",
       "/images/borehole-drilling4.jpg",
-      "/images/borehole-drilling5.jpg"
+      "/images/borehole-drilling5.jpg",
+      "/images/borehole.jpg",
     ]
   },
   {
-    title: "Water Tower Construction",
-    location: "Dar es Salaam, Tanzania",
+    title: "Water Tower Construction Showcase",
+    location: "Various Locations",
     category: "Water Tower",
     images: [
+      // Added all new water tower images
+      "/images/watertower1.jpeg",
+      "/images/water_tower1.jpeg", 
+      "/images/water_tower2.jpeg", 
+      "/images/water_tower3.jpeg", 
+      "/images/water_tower4.jpeg", 
+      "/images/water_tower5.jpeg", 
+      "/images/water_tower6.jpeg", 
+      "/images/water_tower7.jpeg", 
+      "/images/water_tower8.jpeg", 
       "/images/tower-construction1.jpg",
       "/images/tower-construction2.jpg",
       "/images/watertower.jpg"
     ]
   },
   {
-    title: "Commercial Solar Farm",
-    location: "Kigali, Rwanda",
-    category: "Solar Installation",
-    images: [
-      "/images/solar.jpg",
-      "/images/solar-image1.jpg",
-      "/images/solar-image2.jpg",
-      "/images/solar-image3.jpg"
-    ]
-  },
-  {
-    title: "Hospital Water System",
-    location: "Mombasa, Kenya",
+    title: "Combined Solutions Showcase",
+    location: "Various Locations",
     category: "Combined Solution",
     images: [
       "/images/Combined-1.jpg",
@@ -61,36 +65,6 @@ const projects = [
       "/images/combined-3.jpg"
     ]
   },
-  {
-    title: "Urban Solar Grid",
-    location: "Lagos, Nigeria",
-    category: "Solar Installation",
-    images: [
-      "/images/solar-image4.jpg",
-      "/images/solar-4.jpg",
-      "/images/solar.jpg"
-    ]
-  },
-  {
-    title: "Rural Water Supply",
-    location: "Addis Ababa, Ethiopia",
-    category: "Borehole Drilling",
-    images: [
-      "/images/borehole.jpg",
-      "/images/borehole-drilling1.jpg",
-      "/images/borehole-drilling2.jpg"
-    ]
-  },
-  {
-    title: "Industrial Water System",
-    location: "Cairo, Egypt",
-    category: "Water Tower",
-    images: [
-      "/images/watertower.jpg",
-      "/images/tower-construction1.jpg",
-      "/images/tower-construction2.jpg"
-    ]
-  }
 ];
 
 const categories = ["All", "Solar Installation", "Borehole Drilling", "Water Tower", "Combined Solution"];
@@ -181,13 +155,13 @@ const Projects = () => {
     setSelectedImage({ project: item.project, imageIndex: item.imageIndex });
   };
 
-  // Scroll to gallery function
-  const scrollToGallery = () => {
-    const gallerySection = document.getElementById('gallery-section');
-    if (gallerySection) {
-      gallerySection.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
+  // Scroll to gallery function (Removed as it wasn't used in the provided code)
+  // const scrollToGallery = () => {
+  //   const gallerySection = document.getElementById('gallery-section');
+  //   if (gallerySection) {
+  //     gallerySection.scrollIntoView({ behavior: 'smooth' });
+  //   }
+  // };
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">

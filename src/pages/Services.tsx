@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Droplets, Sun, Building2, CheckCircle, Zap, ArrowRight, Play, Pause, Shield, X } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion"; // Import Variants type
 import CircularGallery from "@/components/CircularGallery";
 
-// Service Images Mapping
+// Service Images Mapping - UPDATED
 const serviceImages: Record<string, { image: string; text: string }[]> = {
   Borehole: [
+    // Added new borehole image
+    { image: "/images/borehole_drilling.jpeg", text: "New Drill Site" }, 
     { image: "/images/borehole-drilling1.jpg", text: "Site Survey" },
     { image: "/images/borehole-drilling2.jpg", text: "Drilling Rig" },
     { image: "/images/borehole-drilling3.jpg", text: "Deep Bore" },
@@ -26,6 +28,16 @@ const serviceImages: Record<string, { image: string; text: string }[]> = {
     { image: "/images/solar.jpg", text: "Energy Harvest" },
   ],
   "Water Tower": [
+    // Added all new water tower images
+    { image: "/images/watertower1.jpeg", text: "Tower Design" }, 
+    { image: "/images/water_tower1.jpeg", text: "Tower Steel" }, 
+    { image: "/images/water_tower2.jpeg", text: "Tank Installation" }, 
+    { image: "/images/water_tower3.jpeg", text: "High Capacity" }, 
+    { image: "/images/water_tower4.jpeg", text: "Rural Access" }, 
+    { image: "/images/water_tower5.jpeg", text: "Urban Utility" }, 
+    { image: "/images/water_tower6.jpeg", text: "Finished Project" }, 
+    { image: "/images/water_tower7.jpeg", text: "Support Structure" }, 
+    { image: "/images/water_tower8.jpeg", text: "Storage Tank" }, 
     { image: "/images/tower-construction1.jpg", text: "Foundation" },
     { image: "/images/tower-construction2.jpg", text: "Steel Frame" },
     { image: "/images/watertower.jpg", text: "Completed Tower" },
@@ -120,6 +132,13 @@ const servicesDetail = [
   },
 ];
 
+// CORRECTED: Define modalVariants with the correct 'ease' type
+const modalVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.8 },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
+  exit: { opacity: 0, scale: 0.8, transition: { duration: 0.2, ease: "easeIn" } },
+};
+
 const Services = () => {
   const [activeService, setActiveService] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -143,7 +162,8 @@ const Services = () => {
             setActiveService((prev) => (prev + 1) % filteredServices.length);
             return 0;
           }
-          return prev + 100 / (5000 / 100);
+          // Note: 5000 is the total duration (5 seconds)
+          return prev + 100 / (5000 / 100); 
         });
       }, 100);
     }
@@ -161,17 +181,12 @@ const Services = () => {
   const openServiceModal = (service: typeof servicesDetail[0]) => {
     setSelectedService(service);
     setIsModalOpen(true);
-    setIsPlaying(false);
+    // Do not set isPlaying to false here, let the auto-play useEffect handle it if needed
   };
 
   const trackEvent = (action: string, label: string) => {
+    // Placeholder for analytics tracking
     console.log(`Analytics: ${action} - ${label}`);
-  };
-
-  const modalVariants = {
-    hidden: { opacity: 0, scale: 0.8 },
-    visible: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
-    exit: { opacity: 0, scale: 0.8, transition: { duration: 0.2, ease: "easeIn" } },
   };
 
   // Preload first image of each gallery
