@@ -25,10 +25,10 @@ import { Button } from "@/components/ui/button";
    PDF metadata – put your file in /public/profile.pdf
    -------------------------------------------------------------- */
 const profilePdf = {
-  url: "/profile.pdf",               // <-- must be in public/
+  url: "/profile.pdf",               
   name: "Plasma_Water_Africa_Profile.pdf",
-  size: "2.5 MB",
-  lastUpdated: "October 2025",
+  size: "8 MB",
+  lastUpdated: "December 2025",
 };
 
 /* --------------------------------------------------------------
