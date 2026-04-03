@@ -441,40 +441,7 @@ export async function getCategory(slug: string) {
 }
 
 
-// ========== REVIEWS API ==========
-export async function getReviews(productId: string, params?: {
-  page?: number;
-  limit?: number;
-}) {
-  const query = new URLSearchParams();
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      query.append(key, String(value));
-    }
-  });
 
-  try {
-    const response = await api.get(`/products/${productId}/reviews?${query.toString()}`);
-    return response.data;
-  } catch (error: any) {
-    console.error('Failed to fetch reviews:', error);
-    throw error;
-  }
-}
-
-export async function createReview(productId: string, reviewData: {
-  rating: number;
-  comment: string;
-}) {
-  try {
-    const response = await api.post(`/products/${productId}/reviews`, reviewData);
-    toast.success('Review submitted successfully');
-    return response.data;
-  } catch (error: any) {
-    toast.error(error.response?.data?.error || 'Failed to submit review');
-    throw error;
-  }
-}
 
 // Export the api instance for custom requests if needed
 export default api;
