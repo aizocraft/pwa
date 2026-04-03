@@ -58,7 +58,7 @@ export async function deleteFavicon(): Promise<void> {
   await api.delete('/company/favicon');
 }
 
-// Set logo URL - FIXED: Send correct data structure
+// Set logo URL 
 export async function setLogoUrl(url: string): Promise<CompanySettings> {
   console.log('Sending logo URL to backend:', { url });
   const response = await api.post('/company/logo-url', { url });
@@ -66,7 +66,7 @@ export async function setLogoUrl(url: string): Promise<CompanySettings> {
   return response.data.data || response.data;
 }
 
-// Set favicon URL - FIXED: Send correct data structure
+// Set favicon URL
 export async function setFaviconUrl(url: string): Promise<CompanySettings> {
   console.log('Sending favicon URL to backend:', { url });
   const response = await api.post('/company/favicon-url', { url });
@@ -74,9 +74,7 @@ export async function setFaviconUrl(url: string): Promise<CompanySettings> {
   return response.data.data || response.data;
 }
 
-// src/lib/company.ts
-
-// ✅ Fixed helper to get logo URL
+// Helper to get logo URL
 export function getLogoUrl(settings: any): string | null {
   if (!settings?.logo) return null;
   
@@ -92,7 +90,7 @@ export function getLogoUrl(settings: any): string | null {
   return null;
 }
 
-// ✅ Fixed helper to get favicon URL
+// Helper to get favicon URL
 export function getFaviconUrl(settings: any): string | null {
   if (!settings?.favicon) return null;
   

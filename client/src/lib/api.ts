@@ -6,10 +6,6 @@ import type { Order, OrderListResponse, CreateOrderRequest } from '@/types/order
 import toast from 'react-hot-toast';
 import { getToken } from './auth';
 
-// src/lib/api.ts - Add this section
-
-import { CompanySettings, UpdateCompanyRequest, UploadLogoResponse } from '@/types/company';
-
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -443,5 +439,5 @@ export async function getCategory(slug: string) {
 
 
 
-// Export the api instance for custom requests if needed
+// Export the api instance for custom requests 
 export default api;

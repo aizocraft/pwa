@@ -11,12 +11,13 @@ import orderRoutes from './routes/order.routes';
 import userRoutes from './routes/user.routes';
 import categoryRoutes from './routes/categoryRoutes';
 import companyRoutes from './routes/companyRoutes';
-
+import feedbackRoutes from './routes/feedback.routes';
+import contactRoutes from './routes/contact.routes';
 dotenv.config();
 
 // Connect to DB and initialize GridFS
 connectDB().then(() => {
-  initGridFS(); // Initialize GridFS after DB connection
+  initGridFS(); 
   console.log('✅ GridFS initialized');
 }).catch((error) => {
   console.error('Failed to initialize GridFS:', error);
@@ -39,6 +40,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/company', companyRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/contact', contactRoutes);
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

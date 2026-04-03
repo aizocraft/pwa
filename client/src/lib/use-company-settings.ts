@@ -1,4 +1,4 @@
-// src/lib/use-company-settings.tss
+// src/lib/use-company-settings.ts
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -9,8 +9,8 @@ import {
   deleteLogo, 
   uploadFavicon, 
   deleteFavicon,
-  setLogoUrl,      // Import this!
-  setFaviconUrl    // Import this!
+  setLogoUrl,      
+  setFaviconUrl    
 } from './company'
 import { CompanySettings, UpdateCompanyRequest } from '@/types/company'
 import toast from 'react-hot-toast'
@@ -55,7 +55,7 @@ export function useCompanySettings() {
     },
   })
 
-  // FIXED: Use the dedicated setLogoUrl endpoint
+  // Dedicated setLogoUrl endpoint
   const updateLogoUrlMutation = useMutation({
     mutationFn: async (logoUrl: string) => {
       return await setLogoUrl(logoUrl)  // Use the correct endpoint!
