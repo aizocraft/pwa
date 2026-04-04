@@ -5,6 +5,20 @@ import { User, UserListResponse, CreateUserRequest, UpdateUserRequest } from '@/
 import type { Order, OrderListResponse, CreateOrderRequest } from '@/types/order';
 import toast from 'react-hot-toast';
 import { getToken } from './auth';
+import type {
+  ContactStatus, 
+  CreateContactRequest, 
+  ContactSubmissionResponse,
+  ContactListResponse, 
+  ContactMessage
+} from '@/types/contact';
+import type {
+  FeedbackCategory,
+  CreateFeedbackRequest,
+  FeedbackSubmissionResponse,
+  PublicFeedbackResponse,
+  FeedbackStatsResponse
+} from '@/types/feedback';
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -436,8 +450,118 @@ export async function getCategory(slug: string) {
   }
 }
 
+// ========== CONTACT API ==========
+export async function submitContact(data: CreateContactRequest): Promise<ContactSubmissionResponse> {
+  try {
+    const response = await api.post('/contact', data);
+    toast.success('Message sent successfully!');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to send message');
+    throw error;
+  }
+}
 
+export async function getContactMessages(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+}): Promise<ContactListResponse> {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  });
+  const response = await api.get(`/contact?${query.toString()}`);
+  return response.data;
+}
 
+export async function getContactMessage(id: string): Promise<{ success: true; data: ContactMessage }> {
+  const response = await api.get(`/contact/${id}`);
+  return response.data;
+}
+
+export async function updateContactStatus(id: string, status: string, notes?: string): Promise<{ success: true; message: string; data: ContactMessage }> {
+  const data: any = { status };
+  if (notes) data.notes = notes;
+  const response = await api.patch(`/contact/${id}/status`, data);
+  toast.success('Contact status updated');
+  return response.data;
+}
+
+export async function deleteContact(id: string): Promise<{ success: true; message: string }> {
+  const response = await api.delete(`/contact/${id}`);
+  toast.success('Contact deleted');
+  return response.data;
+}
+
+export async function getContactStats(): Promise<{ success: true; data: any }> {
+  const response = await api.get('/contact/stats/overview');
+  return response.data;
+}
+
+// ========== FEEDBACK API ==========
+export async function submitFeedback(data: CreateFeedbackRequest): Promise<FeedbackSubmissionResponse> {
+  try {
+    const response = await api.post('/feedback', data);
+    toast.success('Thank you for your feedback!');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to submit feedback');
+    throw error;
+  }
+}
+
+export async function getPublicFeedback(params?: {
+  limit?: number;
+  rating?: number;
+}): Promise<PublicFeedbackResponse> {
+  const query = new URLSearchParams();
+Object.entries(params || {}).forEach(([key, value]) => {
+  if (value !== undefined && value !== null && typeof value === 'string' && value !== '') {
+    query.append(key, String(value));
+  }
+});
+  const response = await api.get(`/feedback/public?${query.toString()}`);
+  return response.data;
+}
+
+export async function getFeedbackStats(): Promise<FeedbackStatsResponse> {
+  const response = await api.get('/feedback/stats');
+  return response.data;
+}
+
+export async function getFeedbacks(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  category?: FeedbackCategory;
+  rating?: number;
+  search?: string;
+}): Promise<{ success: true; data: any[]; pagination: any }> {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  });
+  const response = await api.get(`/feedback?${query.toString()}`);
+  return response.data;
+}
+
+export async function updateFeedbackStatus(id: string, status: string): Promise<{ success: true; message: string; data: any }> {
+  const response = await api.patch(`/feedback/${id}/status`, { status });
+  toast.success('Feedback status updated');
+  return response.data;
+}
+
+export async function deleteFeedback(id: string): Promise<{ success: true; message: string }> {
+  const response = await api.delete(`/feedback/${id}`);
+  toast.success('Feedback deleted');
+  return response.data;
+}
 
 // Export the api instance for custom requests 
 export default api;

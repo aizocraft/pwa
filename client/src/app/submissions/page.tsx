@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { submitFeedback, submitContact } from '@/lib/submissions'
+import toast from 'react-hot-toast'
+import { FeedbackCategory } from '@/types/feedback'
+import { submitFeedback, submitContact } from '@/lib/api'
+
 import { 
   Star, 
   Send, 
@@ -17,13 +20,13 @@ import {
   ShoppingBag,
   Truck,
   Globe,
+  Phone,
   Headphones,
   Wrench,
-  CheckCircle,
-  AlertCircle
+  CheckCircle
 } from 'lucide-react'
 
-type FeedbackCategory = 'product' | 'service' | 'shipping' | 'website' | 'customer-support' | 'other';
+
 
 export default function SubmissionsPage() {
   const router = useRouter()
@@ -47,6 +50,7 @@ export default function SubmissionsPage() {
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
+    phone: '',  
     subject: '',
     message: ''
   })
@@ -73,7 +77,25 @@ export default function SubmissionsPage() {
     setLoading(true)
     
     try {
-      await submitFeedback(feedbackForm)
+      // Prepare submission data - only include name/email if they have values
+      const submitData: any = {
+        rating: feedbackForm.rating,
+        category: feedbackForm.category,
+        feedback: feedbackForm.feedback,
+        isPublic: feedbackForm.isPublic
+      }
+      
+      // Only include name if provided and not empty
+      if (feedbackForm.name && feedbackForm.name.trim()) {
+        submitData.name = feedbackForm.name.trim()
+      }
+      
+      // Only include email if provided and valid format
+      if (feedbackForm.email && feedbackForm.email.trim()) {
+        submitData.email = feedbackForm.email.trim()
+      }
+      
+      await submitFeedback(submitData)
       setSubmissionType('feedback')
       setSubmitted(true)
       setFeedbackForm({
@@ -87,8 +109,9 @@ export default function SubmissionsPage() {
       setTimeout(() => {
         router.push('/')
       }, 3000)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Feedback submission error:', error)
+      toast.error(error.response?.data?.error || 'Failed to submit feedback. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -99,20 +122,46 @@ export default function SubmissionsPage() {
     setLoading(true)
     
     try {
-      await submitContact(contactForm)
+      // Validate that either email or phone is provided
+      if (!contactForm.email?.trim() && !contactForm.phone?.trim()) {
+        toast.error('Please provide either an email address or phone number')
+        setLoading(false)
+        return
+      }
+      
+      // Prepare submission data
+      const submitData: any = {
+        name: contactForm.name.trim(),
+        subject: contactForm.subject.trim(),
+        message: contactForm.message.trim()
+      }
+      
+      // Only include email if provided
+      if (contactForm.email && contactForm.email.trim()) {
+        submitData.email = contactForm.email.trim()
+      }
+      
+      // Only include phone if provided
+      if (contactForm.phone && contactForm.phone.trim()) {
+        submitData.phone = contactForm.phone.trim()
+      }
+      
+      await submitContact(submitData)
       setSubmissionType('contact')
       setSubmitted(true)
       setContactForm({
         name: '',
         email: '',
+        phone: '',
         subject: '',
         message: ''
       })
       setTimeout(() => {
         router.push('/')
       }, 3000)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Contact submission error:', error)
+      toast.error(error.response?.data?.error || 'Failed to send message. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -195,48 +244,47 @@ export default function SubmissionsPage() {
                 <p className="text-gray-600 dark:text-gray-400 mt-2">Your feedback helps us improve</p>
               </div>
 
-              {/* Name */}
+              {/* Name - Optional */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Full Name *
+                  Full Name <span className="text-xs font-normal text-gray-500">(optional)</span>
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="text"
-                    required
                     value={feedbackForm.name}
                     onChange={(e) => setFeedbackForm({...feedbackForm, name: e.target.value})}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    placeholder="John Doe"
+                    placeholder="John Doe (optional)"
                   />
                 </div>
               </div>
 
-              {/* Email */}
+              {/* Email - Optional */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Email Address *
+                  Email Address <span className="text-xs font-normal text-gray-500">(optional)</span>
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="email"
-                    required
                     value={feedbackForm.email}
                     onChange={(e) => setFeedbackForm({...feedbackForm, email: e.target.value})}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    placeholder="john@example.com"
+                    placeholder="john@example.com (optional)"
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">Providing your email helps us follow up if needed</p>
               </div>
 
-              {/* Rating */}
+              {/* Rating - Required */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                   Rating *
                 </label>
-                <div className="flex gap-2 justify-center">
+                <div className="flex gap-2 justify-center flex-wrap">
                   {[1, 2, 3, 4, 5].map((star) => {
                     const ratingInfo = ratingLabels[star as keyof typeof ratingLabels]
                     const Icon = ratingInfo.icon
@@ -269,14 +317,14 @@ export default function SubmissionsPage() {
                 </div>
               </div>
 
-              {/* Category */}
+              {/* Category - Required */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   Category *
                 </label>
                 <select
                   value={feedbackForm.category}
-                    onChange={(e) => setFeedbackForm({...feedbackForm, category: e.target.value as FeedbackCategory})}
+                  onChange={(e) => setFeedbackForm({...feedbackForm, category: e.target.value as FeedbackCategory})}
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 >
                   {categories.map((cat) => (
@@ -285,7 +333,7 @@ export default function SubmissionsPage() {
                 </select>
               </div>
 
-              {/* Feedback Message */}
+              {/* Feedback Message - Required */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   Your Feedback *
@@ -315,7 +363,7 @@ export default function SubmissionsPage() {
 
               <button
                 type="submit"
-                disabled={loading || feedbackForm.rating === 0}
+                disabled={loading || feedbackForm.rating === 0 || !feedbackForm.feedback.trim()}
                 className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
               >
                 {loading ? (
@@ -340,7 +388,7 @@ export default function SubmissionsPage() {
                 <p className="text-gray-600 dark:text-gray-400 mt-2">We'd love to hear from you</p>
               </div>
 
-              {/* Name */}
+              {/* Name - Required */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   Full Name *
@@ -358,16 +406,15 @@ export default function SubmissionsPage() {
                 </div>
               </div>
 
-              {/* Email */}
+              {/* Email - Optional */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Email Address *
+                  Email Address <span className="text-xs font-normal text-gray-500">(optional)</span>
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="email"
-                    required
                     value={contactForm.email}
                     onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
@@ -376,7 +423,25 @@ export default function SubmissionsPage() {
                 </div>
               </div>
 
-              {/* Subject */}
+              {/* Phone - Optional */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Phone Number <span className="text-xs font-normal text-gray-500">(optional)</span>
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={contactForm.phone}
+                    onChange={(e) => setContactForm({...contactForm, phone: e.target.value})}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    placeholder="+1 234 567 8900"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Please provide either email or phone number</p>
+              </div>
+
+              {/* Subject - Required */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   Subject *
@@ -391,7 +456,7 @@ export default function SubmissionsPage() {
                 />
               </div>
 
-              {/* Message */}
+              {/* Message - Required */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   Message *
@@ -408,7 +473,7 @@ export default function SubmissionsPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (!contactForm.email?.trim() && !contactForm.phone?.trim())}
                 className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
               >
                 {loading ? (

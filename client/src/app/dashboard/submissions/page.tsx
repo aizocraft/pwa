@@ -1,14 +1,20 @@
+// src/app/dashboard/submissions/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
-import { 
-  getSubmissions, 
-  updateSubmissionStatus, 
-  deleteSubmission,
-  getAdminStats,
-  bulkUpdateStatus,
-  exportSubmissions
-} from '@/lib/submissions'
+import type { ContactStatus } from '@/types/contact'
+import toast from 'react-hot-toast'
+import {
+  getContactMessages,
+  getContactMessage,
+  updateContactStatus,
+  deleteContact,
+  getContactStats,
+  getFeedbacks,
+  getFeedbackStats,
+  updateFeedbackStatus,
+  deleteFeedback
+} from '@/lib/api'
 import { 
   Star, 
   Mail, 
@@ -41,7 +47,8 @@ type Submission = {
   _id: string
   type: 'feedback' | 'contact'
   name: string
-  email: string
+  email?: string
+  phone?: string
   rating?: number
   category?: string
   feedback?: string
@@ -50,6 +57,15 @@ type Submission = {
   status: string
   createdAt: string
   isPublic?: boolean
+  notes?: string
+}
+
+type SubmissionStats = {
+  total: number
+  pending: number
+  resolved: number
+  replied: number
+  feedbackCount: number
 }
 
 export default function AdminSubmissionsPage() {
@@ -81,21 +97,80 @@ export default function AdminSubmissionsPage() {
 const fetchData = async () => {
   setLoading(true)
   try {
-    const [submissionsData, statsData] = await Promise.all([
-      getSubmissions({
-        page: filters.page,
-        limit: filters.limit,
-        type: filters.type === '' ? undefined : filters.type as 'feedback' | 'contact',
-        status: filters.status === '' ? undefined : filters.status,
-        search: filters.search === '' ? undefined : filters.search
-      }),
-      getAdminStats()
+    const contactParams = {
+      page: filters.page,
+      limit: Math.floor(filters.limit / 2),
+      status: filters.status === '' ? undefined : filters.status,
+      search: filters.search
+    }
+    const feedbackParams = {
+      page: filters.page,
+      limit: Math.floor(filters.limit / 2),
+      status: filters.status,
+      search: filters.search,
+      rating: undefined
+    }
+
+    const [contactsRes, feedbackRes, contactStatsRes, feedbackStatsRes] = await Promise.all([
+      filters.type !== 'feedback' ? getContactMessages(contactParams) : Promise.resolve({ data: [], pagination: { total: 0 } } as any),
+      filters.type !== 'contact' ? getFeedbacks(feedbackParams) : Promise.resolve({ data: [], pagination: { total: 0 } } as any),
+      getContactStats(),
+      getFeedbackStats()
     ])
-    setSubmissions(submissionsData.data)
-    setPagination(submissionsData.pagination)
-    setStats(statsData)
+
+    // Merge submissions
+    const allContacts: Submission[] = contactsRes.data.map((c: any) => ({
+      _id: c._id,
+      type: 'contact' as const,
+      name: c.name,
+      email: c.email,
+      phone: c.phone,
+      subject: c.subject,
+      message: c.message,
+      status: c.status,
+      createdAt: c.createdAt,
+      notes: c.notes
+    }))
+
+    const allFeedback: Submission[] = feedbackRes.data.map((f: any) => ({
+      _id: f._id,
+      type: 'feedback' as const,
+      name: f.name,
+      email: f.email,
+      rating: f.rating,
+      category: f.category,
+      feedback: f.feedback,
+      status: f.status,
+      createdAt: f.createdAt,
+      isPublic: f.isPublic
+    }))
+
+    // Sort by createdAt desc
+    const mergedSubmissions = [...allContacts, ...allFeedback].sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    ).slice(0, filters.limit)
+
+    const total = contactsRes.pagination.total + feedbackRes.pagination.total
+
+    setSubmissions(mergedSubmissions)
+    setPagination({
+      page: filters.page,
+      limit: filters.limit,
+      total,
+      pages: Math.ceil(total / filters.limit)
+    })
+
+    // Merge stats
+    setStats({
+      total,
+      pending: contactStatsRes.data.pending + (feedbackStatsRes.data as any).pending || 0,
+      resolved: contactStatsRes.data.resolved + (feedbackStatsRes.data as any).resolved || 0,
+      replied: contactStatsRes.data.replied + 0,
+      feedbackCount: feedbackRes.pagination.total
+    } as SubmissionStats)
   } catch (error) {
     console.error('Failed to fetch data:', error)
+    toast.error('Failed to load submissions')
   } finally {
     setLoading(false)
   }
@@ -103,9 +178,16 @@ const fetchData = async () => {
 
   const handleStatusUpdate = async (id: string, status: string) => {
     try {
-      await updateSubmissionStatus(id, status as any)
+      const submission = submissions.find(s => s._id === id)
+      if (submission?.type === 'contact') {
+        await updateContactStatus(id, status as any)
+      } else {
+        await updateFeedbackStatus(id, status)
+      }
+      toast.success('Status updated successfully')
       fetchData()
-    } catch (error) {
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update status')
       console.error('Failed to update status:', error)
     }
   }
@@ -113,10 +195,17 @@ const fetchData = async () => {
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this submission?')) {
       try {
-        await deleteSubmission(id)
+        const submission = submissions.find(s => s._id === id)
+        if (submission?.type === 'contact') {
+          await deleteContact(id)
+        } else {
+          await deleteFeedback(id)
+        }
+        toast.success('Submission deleted')
         fetchData()
         setSelectedSubmissions(selectedSubmissions.filter(sid => sid !== id))
-      } catch (error) {
+      } catch (error: any) {
+        toast.error(error.response?.data?.error || 'Failed to delete submission')
         console.error('Failed to delete:', error)
       }
     }
@@ -127,29 +216,61 @@ const fetchData = async () => {
     
     if (confirm(`Apply ${bulkAction} to ${selectedSubmissions.length} submissions?`)) {
       try {
-        await bulkUpdateStatus(selectedSubmissions, bulkAction as any)
+        await Promise.all(selectedSubmissions.map(async (id) => {
+          const submission = submissions.find(s => s._id === id)
+          if (submission?.type === 'contact') {
+            await updateContactStatus(id, bulkAction as ContactStatus)
+          } else {
+            await updateFeedbackStatus(id, bulkAction)
+          }
+        }))
+        toast.success(`Updated ${selectedSubmissions.length} submissions`)
         setSelectedSubmissions([])
         setBulkAction('')
         fetchData()
-      } catch (error) {
+      } catch (error: any) {
+        toast.error('Bulk action failed')
         console.error('Bulk action failed:', error)
       }
     }
   }
 
   const handleExport = async () => {
-    await exportSubmissions({
-      type: filters.type as any,
-      status: filters.status
-    })
+    if (submissions.length === 0) {
+      toast.error('No data to export')
+      return
+    }
+
+    const csvContent = [
+      ['ID', 'Type', 'Name', 'Email', 'Phone', 'Rating', 'Category', 'Status', 'Created'],
+      ...submissions.map(s => [
+        s._id,
+        s.type,
+        s.name,
+        s.email || '',
+        s.phone || '',
+        s.rating?.toString() || '',
+        s.category || '',
+        s.status,
+        new Date(s.createdAt).toLocaleDateString()
+      ])
+    ].map(row => row.map(field => `"${(field || '').toString().replace(/"/g, '""')}"`).join(',')).join('\\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `submissions-${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    toast.success('Exported successfully')
   }
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { color: string; icon: any }> = {
       pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock },
       read: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: Eye },
-      reviewed: { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', icon: Check },
-      resolved: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle },
+     
       replied: { color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400', icon: Reply },
       spam: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: AlertCircle }
     }
@@ -271,8 +392,7 @@ const fetchData = async () => {
               <option value="">All Status</option>
               <option value="pending">Pending</option>
               <option value="read">Read</option>
-              <option value="reviewed">Reviewed</option>
-              <option value="resolved">Resolved</option>
+        
               <option value="replied">Replied</option>
               <option value="spam">Spam</option>
             </select>
@@ -309,8 +429,7 @@ const fetchData = async () => {
               >
                 <option value="">Bulk Action</option>
                 <option value="read">Mark as Read</option>
-                <option value="reviewed">Mark as Reviewed</option>
-                <option value="resolved">Mark as Resolved</option>
+            
                 <option value="replied">Mark as Replied</option>
                 <option value="spam">Mark as Spam</option>
               </select>
@@ -415,8 +534,7 @@ const fetchData = async () => {
                       >
                         <option value="pending">Pending</option>
                         <option value="read">Read</option>
-                        <option value="reviewed">Reviewed</option>
-                        <option value="resolved">Resolved</option>
+                  
                         <option value="replied">Replied</option>
                         <option value="spam">Spam</option>
                       </select>

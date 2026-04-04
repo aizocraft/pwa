@@ -13,19 +13,26 @@ const getClientIp = (req: Request): string => {
 
 // ==================== PUBLIC ROUTES ====================
 
-// Submit contact form (public)
+// Submit contact form (public) - accepts email OR phone
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { name, email, subject, message } = req.body;
+    const { name, email, phone, subject, message } = req.body;
 
     // Validation
-    if (!name || !email || !subject || !message) {
+    if (!name || !subject || !message) {
       return res.status(400).json({ 
-        error: 'Missing required fields: name, email, subject, message' 
+        error: 'Missing required fields: name, subject, message are required' 
       });
     }
 
-    // Basic spam detection (optional)
+    // Check if either email or phone is provided
+    if (!email && !phone) {
+      return res.status(400).json({ 
+        error: 'Either email or phone number is required' 
+      });
+    }
+
+    // Basic spam detection
     const spamKeywords = ['viagra', 'casino', 'lottery', 'prize'];
     const isSpam = spamKeywords.some(keyword => 
       message.toLowerCase().includes(keyword) || 
@@ -35,7 +42,8 @@ router.post('/', async (req: Request, res: Response) => {
     // Create contact message
     const contact = new Contact({
       name,
-      email,
+      email: email || undefined,
+      phone: phone || undefined,
       subject,
       message,
       status: isSpam ? 'spam' : 'pending',
@@ -44,9 +52,6 @@ router.post('/', async (req: Request, res: Response) => {
     });
 
     await contact.save();
-
-    // Here you could send email notification to admin
-    // await sendEmailNotification(contact);
 
     res.status(201).json({
       success: true,
@@ -78,6 +83,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
         { subject: { $regex: search, $options: 'i' } },
         { message: { $regex: search, $options: 'i' } }
       ];

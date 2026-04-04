@@ -1,8 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IFeedback extends Document {
-  name: string;
-  email: string;
+  name?: string;  // Made optional
+  email?: string; // Made optional
   rating: number;
   category: string;
   feedback: string;
@@ -18,16 +18,16 @@ const FeedbackSchema = new Schema<IFeedback>(
   {
     name: {
       type: String,
-      required: [true, 'Name is required'],
       trim: true,
       maxlength: [100, 'Name cannot exceed 100 characters']
+      // Removed required
     },
     email: {
       type: String,
-      required: [true, 'Email is required'],
       trim: true,
       lowercase: true,
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
+      // Removed required
     },
     rating: {
       type: Number,
@@ -72,7 +72,6 @@ const FeedbackSchema = new Schema<IFeedback>(
 
 // Indexes for better query performance
 FeedbackSchema.index({ status: 1, createdAt: -1 });
-FeedbackSchema.index({ email: 1 });
 FeedbackSchema.index({ rating: 1 });
 FeedbackSchema.index({ category: 1 });
 

@@ -13,22 +13,22 @@ const getClientIp = (req: Request): string => {
 
 // ==================== PUBLIC ROUTES ====================
 
-// Submit feedback (public)
+// Submit feedback (public) - name and email are optional
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { name, email, rating, category, feedback, isPublic } = req.body;
 
-    // Validation
-    if (!name || !email || !rating || !feedback) {
+    // Validation - only rating and feedback are required
+    if (!rating || !feedback) {
       return res.status(400).json({ 
-        error: 'Missing required fields: name, email, rating, feedback' 
+        error: 'Missing required fields: rating and feedback are required' 
       });
     }
 
-    // Create feedback
+    // Create feedback (name and email are optional)
     const newFeedback = new Feedback({
-      name,
-      email,
+      name: name || 'Anonymous',  // Default to Anonymous if not provided
+      email: email || undefined,   // Can be undefined
       rating,
       category: category || 'product',
       feedback,

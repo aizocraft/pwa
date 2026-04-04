@@ -2,7 +2,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IContact extends Document {
   name: string;
-  email: string;
+  email?: string;  // Made optional
+  phone?: string;  // Added phone field
   subject: string;
   message: string;
   status: 'pending' | 'read' | 'replied' | 'spam';
@@ -25,10 +26,16 @@ const ContactSchema = new Schema<IContact>(
     },
     email: {
       type: String,
-      required: [true, 'Email is required'],
       trim: true,
       lowercase: true,
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
+      // Removed required - either email or phone can be provided
+    },
+    phone: {
+      type: String,
+      trim: true,
+      match: [/^\+?[\d\s-]{10,}$/, 'Please enter a valid phone number']
+      // Added phone field
     },
     subject: {
       type: String,
@@ -73,9 +80,19 @@ const ContactSchema = new Schema<IContact>(
   }
 );
 
+// Validate that either email or phone is provided
+ContactSchema.pre('validate', function(next) {
+  if (!this.email && !this.phone) {
+    next(new Error('Either email or phone number is required'));
+  } else {
+    next();
+  }
+});
+
 // Indexes
 ContactSchema.index({ status: 1, createdAt: -1 });
 ContactSchema.index({ email: 1 });
+ContactSchema.index({ phone: 1 });
 ContactSchema.index({ createdAt: -1 });
 
 export const Contact = mongoose.models.Contact || mongoose.model<IContact>('Contact', ContactSchema);
