@@ -1,9 +1,13 @@
+// src/routes/orderRoutes.ts
+
 import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import OrderModel from '../models/Order';
 import ProductModel from '../models/Product';
+import UserModel from '../models/User';
 import authMiddleware from '../middleware/auth';
-import optionalAuthMiddleware from '../middleware/optionalAuth'; // Import the optional auth
+import optionalAuthMiddleware from '../middleware/optionalAuth';
+import { sendOrderConfirmation, sendAdminOrderNotification } from '../services/email.service';
 
 const router = Router();
 
@@ -121,7 +125,6 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
     }
 
     // Use client-provided values or calculate fallbacks
-    // This allows frontend to control shipping cost logic
     const finalSubtotal = clientSubtotal !== undefined ? clientSubtotal : calculatedSubtotal;
     const finalShippingCost = clientShippingCost !== undefined ? clientShippingCost : 0;
     const finalTax = clientTax !== undefined ? clientTax : finalSubtotal * 0.16;
@@ -155,6 +158,59 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
 
     const order = new OrderModel(orderData);
     await order.save();
+
+    // Get customer information for emails
+    let customerName = shippingAddress.fullName;
+    let customerEmail = shippingAddress.email || '';
+    let customerPhone = shippingAddress.phone;
+
+    if (userId) {
+      const user = await UserModel.findById(userId);
+      if (user) {
+        customerName = user.name || customerName;
+        customerEmail = user.email || customerEmail;
+      }
+    } else if (guestInfoData) {
+      customerName = guestInfoData.name || customerName;
+      customerEmail = guestInfoData.email || customerEmail;
+      customerPhone = guestInfoData.phone || customerPhone;
+    }
+
+    // Format shipping address for email
+    const formattedAddress = `${shippingAddress.address1}${shippingAddress.address2 ? ', ' + shippingAddress.address2 : ''}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.zip}, ${shippingAddress.country}`;
+
+    // Prepare email items
+    const emailItems = orderItems.map(item => ({
+      name: item.name,
+      quantity: item.qty,
+      price: item.price
+    }));
+
+    // Send order confirmation to customer (don't await - let it run in background)
+    sendOrderConfirmation({
+      orderId: order.orderNumber,
+      customerName: customerName,
+      customerEmail: customerEmail,
+      total: finalTotal,
+      status: order.status,
+      items: emailItems
+    }).catch(err => console.error('Failed to send customer confirmation:', err));
+
+    // Send admin notification (don't await - let it run in background)
+    if (process.env.ADMIN_EMAIL) {
+      sendAdminOrderNotification({
+        orderId: order.orderNumber,
+        customerName: customerName,
+        customerEmail: customerEmail,
+        customerPhone: customerPhone,
+        shippingAddress: formattedAddress,
+        total: finalTotal,
+        paymentMethod: paymentMethod,
+        status: order.status,
+        items: emailItems,
+        orderDate: order.createdAt || new Date()
+      }).catch(err => console.error('Failed to send admin notification:', err));
+    }
 
     // Populate product details for response
     const populatedOrder = await OrderModel.findById(order._id)
@@ -191,6 +247,7 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
     });
   }
 });
+
 // GET /api/orders/track/:orderNumber - Track order by order number (public)
 router.get('/track/:orderNumber', async (req: Request, res: Response) => {
   try {
@@ -209,7 +266,7 @@ router.get('/track/:orderNumber', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Don't expose sensitive info
+    //  sensitive info
     const safeOrder = {
       orderNumber: order.orderNumber,
       status: order.status,

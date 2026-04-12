@@ -1,4 +1,3 @@
-// src/server/models/Product.ts
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export interface IProduct extends Document {
@@ -7,9 +6,9 @@ export interface IProduct extends Document {
   category: string;
   brand: string;
   type: string;
-  price: number; // Changed from Decimal128 to number
+  price: number; 
   description?: string;
-  specs: any; // Json -> Mixed
+  specs: any;
   stock: number;
   images: string[];
   featured: boolean;
@@ -25,7 +24,7 @@ const productSchema = new Schema<IProduct>({
   category: { type: String, required: true },
   brand: { type: String, required: true },
   type: { type: String, required: true },
-  price: { type: Number, required: true }, // Changed to Number
+  price: { type: Number, required: true }, 
   description: { type: String },
   specs: { type: Schema.Types.Mixed, default: {} },
   stock: { type: Number, default: 0 },
@@ -37,6 +36,7 @@ const productSchema = new Schema<IProduct>({
   timestamps: true
 });
 
-const ProductModel: Model<IProduct> = mongoose.model<IProduct>('Product', productSchema);
-
+// Export both the model and the model type
+const ProductModel = mongoose.model<IProduct>('Product', productSchema);
 export default ProductModel;
+export type ProductModelType = typeof ProductModel;

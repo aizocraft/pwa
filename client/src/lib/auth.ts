@@ -68,7 +68,7 @@ export function useAuth() {
     queryFn: fetchProfile,
     initialData: localUser,
     staleTime: 60 * 1000,
-    refetchInterval: 30 * 1000,
+refetchInterval: 300 * 1000, // 5min
     retry: 1,
     refetchOnWindowFocus: false,
     placeholderData: localUser,

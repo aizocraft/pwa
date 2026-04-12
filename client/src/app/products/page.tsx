@@ -5,25 +5,61 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { ShoppingCart, Search, Filter, Sparkles, X, SlidersHorizontal, Star, Package, TrendingUp, Grid, List, ChevronDown } from "lucide-react"
 import Link from "next/link"
+import { useSearchParams } from 'next/navigation'
 import { Product } from "../../types/product"
 import ProductCard from "../../components/ProductCard"
-import { getProducts } from "../../lib/api"
+import { getProducts, getBrands } from "../../lib/api"
 import { useCartStore } from "../../store/cart"
 
 export default function ProductsPage() {
-  const [search, setSearch] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState("all")
-  const [priceRange, setPriceRange] = useState("all")
-const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-high' | 'rating' | 'name'>("all")
+  const searchParams = useSearchParams()
+  
+  // Initialize state from URL params
+  const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || "all")
+  const [selectedBrand, setSelectedBrand] = useState(searchParams.get('brand') || "all")
+  const [minPrice, setMinPrice] = useState(() => {
+    const min = searchParams.get('minPrice')
+    return min ? parseInt(min) : 0
+  })
+  const [maxPrice, setMaxPrice] = useState(() => {
+    const max = searchParams.get('maxPrice')
+    return max ? parseInt(max) : 1000000
+  })
+  const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-high' | 'rating' | 'name'>(
+    (searchParams.get('sort') as any) || "all"
+  )
   const [viewMode, setViewMode] = useState<'grid' | 'list'>("grid")
-  const [showInStockOnly, setShowInStockOnly] = useState(false)
+  const [showInStockOnly, setShowInStockOnly] = useState(searchParams.get('inStock') === 'true')
   const [showFilters, setShowFilters] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useState(() => {
+    const page = searchParams.get('page')
+    return page ? parseInt(page) : 1
+  })
   const itemsPerPage = 12
   
   const cartItemsCount = useCartStore((state) => state.totalItems)
+
+  // Fetch brands for filter with error handling
+  const { data: brandsData, isLoading: brandsLoading } = useQuery({
+    queryKey: ["brands"],
+    queryFn: () => getBrands().catch(() => []),
+    staleTime: 30 * 60 * 1000,
+    placeholderData: []
+  })
+
+  const brands = useMemo(() => {
+    const brandsList = Array.isArray(brandsData) ? brandsData : []
+    if (brandsList.length === 0) {
+      return [{ value: "all", label: "All Brands" }]
+    }
+    return [
+      { value: "all", label: "All Brands" },
+      ...brandsList.map((brand: string) => ({ value: brand, label: brand }))
+    ]
+  }, [brandsData])
 
   // Map UI filters to API params
   const getApiParams = useMemo(() => {
@@ -34,22 +70,17 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
     
     if (search.trim()) params.q = search.trim()
     if (selectedCategory !== "all") params.category = selectedCategory
+    if (selectedBrand !== "all") params.brand = selectedBrand
     
-    // Price range mapping
-    if (priceRange !== "all") {
-      const [minStr, maxStr] = priceRange.split('-')
-      params.minPrice = parseFloat(minStr)
-      if (maxStr !== "+") params.maxPrice = parseFloat(maxStr)
-    }
+    // Price range mapping - only add if valid numbers
+    if (minPrice > 0 && !isNaN(minPrice)) params.minPrice = minPrice
+    if (maxPrice < 1000000 && !isNaN(maxPrice)) params.maxPrice = maxPrice
     
     // Stock filter
     if (showInStockOnly) params.minStock = 1
     
     // Sort mapping
     switch (sortBy) {
-       case "all":
-    // No sorting - default order
-    break
       case "price-low":
         params.sort = "price"
         params.order = "asc"
@@ -72,7 +103,7 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
     }
     
     return params
-  }, [search, selectedCategory, priceRange, showInStockOnly, sortBy, currentPage])
+  }, [search, selectedCategory, selectedBrand, minPrice, maxPrice, showInStockOnly, sortBy, currentPage])
 
   // Products query
   const { data, isLoading, error, refetch } = useQuery({
@@ -106,13 +137,33 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
     ]
   }, [data?.products, data?.pagination?.total])
 
-  const priceRanges = [
-    { value: "all", label: "All Prices" },
-    { value: "0-50000", label: "Under KSh 50K" },
-    { value: "50000-150000", label: "KSh 50K - 150K" },
-    { value: "150000-300000", label: "KSh 150K - 300K" },
-    { value: "300000+", label: "Over KSh 300K" },
-  ]
+  // Update URL when filters change
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (selectedCategory !== "all") params.set('category', selectedCategory)
+    if (selectedBrand !== "all") params.set('brand', selectedBrand)
+    if (search) params.set('q', search)
+    if (minPrice > 0 && !isNaN(minPrice)) params.set('minPrice', minPrice.toString())
+    if (maxPrice < 1000000 && !isNaN(maxPrice)) params.set('maxPrice', maxPrice.toString())
+    if (sortBy !== "all") params.set('sort', sortBy)
+    if (showInStockOnly) params.set('inStock', 'true')
+    if (currentPage > 1) params.set('page', currentPage.toString())
+    
+    const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`
+    window.history.replaceState({}, '', newUrl)
+  }, [selectedCategory, selectedBrand, search, minPrice, maxPrice, sortBy, showInStockOnly, currentPage])
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: 'KES',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(price).replace('KSh', 'KSh')
+  }
+
+  const minPriceLabel = formatPrice(minPrice)
+  const maxPriceLabel = formatPrice(maxPrice)
 
   const sortOptions = [
     { value: "all", label: "All Products" },
@@ -125,13 +176,16 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
 
   const activeFiltersCount = 
     (selectedCategory !== "all" ? 1 : 0) + 
-    (priceRange !== "all" ? 1 : 0) + 
+    (selectedBrand !== "all" ? 1 : 0) +
+    (minPrice > 0 || maxPrice < 1000000 ? 1 : 0) + 
     (showInStockOnly ? 1 : 0) +
     (search ? 1 : 0)
 
   const clearAllFilters = () => {
     setSelectedCategory("all")
-    setPriceRange("all")
+    setSelectedBrand("all")
+    setMinPrice(0)
+    setMaxPrice(1000000)
     setShowInStockOnly(false)
     setSearch("")
     setCurrentPage(1)
@@ -164,6 +218,79 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
       : "0.0"
   }
 
+  // Price range slider component
+  const PriceRangeSlider = () => {
+    const [localMin, setLocalMin] = useState(minPrice)
+    const [localMax, setLocalMax] = useState(maxPrice)
+    
+    useEffect(() => {
+      setLocalMin(minPrice)
+      setLocalMax(maxPrice)
+    }, [minPrice, maxPrice])
+    
+    const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = parseInt(e.target.value)
+      if (!isNaN(val) && val <= localMax) {
+        setLocalMin(val)
+        setMinPrice(val)
+        setCurrentPage(1)
+      }
+    }
+    
+    const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = parseInt(e.target.value)
+      if (!isNaN(val) && val >= localMin) {
+        setLocalMax(val)
+        setMaxPrice(val)
+        setCurrentPage(1)
+      }
+    }
+    
+    return (
+      <div className="space-y-6">
+        <div className="relative pt-2">
+          <div className="relative h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+            <div 
+              className="absolute h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
+              style={{ 
+                left: `${(localMin / 1000000) * 100}%`, 
+                right: `${100 - (localMax / 1000000) * 100}%` 
+              }}
+            />
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1000000"
+            step="1000"
+            value={localMin}
+            onChange={handleMinChange}
+            className="absolute top-0 left-0 w-full h-2 opacity-0 cursor-pointer"
+          />
+          <input
+            type="range"
+            min="0"
+            max="1000000"
+            step="1000"
+            value={localMax}
+            onChange={handleMaxChange}
+            className="absolute top-0 left-0 w-full h-2 opacity-0 cursor-pointer"
+          />
+        </div>
+        <div className="flex justify-between gap-4">
+          <div className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl text-center">
+            <span className="text-xs text-gray-500 dark:text-gray-400">Min</span>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatPrice(localMin)}</p>
+          </div>
+          <div className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl text-center">
+            <span className="text-xs text-gray-500 dark:text-gray-400">Max</span>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatPrice(localMax)}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -194,8 +321,6 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
             <Sparkles className="w-5 h-5 text-yellow-500 animate-pulse" />
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Free Shipping on Orders Ksh. 50,000+</span>
           </div>
-          
-          
           
           <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto mb-12">
             Discover our curated collection of high-performance equipments.
@@ -335,7 +460,7 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2">
                   Category
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                   {categories.map((category) => (
                     <label
                       key={category.value}
@@ -365,34 +490,44 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
                 </div>
               </div>
 
+              {/* Brand Filter */}
+              {brands.length > 1 && (
+                <div className="mb-8 pb-8 border-b border-gray-200/30 dark:border-gray-700/50">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2">
+                    Brand
+                  </h3>
+                  <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                    {brands.map((brand) => (
+                      <label
+                        key={brand.value}
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer group transition-all duration-200 hover:shadow-sm"
+                      >
+                        <input
+                          type="radio"
+                          name="brand"
+                          value={brand.value}
+                          checked={selectedBrand === brand.value}
+                          onChange={(e) => {
+                            setSelectedBrand(e.target.value)
+                            setCurrentPage(1)
+                          }}
+                          className="w-5 h-5 text-blue-600 bg-gray-100 border-2 border-gray-300 rounded-lg focus:ring-blue-500 focus:ring-2 cursor-pointer transition-all duration-200"
+                        />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          {brand.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Price Range Filter */}
               <div className="mb-8 pb-8 border-b border-gray-200/30 dark:border-gray-700/50">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2">
                   Price Range
                 </h3>
-                <div className="space-y-3">
-                  {priceRanges.map((range) => (
-                    <label
-                      key={range.value}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer group transition-all duration-200 hover:shadow-sm"
-                    >
-                      <input
-                        type="radio"
-                        name="price"
-                        value={range.value}
-                        checked={priceRange === range.value}
-                        onChange={(e) => {
-                          setPriceRange(e.target.value)
-                          setCurrentPage(1)
-                        }}
-                        className="w-5 h-5 text-blue-600 bg-gray-100 border-2 border-gray-300 rounded-lg focus:ring-blue-500 focus:ring-2 cursor-pointer transition-all duration-200"
-                      />
-                      <span className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                        {range.label}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                <PriceRangeSlider />
               </div>
 
               {/* Availability */}
@@ -420,8 +555,6 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
                   </div>
                 </label>
               </div>
-
-           
             </div>
           </div>
 
@@ -452,23 +585,40 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
                     </button>
                   </div>
                 )}
-                {priceRange !== "all" && (
+                {selectedBrand !== "all" && (
                   <div className="group flex items-center gap-2 bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 px-4 py-2 rounded-xl text-sm font-medium shadow-sm hover:shadow-md transition-all duration-200">
-                    <span>{priceRanges.find(r => r.value === priceRange)?.label}</span>
+                    <span>Brand: {selectedBrand}</span>
                     <button
-                      onClick={() => setPriceRange("all")}
+                      onClick={() => setSelectedBrand("all")}
                       className="p-1 hover:bg-purple-200 dark:hover:bg-purple-800 rounded-lg transition-colors group-hover:scale-110"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
                 )}
-                {showInStockOnly && (
+                {(minPrice > 0 || maxPrice < 1000000) && (
                   <div className="group flex items-center gap-2 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 px-4 py-2 rounded-xl text-sm font-medium shadow-sm hover:shadow-md transition-all duration-200">
+                    <span>
+                      {formatPrice(minPrice)} - {formatPrice(maxPrice)}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setMinPrice(0)
+                        setMaxPrice(1000000)
+                        setCurrentPage(1)
+                      }}
+                      className="p-1 hover:bg-emerald-200 dark:hover:bg-emerald-800 rounded-lg transition-colors group-hover:scale-110"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}  
+                {showInStockOnly && (
+                  <div className="group flex items-center gap-2 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 px-4 py-2 rounded-xl text-sm font-medium shadow-sm hover:shadow-md transition-all duration-200">
                     <span>In Stock Only</span>
                     <button
                       onClick={() => setShowInStockOnly(false)}
-                      className="p-1 hover:bg-emerald-200 dark:hover:bg-emerald-800 rounded-lg transition-colors group-hover:scale-110"
+                      className="p-1 hover:bg-amber-200 dark:hover:bg-amber-800 rounded-lg transition-colors group-hover:scale-110"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -576,6 +726,29 @@ const [sortBy, setSortBy] = useState<'all' | 'featured' | 'price-low' | 'price-h
           </div>
         </div>
       </div>
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.05);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 0, 0, 0.3);
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.2);
+        }
+      `}</style>
     </div>
   )
 }

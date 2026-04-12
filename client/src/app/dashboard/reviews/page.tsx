@@ -1,192 +1,101 @@
 // src/app/dashboard/reviews/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   Star, Search, Filter, Download, RefreshCw,
   User, Mail, Calendar, Loader2, ChevronLeft,
   ChevronRight, Eye, Trash2, CheckCircle, XCircle,
   MessageSquare, ThumbsUp, ThumbsDown, Flag,
-  Award, TrendingUp, StarHalf, Heart
+  Award, TrendingUp, StarHalf, Heart, X, Package, Clock
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { getProductReviews, deleteReview, updateReview } from '@/lib/api'
 
 // Types
 interface Review {
-  id: string
-  productId: string
-  productName: string
-  productImage: string
-  customerName: string
-  customerEmail: string
+  _id?: string
+  id?: string
+  productId: string | {
+    _id: string
+    name: string
+    images?: string[]
+  }
+  userId: string | {
+    _id: string
+    name: string
+    email?: string
+  }
   rating: number
-  title: string
-  comment: string
-  isVerified: boolean
+  review?: string
   isApproved: boolean
-  helpful: number
-  notHelpful: number
-  replies?: ReviewReply[]
   createdAt: string
   updatedAt: string
 }
 
-interface ReviewReply {
-  id: string
-  author: string
-  comment: string
-  createdAt: string
-}
-
-// Mock data
-const mockReviews: Review[] = [
-  {
-    id: '1',
-    productId: 'prod_1',
-    productName: 'Solar Panel 500W',
-    productImage: '/placeholder.jpg',
-    customerName: 'John Doe',
-    customerEmail: 'john@example.com',
-    rating: 5,
-    title: 'Excellent product!',
-    comment: 'This solar panel exceeded my expectations. Installation was easy and performance is outstanding.',
-    isVerified: true,
-    isApproved: true,
-    helpful: 12,
-    notHelpful: 1,
-    replies: [
-      {
-        id: 'reply_1',
-        author: 'Support Team',
-        comment: 'Thank you for your feedback! We appreciate your support.',
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
-      }
-    ],
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString()
-  },
-  {
-    id: '2',
-    productId: 'prod_2',
-    productName: 'Water Pump 2000W',
-    productImage: '/placeholder.jpg',
-    customerName: 'Jane Smith',
-    customerEmail: 'jane@example.com',
-    rating: 4,
-    title: 'Good quality pump',
-    comment: 'Works well for our irrigation needs. A bit noisy but powerful.',
-    isVerified: true,
-    isApproved: true,
-    helpful: 8,
-    notHelpful: 2,
-    replies: [],
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString()
-  },
-  {
-    id: '3',
-    productId: 'prod_3',
-    productName: 'Inverter 3000W',
-    productImage: '/placeholder.jpg',
-    customerName: 'Michael Otieno',
-    customerEmail: 'michael@example.com',
-    rating: 3,
-    title: 'Decent but has issues',
-    comment: 'The inverter works but the fan is loud. Customer service was helpful though.',
-    isVerified: true,
-    isApproved: false,
-    helpful: 5,
-    notHelpful: 3,
-    replies: [],
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString()
-  },
-  {
-    id: '4',
-    productId: 'prod_4',
-    productName: 'Battery 12V 200Ah',
-    productImage: '/placeholder.jpg',
-    customerName: 'Sarah Wanjiku',
-    customerEmail: 'sarah@example.com',
-    rating: 5,
-    title: 'Amazing battery life!',
-    comment: 'Lasts longer than expected. Perfect for our solar system.',
-    isVerified: true,
-    isApproved: true,
-    helpful: 15,
-    notHelpful: 0,
-    replies: [
-      {
-        id: 'reply_2',
-        author: 'Tech Support',
-        comment: 'Great to hear! Thank you for choosing our product.',
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 1).toISOString()
-      }
-    ],
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString()
-  },
-  {
-    id: '5',
-    productId: 'prod_5',
-    productName: 'Charge Controller 60A',
-    productImage: '/placeholder.jpg',
-    customerName: 'David Kimani',
-    customerEmail: 'david@example.com',
-    rating: 2,
-    title: 'Not as described',
-    comment: 'The product specifications were misleading. Returns process was complicated.',
-    isVerified: true,
-    isApproved: false,
-    helpful: 7,
-    notHelpful: 4,
-    replies: [],
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString()
-  }
-]
-
 export default function ReviewsPage() {
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [ratingFilter, setRatingFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
-  const [isLoading, setIsLoading] = useState(false)
+  const [totalPages, setTotalPages] = useState(1)
   const [selectedReview, setSelectedReview] = useState<Review | null>(null)
+  const [allProducts, setAllProducts] = useState<Map<string, string>>(new Map())
+  const [allUsers, setAllUsers] = useState<Map<string, { name: string; email: string }>>(new Map())
   const itemsPerPage = 10
 
-  // Filter reviews
-  const filteredReviews = mockReviews.filter(review => {
-    const matchesSearch = search === '' || 
-      review.productName.toLowerCase().includes(search.toLowerCase()) ||
-      review.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      review.comment.toLowerCase().includes(search.toLowerCase())
-    
-    const matchesRating = ratingFilter === '' || review.rating === parseInt(ratingFilter)
-    const matchesStatus = statusFilter === '' || 
-      (statusFilter === 'approved' && review.isApproved) ||
-      (statusFilter === 'pending' && !review.isApproved)
-    
-    return matchesSearch && matchesRating && matchesStatus
-  })
+  // Fetch all reviews (you'll need a getAdminReviews endpoint)
+  // For now, we'll simulate by fetching from multiple products
+  // You should add a GET /api/reviews/admin endpoint in your backend
 
-  // Pagination
-  const totalPages = Math.ceil(filteredReviews.length / itemsPerPage)
-  const paginatedReviews = filteredReviews.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+  const fetchReviews = async () => {
+    try {
+      setLoading(true)
+      // TODO: Replace with actual admin reviews endpoint
+      // const response = await getAdminReviews({ page, limit: itemsPerPage, status: statusFilter, rating: ratingFilter })
+      // For now, show empty state
+      setReviews([])
+      setTotalPages(1)
+    } catch (error) {
+      console.error('Failed to fetch reviews:', error)
+      toast.error('Failed to load reviews')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchReviews()
+  }, [page, ratingFilter, statusFilter])
+
+  // Handle search with debounce
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (page !== 1) setPage(1)
+      fetchReviews()
+    }, 500)
+    return () => clearTimeout(timeout)
+  }, [search])
 
   // Statistics
-  const stats = {
-    total: mockReviews.length,
-    averageRating: (mockReviews.reduce((sum, r) => sum + r.rating, 0) / mockReviews.length).toFixed(1),
-    approved: mockReviews.filter(r => r.isApproved).length,
-    pending: mockReviews.filter(r => !r.isApproved).length,
-    fiveStar: mockReviews.filter(r => r.rating === 5).length,
-    fourStar: mockReviews.filter(r => r.rating === 4).length,
-    threeStar: mockReviews.filter(r => r.rating === 3).length,
-    twoStar: mockReviews.filter(r => r.rating === 2).length,
-    oneStar: mockReviews.filter(r => r.rating === 1).length
-  }
+  const stats = useMemo(() => {
+    const total = reviews.length
+    const avgRating = reviews.length > 0 
+      ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+      : '0.0'
+    const approved = reviews.filter(r => r.isApproved).length
+    const pending = reviews.filter(r => !r.isApproved).length
+    const fiveStar = reviews.filter(r => r.rating === 5).length
+    const fourStar = reviews.filter(r => r.rating === 4).length
+    const threeStar = reviews.filter(r => r.rating === 3).length
+    const twoStar = reviews.filter(r => r.rating === 2).length
+    const oneStar = reviews.filter(r => r.rating === 1).length
+    
+    return { total, averageRating: avgRating, approved, pending, fiveStar, fourStar, threeStar, twoStar, oneStar }
+  }, [reviews])
 
   const renderStars = (rating: number) => {
     return (
@@ -206,22 +115,57 @@ export default function ReviewsPage() {
   }
 
   const handleRefresh = async () => {
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsLoading(false)
+    await fetchReviews()
     toast.success('Reviews refreshed')
   }
 
   const handleExport = () => {
-    toast.success('Export started. You will be notified when ready.')
+    const csvData = reviews.map((r: any) => ({
+      'Product': typeof r.productId === 'object' ? r.productId?.name || 'N/A' : 'N/A',
+      'Customer': typeof r.userId === 'object' ? r.userId?.name || 'N/A' : 'N/A',
+      'Email': typeof r.userId === 'object' ? r.userId?.email || 'N/A' : 'N/A',
+      'Rating': r.rating || 0,
+      'Review': r.review || '',
+      'Status': r.isApproved ? 'approved' : 'pending',
+      'Date': new Date(r.createdAt || Date.now()).toLocaleDateString()
+    }))
+
+    const headers = Object.keys(csvData[0] || {})
+    const csv = [
+      headers.join(','),
+      ...csvData.map(row => headers.map(h => JSON.stringify(row[h as keyof typeof row] || '')).join(','))
+    ].join('\n')
+    
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `reviews_${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Export completed')
   }
 
-  const handleApprove = (reviewId: string) => {
-    toast.success('Review approved successfully')
+  const handleApprove = async (id: string) => {
+    try {
+      await updateReview(id, { rating: 5 }) // You'll need to add status update to review
+      toast.success('Review approved successfully')
+      fetchReviews()
+    } catch (error) {
+      toast.error('Failed to approve review')
+    }
   }
 
-  const handleDelete = (reviewId: string) => {
-    toast.success('Review deleted successfully')
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this review?')) {
+      try {
+        await deleteReview(id)
+        toast.success('Review deleted successfully')
+        fetchReviews()
+      } catch (error) {
+        toast.error('Failed to delete review')
+      }
+    }
   }
 
   const clearFilters = () => {
@@ -240,6 +184,34 @@ export default function ReviewsPage() {
     if (days < 1) return 'Today'
     if (days < 7) return `${days} days ago`
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  const getProductName = (review: Review) => {
+    if (typeof review.productId === 'object') {
+      return review.productId?.name || 'Unknown Product'
+    }
+    return 'Product ID: ' + review.productId
+  }
+
+  const getCustomerName = (review: Review) => {
+    if (typeof review.userId === 'object') {
+      return review.userId?.name || 'Anonymous'
+    }
+    return 'Anonymous'
+  }
+
+  const getCustomerEmail = (review: Review) => {
+    if (typeof review.userId === 'object') {
+      return review.userId?.email || 'No email'
+    }
+    return 'No email'
+  }
+
+  const getProductImage = (review: Review) => {
+    if (typeof review.productId === 'object') {
+      return review.productId?.images?.[0]
+    }
+    return null
   }
 
   return (
@@ -264,10 +236,10 @@ export default function ReviewsPage() {
             <div className="flex gap-3">
               <button
                 onClick={handleRefresh}
-                disabled={isLoading}
+                disabled={loading}
                 className="flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
               <button
@@ -431,11 +403,11 @@ export default function ReviewsPage() {
           transition={{ delay: 0.3 }}
           className="space-y-4"
         >
-          {isLoading ? (
+          {loading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
             </div>
-          ) : paginatedReviews.length === 0 ? (
+          ) : reviews.length === 0 ? (
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 text-center py-16">
               <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <MessageSquare className="w-8 h-8 text-gray-400" />
@@ -447,9 +419,9 @@ export default function ReviewsPage() {
               </button>
             </div>
           ) : (
-            paginatedReviews.map((review, index) => (
+            reviews.map((review, index) => (
               <motion.div
-                key={review.id}
+                key={review._id || review.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
@@ -459,70 +431,45 @@ export default function ReviewsPage() {
                   <div className="flex-1">
                     {/* Product Info */}
                     <div className="flex items-start gap-4 mb-4">
-                      <div className="w-16 h-16 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-xl flex items-center justify-center">
-                        <Package className="w-8 h-8 text-gray-500" />
-                      </div>
+                     <div className="w-16 h-16 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-xl flex items-center justify-center overflow-hidden">
+  {(() => {
+    const productImage = getProductImage(review)
+    return productImage ? (
+      <img src={productImage} alt={getProductName(review)} className="w-full h-full object-cover" />
+    ) : (
+      <Package className="w-8 h-8 text-gray-500" />
+    )
+  })()}
+</div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">{review.productName}</h3>
+                        <h3 className="font-semibold text-gray-900 dark:text-white">{getProductName(review)}</h3>
                         <div className="flex items-center gap-2 mt-1">
                           {renderStars(review.rating)}
                           <span className="text-sm text-gray-500">({review.rating}/5)</span>
-                          {review.isVerified && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                              <CheckCircle className="w-3 h-3" />
-                              Verified
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
 
                     {/* Review Content */}
-                    <h4 className="font-medium text-gray-900 dark:text-white mb-2">{review.title}</h4>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">{review.comment}</p>
+                    {review.review && (
+                      <p className="text-gray-600 dark:text-gray-400 mb-4">{review.review}</p>
+                    )}
 
                     {/* Customer Info */}
                     <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
                       <div className="flex items-center gap-1">
                         <User className="w-3.5 h-3.5" />
-                        {review.customerName}
+                        {getCustomerName(review)}
                       </div>
                       <div className="flex items-center gap-1">
                         <Mail className="w-3.5 h-3.5" />
-                        {review.customerEmail}
+                        {getCustomerEmail(review)}
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />
                         {formatDate(review.createdAt)}
                       </div>
                     </div>
-
-                    {/* Helpful Stats */}
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-1 text-green-600">
-                        <ThumbsUp className="w-3.5 h-3.5" />
-                        {review.helpful} helpful
-                      </div>
-                      <div className="flex items-center gap-1 text-red-600">
-                        <ThumbsDown className="w-3.5 h-3.5" />
-                        {review.notHelpful} not helpful
-                      </div>
-                    </div>
-
-                    {/* Replies */}
-                    {review.replies && review.replies.length > 0 && (
-                      <div className="mt-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
-                        {review.replies.map(reply => (
-                          <div key={reply.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-sm text-blue-600 dark:text-blue-400">{reply.author}</span>
-                              <span className="text-xs text-gray-500">{formatDate(reply.createdAt)}</span>
-                            </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">{reply.comment}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
 
                   {/* Actions */}
@@ -536,7 +483,7 @@ export default function ReviewsPage() {
                     </button>
                     {!review.isApproved && (
                       <button
-                        onClick={() => handleApprove(review.id)}
+                        onClick={() => handleApprove(review._id || review.id || '')}
                         className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30 rounded-lg transition-colors"
                         title="Approve"
                       >
@@ -544,7 +491,7 @@ export default function ReviewsPage() {
                       </button>
                     )}
                     <button
-                      onClick={() => handleDelete(review.id)}
+                      onClick={() => handleDelete(review._id || review.id || '')}
                       className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
                       title="Delete"
                     >
@@ -640,7 +587,7 @@ export default function ReviewsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-gray-500">Product</label>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedReview.productName}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{getProductName(selectedReview)}</p>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500">Rating</label>
@@ -648,26 +595,35 @@ export default function ReviewsPage() {
                 </div>
                 <div>
                   <label className="text-xs text-gray-500">Customer</label>
-                  <p className="text-sm text-gray-900 dark:text-white">{selectedReview.customerName}</p>
+                  <p className="text-sm text-gray-900 dark:text-white">{getCustomerName(selectedReview)}</p>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500">Email</label>
-                  <p className="text-sm text-gray-900 dark:text-white">{selectedReview.customerEmail}</p>
+                  <p className="text-sm text-gray-900 dark:text-white">{getCustomerEmail(selectedReview)}</p>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs text-gray-500">Title</label>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedReview.title}</p>
+                  <label className="text-xs text-gray-500">Review</label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedReview.review || 'No review text'}</p>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs text-gray-500">Comment</label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedReview.comment}</p>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs text-gray-500">Helpful Votes</label>
-                  <div className="flex items-center gap-4 mt-1">
-                    <span className="text-sm text-green-600">👍 {selectedReview.helpful}</span>
-                    <span className="text-sm text-red-600">👎 {selectedReview.notHelpful}</span>
+                  <label className="text-xs text-gray-500">Status</label>
+                  <div className="mt-1">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                      selectedReview.isApproved
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                    }`}>
+                      {selectedReview.isApproved ? 'Approved' : 'Pending'}
+                    </span>
                   </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">Created</label>
+                  <p className="text-sm text-gray-900 dark:text-white">{new Date(selectedReview.createdAt).toLocaleString()}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">Last Updated</label>
+                  <p className="text-sm text-gray-900 dark:text-white">{new Date(selectedReview.updatedAt).toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -677,6 +633,3 @@ export default function ReviewsPage() {
     </div>
   )
 }
-
-// Missing imports
-import { X, Package, Clock } from 'lucide-react'

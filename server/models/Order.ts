@@ -49,14 +49,12 @@ export interface IOrder extends Document {
   createdAt: Date;
   updatedAt: Date;
   orderNumber: string;
-  // ✅ Add method signatures
+
   canCancel(): boolean;
   canRefund(): boolean;
 }
 
-// ✅ Extend the Model interface to include the methods
 interface IOrderModel extends Model<IOrder> {
-  // Add any static methods here if needed
 }
 
 const orderItemSchema = new Schema({

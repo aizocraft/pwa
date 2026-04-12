@@ -7,6 +7,7 @@ export interface Product {
   brand: string;
   type: string;
   price: number;
+  compareAtPrice?: number;
   description?: string;
   specs: Record<string, any>;
   stock: number;

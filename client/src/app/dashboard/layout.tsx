@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, Settings, 
   Menu, X, Search, Star, ChevronRight, Bell, User, LogOut, 
   BarChart3, AlertCircle, Moon, ClipboardList, Sun, AlertTriangle,
-  Receipt, MessageSquare
+  Receipt, MessageSquare, Mail
 } from 'lucide-react'
 import { useCompanySettings } from '@/lib/use-company-settings'
 import { getFaviconUrl, getLogoUrl } from '@/lib/company'
@@ -47,12 +47,14 @@ export default function DashboardLayout({
     if (path.startsWith('/dashboard/users')) return 'users'
     if (path.startsWith('/dashboard/transactions')) return 'transactions'
     if (path.startsWith('/dashboard/reviews')) return 'reviews'
+    if (path.startsWith('/dashboard/submissions')) return 'submissions'
+    if (path.startsWith('/dashboard/emails')) return 'emails'
     if (path.startsWith('/dashboard/auditlog')) return 'auditlog'
     if (path.startsWith('/dashboard/settings')) return 'settings'
     return 'overview'
   }
 
-  const [activePage, setActivePage] = useState<'overview'|'products'|'orders'|'users'|'transactions'| 'reviews'| 'auditlog'|'settings'>(
+  const [activePage, setActivePage] = useState<'overview'|'products'|'orders'|'users'|'emails'|'submissions'|'transactions'|'reviews'|'auditlog'|'settings'>(
     getActivePageFromPath(pathname)
   )
 
@@ -106,6 +108,8 @@ export default function DashboardLayout({
     { name: 'Transactions', icon: Receipt, page: 'transactions' as const, path: '/dashboard/transactions', color: 'text-amber-500' },
     { name: 'Users', icon: Users, page: 'users' as const, path: '/dashboard/users', color: 'text-orange-500' },
     { name: 'Reviews', icon: MessageSquare, page: 'reviews' as const, path: '/dashboard/reviews', color: 'text-pink-500' },
+    { name: 'Submissions', icon: Star, page: 'submissions' as const, path: '/dashboard/submissions', color: 'text-yellow-500' },
+    { name: 'Emails', icon: Mail, page: 'emails' as const, path: '/dashboard/emails', color: 'text-indigo-500' },
     { name: 'Audit Log', icon: ClipboardList, page: 'auditlog' as const, path: '/dashboard/auditlog', color: 'text-indigo-500' },
     { name: 'Settings', icon: Settings, page: 'settings' as const, path: '/dashboard/settings', color: 'text-gray-500' },
   ]
@@ -315,20 +319,6 @@ export default function DashboardLayout({
               })}
             </div>
           </nav>
-
-          {/* Upgrade Card */}
-          <div className="p-4 pb-6 shrink-0">
-            <div className="p-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-              <div className="flex items-center gap-2 mb-2">
-                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                <span className="text-xs font-semibold">Premium Plan</span>
-              </div>
-              <p className="text-sm mb-3 opacity-90">Upgrade to unlock advanced features</p>
-              <button className="w-full px-3 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-all">
-                Upgrade Now
-              </button>
-            </div>
-          </div>
 
           {/* Sign Out Button */}
           <div className="p-4 pt-0 shrink-0 border-t border-gray-200/50 dark:border-gray-800/50">

@@ -83,6 +83,18 @@ function productRoutes(productModel: typeof ProductModel) {
     }
   });
 
+
+// Get all unique brands
+router.get('/brands', async (req: Request, res: Response) => {
+  try {
+    const brands = await ProductModel.distinct('brand');
+    const validBrands = brands.filter(brand => brand && brand !== '');
+    res.json(validBrands);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error fetching brands' });
+  }
+});
   // Get single product by slug
   router.get('/:slug', async (req: Request, res: Response) => {
     try {

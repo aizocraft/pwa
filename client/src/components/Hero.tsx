@@ -86,22 +86,22 @@ export default function Hero() {
               </Link>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 max-w-2xl lg:mx-0 mx-auto">
-              {stats.map((stat, idx) => {
+            {/* Stats Section */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto lg:mx-0">
+              {stats.map((stat, index) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={idx} className="text-center transform hover:scale-110 transition-transform duration-300">
-                    <div className="inline-flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 bg-opacity-20 backdrop-blur-sm mb-2 shadow-lg">
-                      <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                  <div key={index} className="text-center lg:text-left">
+                    <div className="flex items-center justify-center lg:justify-start gap-2 mb-1">
+                      <Icon className="w-5 h-5 text-yellow-400" />
+                      <span className="text-2xl font-bold text-white">{stat.value}</span>
                     </div>
-                    <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{stat.value}</div>
-                    <div className="text-xs sm:text-sm text-blue-200">{stat.label}</div>
+                    <p className="text-sm text-blue-200">{stat.label}</p>
                   </div>
                 );
               })}
             </div>
-          </div>
+          </div> {/* This was missing - closes the left content div */}
 
           {/* Right Side Image */}
           <div className={`hidden lg:block transform transition-all duration-1000 delay-300 ${isVisible ? 'translate-x-0 opacity-100' : 'translate-x-10 opacity-0'}`}>

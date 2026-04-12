@@ -5,13 +5,7 @@ import { User, UserListResponse, CreateUserRequest, UpdateUserRequest } from '@/
 import type { Order, OrderListResponse, CreateOrderRequest } from '@/types/order';
 import toast from 'react-hot-toast';
 import { getToken } from './auth';
-import type {
-  ContactStatus, 
-  CreateContactRequest, 
-  ContactSubmissionResponse,
-  ContactListResponse, 
-  ContactMessage
-} from '@/types/contact';
+import type {  ContactStatus, CreateContactRequest, ContactSubmissionResponse, ContactListResponse, ContactMessage } from '@/types/contact';
 import type {
   FeedbackCategory,
   CreateFeedbackRequest,
@@ -19,6 +13,17 @@ import type {
   PublicFeedbackResponse,
   FeedbackStatsResponse
 } from '@/types/feedback';
+
+import type { 
+  Review, 
+  CreateReviewRequest, 
+  UpdateReviewRequest, 
+  ReviewListResponse,
+  ReviewStats 
+} from '@/types/review';
+
+import type { SendOrderEmailRequest, SendContactEmailRequest, SendStatusUpdateRequest, EmailResponse, SendOrderEmailsResponse
+} from '@/types/email';
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -208,6 +213,10 @@ export async function getProducts(params?: {
   }
 }
 
+export async function getBrands(): Promise<string[]> {
+  const response = await api.get('/products/brands')
+  return response.data
+}
 export async function getProduct(id: string): Promise<Product> {
   try {
     const response = await api.get(`/products/${id}`);
@@ -533,35 +542,189 @@ export async function getFeedbackStats(): Promise<FeedbackStatsResponse> {
   return response.data;
 }
 
-export async function getFeedbacks(params?: {
-  page?: number;
-  limit?: number;
-  status?: string;
-  category?: FeedbackCategory;
-  rating?: number;
-  search?: string;
-}): Promise<{ success: true; data: any[]; pagination: any }> {
-  const query = new URLSearchParams();
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      query.append(key, String(value));
-    }
-  });
-  const response = await api.get(`/feedback?${query.toString()}`);
-  return response.data;
+// ========== EMAIL API ==========
+
+/**
+ * Send a test email
+ */
+export async function sendTestEmail(data: {
+  to: string;
+  subject: string;
+  message: string;
+}): Promise<EmailResponse> {
+  try {
+    const response = await api.post('/email/send-test', data);
+    toast.success('Test email sent successfully!');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to send test email');
+    throw error;
+  }
 }
 
-export async function updateFeedbackStatus(id: string, status: string): Promise<{ success: true; message: string; data: any }> {
-  const response = await api.patch(`/feedback/${id}/status`, { status });
-  toast.success('Feedback status updated');
-  return response.data;
+
+
+/**
+ * Send order confirmation email (admin only)
+ */
+export async function sendOrderConfirmationEmail(data: SendOrderEmailRequest): Promise<EmailResponse> {
+  try {
+    const response = await api.post('/email/send-order-confirmation', data);
+    toast.success('Order confirmation email sent');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to send order confirmation');
+    throw error;
+  }
 }
 
-export async function deleteFeedback(id: string): Promise<{ success: true; message: string }> {
-  const response = await api.delete(`/feedback/${id}`);
-  toast.success('Feedback deleted');
-  return response.data;
+/**
+ * Send order status update email (admin only)
+ */
+export async function sendOrderStatusUpdateEmail(data: SendStatusUpdateRequest): Promise<EmailResponse> {
+  try {
+    const response = await api.post('/email/send-status-update', data);
+    toast.success('Status update email sent');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to send status update');
+    throw error;
+  }
 }
 
+/**
+ * Send bulk order confirmation emails (admin only)
+ */
+export async function sendBulkOrderEmails(orderIds: string[]): Promise<SendOrderEmailsResponse> {
+  try {
+    const response = await api.post('/email/bulk-order-emails', { orderIds });
+    toast.success(`Sent ${response.data.sent} out of ${response.data.total} emails`);
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to send bulk emails');
+    throw error;
+  }
+}
+
+/**
+ * Send welcome email to new user (admin only)
+ */
+export async function sendWelcomeEmail(data: {
+  email: string;
+  name: string;
+}): Promise<EmailResponse> {
+  try {
+    const response = await api.post('/email/send-welcome', data);
+    toast.success('Welcome email sent');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to send welcome email');
+    throw error;
+  }
+}
+
+/**
+ * Send password reset email
+ */
+export async function sendPasswordResetEmail(email: string): Promise<EmailResponse> {
+  try {
+    const response = await api.post('/email/send-password-reset', { email });
+    toast.success('Password reset email sent');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to send reset email');
+    throw error;
+  }
+}
+// ========== REVIEWS API ==========
+// Add these functions after the PRODUCTS API section (around line 200)
+
+export async function getProductReviews(
+  productId: string,
+  params?: {
+    page?: number;
+    limit?: number;
+  }
+): Promise<{
+  reviews: Review[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+  stats: {
+    averageRating: number;
+    totalReviews: number;
+  };
+}> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.limit) query.append('limit', params.limit.toString());
+    
+    const url = `/reviews/${productId}${query.toString() ? `?${query.toString()}` : ''}`;
+    const response = await api.get(url);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch product reviews:', error);
+    throw error;
+  }
+}
+
+export async function createReview(data: { productId: string; rating: number; review?: string }): Promise<any> {
+  try {
+    const response = await api.post('/reviews', data);
+    toast.success('Review submitted successfully!');
+    return response.data;
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error || 'Failed to submit review';
+    toast.error(errorMessage);
+    throw error;
+  }
+}
+
+export async function updateReview(id: string, data: { rating?: number; review?: string }): Promise<any> {
+  try {
+    const response = await api.put(`/reviews/${id}`, data);
+    toast.success('Review updated successfully!');
+    return response.data;
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error || 'Failed to update review';
+    toast.error(errorMessage);
+    throw error;
+  }
+}
+
+export async function deleteReview(id: string): Promise<void> {
+  try {
+    await api.delete(`/reviews/${id}`);
+    toast.success('Review deleted successfully!');
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error || 'Failed to delete review';
+    toast.error(errorMessage);
+    throw error;
+  }
+}
+
+export async function getProductReviewStats(productId: string): Promise<{ averageRating: number; totalReviews: number }> {
+  try {
+    const response = await api.get(`/reviews/${productId}/stats`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch review stats:', error);
+    return { averageRating: 0, totalReviews: 0 };
+  }
+}
+
+export async function hasUserReviewed(productId: string): Promise<{ hasReviewed: boolean; reviewId?: string }> {
+  try {
+    const response = await api.get(`/reviews/user/${productId}/has-reviewed`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to check user review status:', error);
+    return { hasReviewed: false };
+  }
+}
 // Export the api instance for custom requests 
 export default api;

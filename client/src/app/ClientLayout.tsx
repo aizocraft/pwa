@@ -7,7 +7,7 @@ import Navbar from './Navbar';
 import Footer from './Footer';
 import { QueryProvider } from '@/lib/query-provider';
 import { Toaster } from 'react-hot-toast';
-import { ThemeProvider } from '@/context/ThemeContext'; // Import ThemeProvider
+import { ThemeProvider } from '@/context/ThemeContext'; 
 import './globals.css';
 
 interface ClientLayoutProps {
