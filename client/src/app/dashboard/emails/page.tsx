@@ -856,13 +856,7 @@ export default function EmailsPage() {
           transition={{ delay: 0.3 }}
           className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400"
         >
-          <p className="flex items-center justify-center gap-2">
-            <Shield className="w-4 h-4" />
-            All emails are sent using Brevo's transactional email service
-          </p>
-          <p className="mt-1 text-xs">
-            Make sure your Brevo API key is configured in the backend .env file
-          </p>
+       
         </motion.div>
       </div>
     </div>

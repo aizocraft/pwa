@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/db';
 import { initGridFS } from './config/gridfs'; 
+import { auditContextMiddleware, autoAuditMiddleware, createAuditLog } from './middleware/auditMiddleware';
+import authMiddleware from './middleware/auth'; 
 
 import ProductModel from './models/Product';
 import ReviewModel from './models/Review';
@@ -16,6 +18,8 @@ import companyRoutes from './routes/companyRoutes';
 import feedbackRoutes from './routes/feedback.routes';
 import contactRoutes from './routes/contact.routes';
 import emailRoutes from './routes/email.routes';
+import auditRoutes from './routes/audit.routes';
+
 dotenv.config();
 
 // Connect to DB and initialize GridFS
@@ -36,6 +40,14 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+app.use(authMiddleware); 
+// Apply audit middleware (corrected)
+app.use(auditContextMiddleware); // This adds requestId and startTime
+app.use(autoAuditMiddleware({ 
+  excludePaths: ['/health', '/metrics', '/api/company/logo/', '/api/company/favicon/'],
+  includeBody: false // Don't log sensitive data
+}));
+
 // Routes
 app.use('/api/categories', categoryRoutes());
 app.use('/api/products', productRoutes(ProductModel));
@@ -47,8 +59,9 @@ app.use('/api/company', companyRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/email', emailRoutes);
+app.use('/api/audit', auditRoutes);
 
-// Health check
+// Health check (excluded from audit)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
