@@ -122,7 +122,7 @@ export const sendContactEmail = async (data: ContactEmailData) => {
               </div>
             </div>
             <div class="footer">
-              <p>© ${new Date().getFullYear()} Your Store. All rights reserved.</p>
+              <p>© ${new Date().getFullYear()} Plasma Water Africa. All rights reserved.</p>
             </div>
           </div>
         </body>

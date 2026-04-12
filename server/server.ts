@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/db';
 import { initGridFS } from './config/gridfs'; 
 import { auditContextMiddleware, autoAuditMiddleware, createAuditLog } from './middleware/auditMiddleware';
-import authMiddleware from './middleware/auth'; 
+// import authMiddleware from './middleware/auth'; // REMOVED
 
 import ProductModel from './models/Product';
 import ReviewModel from './models/Review';
@@ -40,8 +40,9 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-app.use(authMiddleware); 
-// Apply audit middleware (corrected)
+// app.use(authMiddleware); // REMOVED - Auth middleware disabled
+
+// Apply audit middleware (retained)
 app.use(auditContextMiddleware); // This adds requestId and startTime
 app.use(autoAuditMiddleware({ 
   excludePaths: ['/health', '/metrics', '/api/company/logo/', '/api/company/favicon/'],
