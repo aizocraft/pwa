@@ -528,11 +528,11 @@ export async function getPublicFeedback(params?: {
   rating?: number;
 }): Promise<PublicFeedbackResponse> {
   const query = new URLSearchParams();
-Object.entries(params || {}).forEach(([key, value]) => {
-  if (value !== undefined && value !== null && typeof value === 'string' && value !== '') {
-    query.append(key, String(value));
-  }
-});
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && typeof value === 'string' && value !== '') {
+      query.append(key, String(value));
+    }
+  });
   const response = await api.get(`/feedback/public?${query.toString()}`);
   return response.data;
 }
@@ -540,6 +540,51 @@ Object.entries(params || {}).forEach(([key, value]) => {
 export async function getFeedbackStats(): Promise<FeedbackStatsResponse> {
   const response = await api.get('/feedback/stats');
   return response.data;
+}
+
+export async function getFeedbacks(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  category?: FeedbackCategory;
+  rating?: number;
+  search?: string;
+}): Promise<{ success: true; data: any[]; pagination: any }> {
+  try {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        query.append(key, String(value));
+      }
+    });
+    const response = await api.get(`/feedback?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch feedbacks:', error);
+    throw error;
+  }
+}
+
+export async function updateFeedbackStatus(id: string, status: string): Promise<{ success: true; message: string; data: any }> {
+  try {
+    const response = await api.patch(`/feedback/${id}/status`, { status });
+    toast.success('Feedback status updated');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to update status');
+    throw error;
+  }
+}
+
+export async function deleteFeedback(id: string): Promise<{ success: true; message: string }> {
+  try {
+    const response = await api.delete(`/feedback/${id}`);
+    toast.success('Feedback deleted');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to delete feedback');
+    throw error;
+  }
 }
 
 // ========== EMAIL API ==========
