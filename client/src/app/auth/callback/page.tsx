@@ -63,7 +63,7 @@ function AuthCallbackContent() {
         localStorage.setItem('user', JSON.stringify(user));
         
         setStatus('success');
-        toast.success(`Welcome back, ${user.name || 'User'}!`);
+       
         
         // Determine redirect path
         let redirectPath = redirect || '/';

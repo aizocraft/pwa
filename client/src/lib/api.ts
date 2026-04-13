@@ -67,7 +67,7 @@ export async function loginUser(credentials: { email: string; password: string }
     const { token, user } = response.data;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
-    toast.success('Logged in successfully');
+    
     return { token, user };
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Login failed');
