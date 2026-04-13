@@ -1,5 +1,6 @@
 // server/routes/auth.routes.ts
 import { Router, Request, Response } from 'express';
+import passport from 'passport';
 import authMiddleware from '../middleware/auth';
 import jwt from 'jsonwebtoken';
 import UserModel from '../models/User';
@@ -24,7 +25,8 @@ router.post('/register', async (req: Request, res: Response) => {
       email, 
       password, 
       role: allowedRole,
-      isActive: true
+      isActive: true,
+      provider: 'local'
     });
     await user.save();
 
@@ -42,7 +44,9 @@ router.post('/register', async (req: Request, res: Response) => {
         name: user.name, 
         email: user.email, 
         role: user.role,
-        isActive: user.isActive 
+        isActive: user.isActive,
+        avatar: user.avatar,
+        provider: user.provider
       }
     });
   } catch (error: any) {
@@ -62,6 +66,15 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid credentials or account disabled' });
     }
     
+    // Check if user is using Google auth
+    if (user.provider === 'google') {
+      return res.status(401).json({ 
+        error: 'This account uses Google Sign-In. Please sign in with Google.',
+        provider: 'google'
+      });
+    }
+    
+    // Verify password for local users
     if (!(await user.comparePassword(password))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -84,13 +97,59 @@ router.post('/login', async (req: Request, res: Response) => {
         name: user.name, 
         email: user.email, 
         role: user.role,
-        isActive: user.isActive
+        isActive: user.isActive,
+        avatar: user.avatar,
+        provider: user.provider
       }
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Login failed' });
   }
 });
+
+// GOOGLE AUTH ROUTES
+
+// Initiate Google authentication
+router.get('/google', 
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+// Google authentication callback
+router.get('/google/callback',
+  passport.authenticate('google', { session: false, failureRedirect: '/login' }),
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user as any;
+      
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user._id, role: user.role },
+        process.env.JWT_SECRET || 'fallback_secret_change_me',
+        { expiresIn: '7d' }
+      );
+      
+      // Get frontend URL from env or use default
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      
+      // Redirect to frontend with token and user info
+      const userData = encodeURIComponent(JSON.stringify({
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        avatar: user.avatar,
+        provider: user.provider
+      }));
+      
+      res.redirect(`${frontendUrl}/auth/callback?token=${token}&user=${userData}`);
+    } catch (error) {
+      console.error('Google callback error:', error);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+    }
+  }
+);
 
 // GET /api/auth/profile
 router.get('/profile', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
@@ -109,6 +168,13 @@ router.get('/profile', authMiddleware, async (req: Request & { user?: any }, res
 router.put('/profile', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { name, email, phone, avatar } = req.body;
+    
+    // Don't allow email change for Google users (optional)
+    const user = await UserModel.findById(req.user.userId);
+    if (user?.provider === 'google' && email !== user.email) {
+      return res.status(400).json({ error: 'Cannot change email for Google-authenticated accounts' });
+    }
+    
     const updatedUser = await UserModel.findByIdAndUpdate(
       req.user.userId,
       { name, email, phone, avatar },
@@ -126,6 +192,15 @@ router.put('/profile', authMiddleware, async (req: Request & { user?: any }, res
   } catch (error: any) {
     res.status(400).json({ error: error.message || 'Failed to update profile' });
   }
+});
+
+// GET /api/auth/google/status - Check if Google auth is configured
+router.get('/google/status', (req: Request, res: Response) => {
+  const isConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  res.json({ 
+    configured: isConfigured,
+    message: isConfigured ? 'Google auth is available' : 'Google auth is not configured'
+  });
 });
 
 export default router;

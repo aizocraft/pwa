@@ -15,6 +15,7 @@ export function getUser(): User | null {
 }
 
 export function getToken(): string | null {
+  if (typeof window === 'undefined') return null
   return localStorage.getItem('token')
 }
 
@@ -34,13 +35,32 @@ export function isAdminOrSales(user: User | null): boolean {
   return user?.role === 'admin' || user?.role === 'sales'
 }
 
+// Google Auth helper functions
+export function isGoogleUser(user: User | null): boolean {
+  return user?.provider === 'google'
+}
+
+export function isLocalUser(user: User | null): boolean {
+  return user?.provider === 'local'
+}
+
+export function getAuthProvider(): 'local' | 'google' | null {
+  const user = getUser()
+  return user?.provider || null
+}
+
 export function logout(queryClient?: ReturnType<typeof useQueryClient>): void {
+  if (typeof window === 'undefined') return
+  
   localStorage.removeItem('token')
   localStorage.removeItem('user')
-  queryClient?.invalidateQueries({ queryKey: ['user'] })
-  queryClient?.removeQueries({ queryKey: ['user'] })
-  queryClient?.invalidateQueries({ queryKey: ['profile'] })
-  queryClient?.removeQueries({ queryKey: ['profile'] })
+  
+  if (queryClient) {
+    queryClient.invalidateQueries({ queryKey: ['user'] })
+    queryClient.removeQueries({ queryKey: ['user'] })
+    queryClient.invalidateQueries({ queryKey: ['profile'] })
+    queryClient.removeQueries({ queryKey: ['profile'] })
+  }
 }
 
 import { getProfile } from './api';
@@ -53,6 +73,10 @@ async function fetchProfile(): Promise<User | null> {
 
   try {
     const user = await getProfile();
+    // Ensure provider is set (backward compatibility)
+    if (user && !user.provider) {
+      user.provider = 'local'
+    }
     return user;
   } catch {
     logout()
@@ -63,12 +87,13 @@ async function fetchProfile(): Promise<User | null> {
 export function useAuth() {
   const queryClient = useQueryClient()
   const localUser = getUser()
+  
   const { data: user, isPending: loading, isFetching } = useQuery<User | null>({
     queryKey: ['user'],
     queryFn: fetchProfile,
     initialData: localUser,
     staleTime: 60 * 1000,
-refetchInterval: 300 * 1000, // 5min
+    refetchInterval: 300 * 1000, // 5min
     retry: 1,
     refetchOnWindowFocus: false,
     placeholderData: localUser,
@@ -84,12 +109,21 @@ refetchInterval: 300 * 1000, // 5min
 
   const optimisticLoggedIn = !!localUser && !!getToken()
 
+  // Ensure user object has provider field
+  const enhancedUser = user || localUser
+  if (enhancedUser && !enhancedUser.provider) {
+    enhancedUser.provider = 'local'
+  }
+
   return {
-    user: user || null,
+    user: enhancedUser,
     isLoggedIn: optimisticLoggedIn,
-    isAdmin: isAdmin(user || localUser),
-    isSales: isSales(user || localUser),
-    isAdminOrSales: isAdminOrSales(user || localUser),
+    isAdmin: isAdmin(enhancedUser),
+    isSales: isSales(enhancedUser),
+    isAdminOrSales: isAdminOrSales(enhancedUser),
+    isGoogleUser: isGoogleUser(enhancedUser),
+    isLocalUser: isLocalUser(enhancedUser),
+    authProvider: getAuthProvider(),
     loading: loading || isFetching,
     logout: logoutHandler,
   }

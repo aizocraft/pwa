@@ -139,6 +139,77 @@ export async function logout() {
   }
 }
 
+// ========== GOOGLE AUTH API ==========
+
+/**
+ * Initialize Google Sign-In
+ * This redirects to the backend Google auth endpoint
+ */
+export const initiateGoogleLogin = () => {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+  // Redirect to backend Google auth endpoint
+  window.location.href = `${API_URL}/auth/google`;
+};
+
+/**
+ * Handle Google auth callback
+ * This should be called on your callback page
+ */
+export const handleGoogleCallback = async (token: string, userData: string) => {
+  try {
+    // Parse user data from URL parameter
+    const user = JSON.parse(decodeURIComponent(userData));
+    
+    // Store token and user in localStorage
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    
+  
+    
+    return { token, user };
+  } catch (error) {
+    console.error('Error handling Google callback:', error);
+    toast.error('Failed to complete Google sign in');
+    throw error;
+  }
+};
+
+/**
+ * Check if Google auth is configured on the backend
+ */
+export const checkGoogleAuthStatus = async (): Promise<{
+  configured: boolean;
+  message: string;
+}> => {
+  try {
+    const response = await api.get('/auth/google/status');
+    return response.data;
+  } catch (error) {
+    console.error('Failed to check Google auth status:', error);
+    return { configured: false, message: 'Unable to check Google auth status' };
+  }
+};
+
+/**
+ * Get current user with proper typing including provider
+ */
+export const getCurrentUser = (): {
+  id: string;
+  name: string;
+  email: string;
+  role: 'user' | 'sales' | 'admin';
+  isActive: boolean;
+  avatar?: string;
+  provider: 'local' | 'google';
+} | null => {
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return null;
+  try {
+    return JSON.parse(userStr);
+  } catch {
+    return null;
+  }
+};
 // ========== USER MANAGEMENT API ==========
 export async function getUsers(params?: {
   role?: string;

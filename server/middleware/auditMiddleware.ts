@@ -3,6 +3,8 @@ import { Request, Response, NextFunction } from 'express';
 import AuditLog from '../models/AuditLog';
 import { Types } from 'mongoose';
 
+// Removed duplicate global declaration - use server/types/express.d.ts
+// Local AuditRequest type for type safety
 interface AuditRequest extends Request {
   user?: {
     userId: string;
@@ -10,10 +12,6 @@ interface AuditRequest extends Request {
   };
   requestId?: string;
   auditStartTime?: number;
-  session?: {
-    id: string;
-    [key: string]: any;
-  };
 }
 
 interface AuditLogOptions {
@@ -30,14 +28,12 @@ interface AuditLogOptions {
   message?: string;
 }
 
-// ✅ ADD THIS FUNCTION - Maps URL paths to valid resource enum values
+// Map URL paths to valid resource enum values
 const mapPathToResource = (path: string): string => {
-  // Remove leading slash and get first segment
   const segment = path.split('/')[1];
   
-  // Map common paths to valid enum values from your AuditLog model
   const resourceMap: Record<string, string> = {
-    'api': 'unknown',     // Default for /api routes
+    'api': 'unknown',
     'auth': 'user',
     'users': 'user',
     'products': 'product',
@@ -61,7 +57,7 @@ const generateRequestId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
 };
 
-// Get location info from IP (simplified - you might want to use a geolocation service)
+// Get location info from IP (simplified)
 const getLocationFromIp = async (ip: string): Promise<{ country?: string; city?: string; timezone?: string }> => {
   return {};
 };
@@ -82,20 +78,15 @@ export const createAuditLog = async (req: AuditRequest, options: AuditLogOptions
       duration
     } = options;
 
-    // If skipIfNoUser is false and no user exists, skip logging
     if (!skipIfNoUser && !req.user) {
       console.warn('Audit log skipped: No authenticated user');
       return null;
     }
 
-    // Get user agent and IP
     const userAgent = req.get('user-agent') || 'unknown';
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
-    
-    // Get location from IP (optional - can be async)
     const location = await getLocationFromIp(ipAddress);
 
-    // Prepare user info
     let userEmail = undefined;
     let userName = undefined;
     
@@ -111,13 +102,12 @@ export const createAuditLog = async (req: AuditRequest, options: AuditLogOptions
       }
     }
 
-    // ✅ VALIDATE RESOURCE - Ensure it's in the enum
     const validResources = ['user', 'product', 'order', 'review', 'category', 'settings', 'feedback', 'contact', 'email', 'company', 'payment', 'shipping', 'inventory', 'unknown'];
     const validResource = validResources.includes(resource) ? resource : 'unknown';
 
     const auditLog = new AuditLog({
       action,
-      resource: validResource,  // Use validated resource
+      resource: validResource,
       resourceId,
       userId: req.user ? new Types.ObjectId(req.user.userId) : new Types.ObjectId(),
       userEmail,
@@ -145,21 +135,21 @@ export const createAuditLog = async (req: AuditRequest, options: AuditLogOptions
   }
 };
 
-// Middleware to initialize audit context
-export const auditContextMiddleware = (req: AuditRequest, res: Response, next: NextFunction) => {
+// ✅ FIX: Properly typed Express middleware
+export const auditContextMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   // Generate unique request ID
-  req.requestId = generateRequestId();
+  (req as any).requestId = generateRequestId();
   
   // Set audit start time for duration calculation
-  req.auditStartTime = Date.now();
+  (req as any).auditStartTime = Date.now();
   
   // Add request ID to response headers
-  res.setHeader('X-Request-ID', req.requestId);
+  res.setHeader('X-Request-ID', (req as any).requestId);
   
   next();
 };
 
-// Middleware to automatically log API requests
+// ✅ FIX: Properly typed Express middleware factory
 export const autoAuditMiddleware = (options?: {
   excludePaths?: string[];
   includeBody?: boolean;
@@ -167,14 +157,15 @@ export const autoAuditMiddleware = (options?: {
   const excludePaths = options?.excludePaths || ['/health', '/metrics', '/static'];
   const includeBody = options?.includeBody || false;
 
-  return async (req: AuditRequest, res: Response, next: NextFunction) => {
+  // Return properly typed Express middleware
+  return (req: Request, res: Response, next: NextFunction): void => {
     // Skip excluded paths
     if (excludePaths.some(path => req.path.includes(path))) {
       return next();
     }
 
-    // ✅ Skip if no authenticated user to avoid logging unauthenticated requests
-    if (!req.user) {
+    // Skip if no authenticated user
+    if (!(req as any).user) {
       return next();
     }
 
@@ -206,7 +197,6 @@ export const autoAuditMiddleware = (options?: {
         break;
     }
 
-    // ✅ USE THE MAPPING FUNCTION instead of direct path extraction
     const resource = mapPathToResource(req.path);
     
     // Extract resource ID from path if exists
@@ -247,8 +237,8 @@ export const autoAuditMiddleware = (options?: {
         details += ` - Error: ${responseBody.error}`;
       }
 
-      // Create audit log - skipIfNoUser is true because we already checked above
-      await createAuditLog(req, {
+      // Create audit log
+      await createAuditLog(req as any, {
         action,
         resource,
         resourceId,
@@ -265,8 +255,8 @@ export const autoAuditMiddleware = (options?: {
   };
 };
 
-// Manual audit logging decorator for specific functions
-export const auditLog = (options: Omit<AuditLogOptions, 'details'> & { details?: string | ((result: any, req: Request) => string) }) => {
+// Manual audit logging decorator
+export const auditLog = (options: Omit<AuditLogOptions, 'details'> & { details?: string | ((result: any, req: AuditRequest) => string) }) => {
   return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
@@ -286,13 +276,11 @@ export const auditLog = (options: Omit<AuditLogOptions, 'details'> & { details?:
         status = 'failed';
         throw err;
       } finally {
-        // Generate details string
         let detailsString = options.details || `${options.action} ${options.resource}`;
         if (typeof options.details === 'function') {
           detailsString = options.details(result, req);
         }
 
-        // Log the audit
         if (req && req.user) {
           await createAuditLog(req, {
             ...options,

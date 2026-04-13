@@ -7,10 +7,14 @@ export interface User {
   role: 'user' | 'sales' | 'admin';
   phone?: string;
   avatar?: string;
-  isActive?: boolean;
+  isActive: boolean;  // Make required (not optional)
   lastLogin?: string;
   createdAt?: string;
   updatedAt?: string;
+  
+  // Google Auth fields
+  provider: 'local' | 'google';
+  googleId?: string;
 }
 
 export interface UserListResponse {
@@ -26,9 +30,10 @@ export interface UserListResponse {
 export interface CreateUserRequest {
   name: string;
   email: string;
-  password: string;
+  password?: string;  // Make optional for Google users
   role?: 'user' | 'sales';
   phone?: string;
+  provider?: 'local' | 'google';  // Allow specifying provider
 }
 
 export interface UpdateUserRequest {
@@ -37,4 +42,5 @@ export interface UpdateUserRequest {
   role?: 'user' | 'sales' | 'admin';
   phone?: string;
   isActive?: boolean;
+  avatar?: string;
 }

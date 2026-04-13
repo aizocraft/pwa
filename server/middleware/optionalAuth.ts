@@ -1,39 +1,38 @@
 // middleware/optionalAuth.ts
 import { Request, Response, NextFunction } from 'express';
+// DELETE THIS LINE: import '../types/express.d.ts';
 import jwt from 'jsonwebtoken';
 import UserModel from '../models/User';
 
-interface AuthRequest extends Request {
-  user?: {
-    userId: string;
-    role: string;
-  };
+interface AuthUser {
+  userId: string;
+  role: string;
 }
 
-const optionalAuthMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
+const optionalAuthMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (!token) {
       // No token - treat as guest user
-      req.user = undefined;
+      (req as any).user = undefined;
       return next();
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_change_me') as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_change_me') as AuthUser;
     
     // Optionally verify user still exists
     const user = await UserModel.findById(decoded.userId).select('-password');
     
     if (!user) {
       // User doesn't exist - treat as guest
-      req.user = undefined;
+      (req as any).user = undefined;
       return next();
     }
 
     // User is authenticated
-    req.user = {
+    (req as any).user = {
       userId: decoded.userId,
       role: user.role || 'user'
     };
@@ -41,7 +40,7 @@ const optionalAuthMiddleware = async (req: AuthRequest, res: Response, next: Nex
   } catch (error) {
     // Invalid token - treat as guest
     console.error('Optional auth error:', error);
-    req.user = undefined;
+    (req as any).user = undefined;
     next();
   }
 };

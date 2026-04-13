@@ -1,3 +1,4 @@
+// app/auth/login/page.tsx (updated)
 'use client'
 
 import { useState, useTransition } from "react"
@@ -6,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import toast from "react-hot-toast"
 import { loginUser } from "@/lib/api"
+import GoogleLoginButton from "@/components/auth/GoogleLoginButton"
 import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react"
 
 export default function LoginPage() {
@@ -20,38 +22,49 @@ export default function LoginPage() {
   const queryClient = useQueryClient()
   const [isPending, startTransition] = useTransition()
 
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-  setLoading(true)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
 
-  startTransition(async () => {
-    try {
-      const { token, user } = await loginUser(formData);
-      
-      queryClient.invalidateQueries({ queryKey: ["user"] })
-      queryClient.refetchQueries({ queryKey: ["user"] })
-      
-      // Determine redirect path based on user role
-      let redirectPath = "/orders" // default fallback
-      
-      if (user.role === "admin") {
-        redirectPath = "/dashboard"
-      } else if (user.role === "sales") {
-        redirectPath = "/sale"
-      } else {
-        redirectPath = "/orders"
+    startTransition(async () => {
+      try {
+        const { token, user } = await loginUser(formData);
+        
+        queryClient.invalidateQueries({ queryKey: ["user"] })
+        queryClient.refetchQueries({ queryKey: ["user"] })
+        
+        toast.success(` Welcome back${user.name ? `, ${user.name}` : ''}! Logged in at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`, {
+          duration: 5000,
+          position: 'top-right',
+        });
+        
+        // Determine redirect path based on user role
+        let redirectPath = "/orders"
+        
+        if (user.role === "admin") {
+          redirectPath = "/dashboard"
+        } else if (user.role === "sales") {
+          redirectPath = "/sale"
+        } else {
+          redirectPath = "/orders"
+        }
+        
+        router.push(redirectPath)
+        router.refresh()
+
+      } catch (err: any) {
+        // Handle Google account error
+        if (err.response?.data?.provider === 'google') {
+          toast.error('This account uses Google Sign-In. Please use the Google button below.')
+        } else {
+          toast.error(err.response?.data?.error || err.message || "Network error. Please try again.")
+        }
+      } finally {
+        setLoading(false)
       }
-      
-      router.push(redirectPath)
-      router.refresh()
+    })
+  }
 
-    } catch (err: any) {
-      toast.error(err.message || "Network error. Please try again.")
-    } finally {
-      setLoading(false)
-    }
-  })
-}
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Email Field */}
@@ -155,6 +168,21 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -translate-x-full group-hover:translate-x-full transition-transform duration-500" />
       </button>
 
+      {/* Divider */}
+      <div className="relative my-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+        </div>
+        <div className="relative flex justify-center text-sm">
+          <span className="px-4 bg-white/80 dark:bg-gray-800/80 text-gray-500 dark:text-gray-400 backdrop-blur-sm">
+            Or continue with
+          </span>
+        </div>
+      </div>
+
+      {/* Google Login Button */}
+      <GoogleLoginButton disabled={loading || isPending} />
+
       {/* Sign Up Link */}
       <div className="text-center pt-4">
         <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -170,15 +198,6 @@ export default function LoginPage() {
           </Link>
         </span>
       </div>
-
-      <style jsx>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-      `}</style>
     </form>
   )
 }
-

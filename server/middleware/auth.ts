@@ -1,15 +1,12 @@
+// server/middleware/auth.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import UserModel from '../models/User';
 
-interface AuthRequest extends Request {
-  user?: {
-    userId: string;
-    role: string;
-  };
-}
+// Extend Express Request type to add custom properties to the existing user object
 
-const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
+
+const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     

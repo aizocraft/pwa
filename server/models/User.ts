@@ -5,15 +5,19 @@ import bcrypt from 'bcryptjs';
 export interface IUser extends Document {
   name: string;
   email: string;
-  password: string;
+  password?: string; // Made optional for Google auth
   role: 'user' | 'sales' | 'admin';
   phone?: string;
   avatar?: string;
-  isActive: boolean;  // Add this field
+  isActive: boolean;
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
-
+  
+  // Google Auth fields
+  googleId?: string;
+  provider: 'local' | 'google';
+  
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -27,7 +31,13 @@ const userSchema = new Schema<IUser>({
     trim: true,
     match: [/^\S+@\S+\.\S+$/, 'Please use a valid email']
   },
-  password: { type: String, required: true, minlength: 6 },
+  password: { 
+    type: String, 
+    minlength: 6,
+    required: function(this: any) {
+      return this.provider === 'local';
+    }
+  },
   role: { 
     type: String, 
     enum: ['user', 'sales', 'admin'], 
@@ -41,28 +51,44 @@ const userSchema = new Schema<IUser>({
   avatar: { type: String },
   isActive: { 
     type: Boolean, 
-    default: true  // Add default value
+    default: true
   },
-  lastLogin: { type: Date }
+  lastLogin: { type: Date },
+  
+  // Google Auth fields
+  googleId: { 
+    type: String, 
+    sparse: true, 
+    unique: true 
+  },
+  provider: { 
+    type: String, 
+    enum: ['local', 'google'], 
+    default: 'local' 
+  }
 }, {
   timestamps: true
 });
 
-// Hash password pre-save
+// Hash password pre-save (only for local provider)
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  try {
-    const salt = await bcrypt.genSalt(12);
-    this.password = await bcrypt.hash(this.password, salt);
+  // Only hash password if provider is local and password is modified
+  if (this.provider === 'local' && this.isModified('password') && this.password) {
+    try {
+      const salt = await bcrypt.genSalt(12);
+      this.password = await bcrypt.hash(this.password, salt);
+      next();
+    } catch (error) {
+      next(error as Error);
+    }
+  } else {
     next();
-  } catch (error) {
-    next(error as Error);
   }
 });
 
-// Compare password method
+// Compare password method (only for local provider)
 userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
+  if (this.provider !== 'local' || !this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
 

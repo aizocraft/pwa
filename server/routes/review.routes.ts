@@ -1,16 +1,10 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response, Request } from 'express';
 import { Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { IReview } from '../models/Review';
 import { IProduct } from '../models/Product';
 import authMiddleware from '../middleware/auth';
-import optionalAuthMiddleware from '../middleware/optionalAuth';
 
-interface AuthRequest extends Request {
-  user?: {
-    userId: string;
-  };
-}
 
 async function updateProductRating(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>, productId: string) {
   const result = await ReviewModel.aggregate([
@@ -44,7 +38,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
 
   // ========== ADMIN DASHBOARD ENDPOINTS ==========
   // GET /api/reviews/admin - List all reviews with filters/pagination/search
-  router.get('/admin', adminMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/admin', adminMiddleware, async (req: any, res: Response) => {
     try {
       const {
         page = 1,
@@ -58,7 +52,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
       const limitNum = parseInt(limit as string);
       const skip = (pageNum - 1) * limitNum;
 
-      const match: any = { isApproved: true }; // Only show approved for consistency, or remove
+      const match: any = { isApproved: true };
 
       if (status) match.status = status;
       if (rating) match.rating = parseInt(rating as string);
@@ -119,7 +113,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
   });
 
   // GET /api/reviews/admin/stats - Aggregate stats for dashboard
-  router.get('/admin/stats', adminMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/admin/stats', adminMiddleware, async (req: any, res: Response) => {
     try {
       const stats = await ReviewModel.aggregate([
         {
@@ -148,7 +142,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
   });
 
   // PATCH /api/reviews/admin/:id/status - Update review status
-  router.patch('/admin/:id/status', adminMiddleware, async (req: AuthRequest, res: Response) => {
+  router.patch('/admin/:id/status', adminMiddleware, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
       const { status } = req.body;
@@ -175,7 +169,6 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
         return res.status(404).json({ error: 'Review not found' });
       }
 
-      // Update product rating if approved/rejected changes
       if (status === 'approved' || status === 'rejected') {
         await updateProductRating(ReviewModel, ProductModel, review.productId as any);
       }
@@ -188,7 +181,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
   });
 
   // DELETE /api/reviews/admin/:id - Delete review (admin)
-  router.delete('/admin/:id', adminMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/admin/:id', adminMiddleware, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
 
@@ -201,7 +194,6 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
         return res.status(404).json({ error: 'Review not found' });
       }
 
-      // Update product rating after deletion
       await updateProductRating(ReviewModel, ProductModel, review.productId.toString());
 
       res.json({ message: 'Review deleted successfully' });
@@ -212,7 +204,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
   });
 
   // GET /api/reviews/user/:productId/has-reviewed - Check if user has reviewed
-  router.get('/user/:productId/has-reviewed', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/user/:productId/has-reviewed', authMiddleware, async (req: any, res: Response) => {
     try {
       const { productId } = req.params;
       
@@ -267,7 +259,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
   });
 
   // GET /api/reviews/:productId - Get product reviews with pagination
-  router.get('/:productId', optionalAuthMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/:productId', async (req: Request, res: Response) => {
     try {
       const { productId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
@@ -319,7 +311,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
   });
 
   // POST /api/reviews - Create review
-  router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/', authMiddleware, async (req: any, res: Response) => {
     try {
       const { productId, rating, review } = req.body;
       
@@ -372,7 +364,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
   });
 
   // PUT /api/reviews/:id - Update review
-  router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/:id', authMiddleware, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
       const { rating, review } = req.body;
@@ -414,7 +406,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
   });
 
   // DELETE /api/reviews/:id - Delete review
-  router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/:id', authMiddleware, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
 

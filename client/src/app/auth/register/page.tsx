@@ -1,3 +1,4 @@
+// app/auth/register/page.tsx
 'use client'
 
 import { useState, useTransition } from "react"
@@ -6,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import toast from "react-hot-toast"
 import { registerUser } from "@/lib/api"
+import GoogleLoginButton from "@/components/auth/GoogleLoginButton"
 import { Eye, EyeOff, Mail, Lock, User, UserPlus, CheckCircle, XCircle } from "lucide-react"
 
 export default function RegisterPage() {
@@ -59,13 +61,26 @@ export default function RegisterPage() {
         queryClient.invalidateQueries({ queryKey: ["user"] })
         queryClient.refetchQueries({ queryKey: ["user"] })
         
-       
+        toast.success(`🎉 Welcome ${user.name}! Account created at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`, {
+          duration: 5000,
+          position: 'top-right',
+        });
         
-        router.push("/orders")
+        // Determine redirect path based on user role
+        let redirectPath = "/orders"
+        if (user.role === "admin") {
+          redirectPath = "/dashboard"
+        } else if (user.role === "sales") {
+          redirectPath = "/sale"
+        } else {
+          redirectPath = "/orders"
+        }
+        
+        router.push(redirectPath)
         router.refresh()
 
       } catch (err: any) {
-        toast.error(err.message || "Registration failed. Please try again.")
+        toast.error(err.response?.data?.error || err.message || "Registration failed. Please try again.")
       } finally {
         setLoading(false)
       }
@@ -216,9 +231,9 @@ export default function RegisterPage() {
               className={`
                 h-2 rounded-full transition-all duration-300
                 ${passwordStrength === 0 ? 'bg-gray-300 w-0' : ''}
-                ${passwordStrength === 1 ? 'bg-red-400 w-25%' : ''}
-                ${passwordStrength === 2 ? 'bg-yellow-400 w-50%' : ''}
-                ${passwordStrength === 3 ? 'bg-orange-400 w-75%' : ''}
+                ${passwordStrength === 1 ? 'bg-red-400 w-[25%]' : ''}
+                ${passwordStrength === 2 ? 'bg-yellow-400 w-[50%]' : ''}
+                ${passwordStrength === 3 ? 'bg-orange-400 w-[75%]' : ''}
                 ${passwordStrength === 4 ? 'bg-green-500 w-full' : ''}
               `}
             />
@@ -254,6 +269,21 @@ export default function RegisterPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -translate-x-full group-hover:translate-x-full transition-transform duration-500" />
       </button>
 
+      {/* Divider */}
+      <div className="relative my-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+        </div>
+        <div className="relative flex justify-center text-sm">
+          <span className="px-4 bg-white/80 dark:bg-gray-800/80 text-gray-500 dark:text-gray-400 backdrop-blur-sm">
+            Or continue with
+          </span>
+        </div>
+      </div>
+
+      {/* Google Sign Up Button */}
+      <GoogleLoginButton text="Sign up with Google" disabled={loading || isPending} />
+
       {/* Login Link */}
       <div className="text-center pt-4">
         <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -269,15 +299,6 @@ export default function RegisterPage() {
           </Link>
         </span>
       </div>
-
-      <style jsx>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-      `}</style>
     </form>
   )
 }
-
