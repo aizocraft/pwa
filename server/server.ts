@@ -1,10 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 import connectDB from './config/db';
 import { initGridFS } from './config/gridfs'; 
 import { auditContextMiddleware, autoAuditMiddleware, createAuditLog } from './middleware/auditMiddleware';
-// import authMiddleware from './middleware/auth'; // REMOVED
 
 import ProductModel from './models/Product';
 import ReviewModel from './models/Review';
@@ -19,6 +19,7 @@ import feedbackRoutes from './routes/feedback.routes';
 import contactRoutes from './routes/contact.routes';
 import emailRoutes from './routes/email.routes';
 import auditRoutes from './routes/audit.routes';
+import healthzRoutes from './routes/healthz.routes'; // Add this import
 
 dotenv.config();
 
@@ -40,12 +41,10 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// app.use(authMiddleware); // REMOVED - Auth middleware disabled
-
 // Apply audit middleware (retained)
 app.use(auditContextMiddleware); // This adds requestId and startTime
 app.use(autoAuditMiddleware({ 
-  excludePaths: ['/health', '/metrics', '/api/company/logo/', '/api/company/favicon/'],
+  excludePaths: ['/health', '/healthz', '/metrics', '/api/company/logo/', '/api/company/favicon/'],
   includeBody: false // Don't log sensitive data
 }));
 
@@ -61,6 +60,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/', healthzRoutes); // Add healthz routes (mounts at root path)
 
 // Health check (excluded from audit)
 app.get('/api/health', (req, res) => {
@@ -71,4 +71,5 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on port ${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`💓 Healthz endpoint: http://localhost:${PORT}/healthz`);
 });
