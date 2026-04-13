@@ -129,7 +129,7 @@ router.get('/google/callback',
       );
       
       // Get frontend URL from env or use default
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       
       // Redirect to frontend with token and user info
       const userData = encodeURIComponent(JSON.stringify({
@@ -145,7 +145,7 @@ router.get('/google/callback',
       res.redirect(`${frontendUrl}/auth/callback?token=${token}&user=${userData}`);
     } catch (error) {
       console.error('Google callback error:', error);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
     }
   }
