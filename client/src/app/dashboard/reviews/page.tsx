@@ -1,7 +1,8 @@
 // src/app/dashboard/reviews/page.tsx
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useInfiniteQuery, useQuery, useQueryClient, useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { 
   Star, Search, Filter, Download, RefreshCw,
   User, Mail, Calendar, Loader2, ChevronLeft,
@@ -11,74 +12,78 @@ import {
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { getProductReviews, deleteReview, updateReview } from '@/lib/api'
+import { 
+  getAdminReviews, 
+  getAdminReviewStats, 
+  updateReviewStatus, 
+  deleteAdminReview 
+} from '@/lib/api'
+import type { Review } from '@/types/review'
 
-// Types
-interface Review {
-  _id?: string
-  id?: string
-  productId: string | {
-    _id: string
-    name: string
-    images?: string[]
-  }
-  userId: string | {
-    _id: string
-    name: string
-    email?: string
-  }
-  rating: number
-  review?: string
-  isApproved: boolean
-  createdAt: string
-  updatedAt: string
-}
+  // Review interface already defined in types/review.ts
+
 
 export default function ReviewsPage() {
-  const [reviews, setReviews] = useState<Review[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [ratingFilter, setRatingFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+    const [statusFilter, setStatusFilter] = useState('')
   const [selectedReview, setSelectedReview] = useState<Review | null>(null)
-  const [allProducts, setAllProducts] = useState<Map<string, string>>(new Map())
-  const [allUsers, setAllUsers] = useState<Map<string, { name: string; email: string }>>(new Map())
+  const [page, setPage] = useState(1)
   const itemsPerPage = 10
 
-  // Fetch all reviews (you'll need a getAdminReviews endpoint)
-  // For now, we'll simulate by fetching from multiple products
-  // You should add a GET /api/reviews/admin endpoint in your backend
+  // Queries
+  const reviewsQuery = useInfiniteQuery({
+    queryKey: ['adminReviews', { search: search, ratingFilter, statusFilter }],
+    queryFn: ({ pageParam = 1 }) => getAdminReviews({ 
+      page: pageParam as number,
+      limit: itemsPerPage, 
+      status: statusFilter || undefined, 
+      rating: ratingFilter ? parseInt(ratingFilter, 10) : undefined, 
+      search 
+    }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, pages) => {
+      return lastPage.pagination.page && lastPage.pagination.page < lastPage.pagination.pages 
+        ? lastPage.pagination.page + 1 
+        : undefined
+    },
+    // keepPreviousData: true,
+    staleTime: 60 * 1000,
+  })
 
-  const fetchReviews = async () => {
-    try {
-      setLoading(true)
-      // TODO: Replace with actual admin reviews endpoint
-      // const response = await getAdminReviews({ page, limit: itemsPerPage, status: statusFilter, rating: ratingFilter })
-      // For now, show empty state
-      setReviews([])
-      setTotalPages(1)
-    } catch (error) {
-      console.error('Failed to fetch reviews:', error)
-      toast.error('Failed to load reviews')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const statsQuery = useQuery({
+    queryKey: ['adminReviewStats'],
+    queryFn: getAdminReviewStats,
+    staleTime: 5 * 60 * 1000,
+  })
 
-  useEffect(() => {
-    fetchReviews()
-  }, [page, ratingFilter, statusFilter])
+  const reviews = reviewsQuery.data?.pages.flatMap(page => page.data) || []
+  const pagination = reviewsQuery.data?.pages[reviewsQuery.data.pages.length - 1]?.pagination || { page: 1, total: 0, pages: 1, limit: 10 }
+  const totalPages = pagination.pages || 1
+  const currentPage = pagination.page || 1
+  const statsData = statsQuery.data || { total: 0, averageRating: 0 }
 
-  // Handle search with debounce
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (page !== 1) setPage(1)
-      fetchReviews()
-    }, 500)
-    return () => clearTimeout(timeout)
-  }, [search])
+
+  // Mutations
+  const approveMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'pending' | 'approved' | 'rejected' }) => updateReviewStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminReviews'] })
+      queryClient.invalidateQueries({ queryKey: ['adminReviewStats'] })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteAdminReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminReviews'] })
+      queryClient.invalidateQueries({ queryKey: ['adminReviewStats'] })
+    },
+  })
+
+  // Handle search debounce
+  const debouncedSearch = useMemo(() => search, [search])
 
   // Statistics
   const stats = useMemo(() => {
@@ -114,8 +119,9 @@ export default function ReviewsPage() {
     )
   }
 
-  const handleRefresh = async () => {
-    await fetchReviews()
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['adminReviews'] })
+    queryClient.invalidateQueries({ queryKey: ['adminReviewStats'] })
     toast.success('Reviews refreshed')
   }
 
@@ -146,25 +152,15 @@ export default function ReviewsPage() {
     toast.success('Export completed')
   }
 
-  const handleApprove = async (id: string) => {
-    try {
-      await updateReview(id, { rating: 5 }) // You'll need to add status update to review
-      toast.success('Review approved successfully')
-      fetchReviews()
-    } catch (error) {
-      toast.error('Failed to approve review')
+  const handleApprove = (id: string) => {
+    if (confirm('Approve this review?')) {
+      approveMutation.mutate({ id, status: 'approved' })
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this review?')) {
-      try {
-        await deleteReview(id)
-        toast.success('Review deleted successfully')
-        fetchReviews()
-      } catch (error) {
-        toast.error('Failed to delete review')
-      }
+      deleteMutation.mutate(id)
     }
   }
 
@@ -236,10 +232,10 @@ export default function ReviewsPage() {
             <div className="flex gap-3">
               <button
                 onClick={handleRefresh}
-                disabled={loading}
+                disabled={reviewsQuery.isFetching || statsQuery.isFetching}
                 className="flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${(reviewsQuery.isFetching || statsQuery.isFetching) ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
               <button
@@ -359,14 +355,14 @@ export default function ReviewsPage() {
                 type="text"
                 placeholder="Search by product or customer..."
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
 
             <select
               value={ratingFilter}
-              onChange={(e) => { setRatingFilter(e.target.value); setPage(1) }}
+              onChange={(e) => setRatingFilter(e.target.value)}
               className="px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="">All Ratings</option>
@@ -403,11 +399,15 @@ export default function ReviewsPage() {
           transition={{ delay: 0.3 }}
           className="space-y-4"
         >
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            </div>
-          ) : reviews.length === 0 ? (
+        {reviewsQuery.isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        ) : reviewsQuery.isError ? (
+          <div className="text-center py-16 text-red-600">
+            Error loading reviews. <button onClick={() => reviewsQuery.refetch()} className="underline hover:no-underline">Retry</button>
+          </div>
+        ) : reviews.length === 0 ? (
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 text-center py-16">
               <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <MessageSquare className="w-8 h-8 text-gray-400" />
@@ -519,8 +519,8 @@ export default function ReviewsPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 mt-6">
               <button
-                disabled={page === 1}
-                onClick={() => setPage(p => p - 1)}
+                disabled={!reviewsQuery.hasPreviousPage}
+                onClick={() => reviewsQuery.fetchPreviousPage()}
                 className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -530,19 +530,18 @@ export default function ReviewsPage() {
                   let pageNum: number
                   if (totalPages <= 5) {
                     pageNum = i + 1
-                  } else if (page <= 3) {
+                  } else if (currentPage <= 3) {
                     pageNum = i + 1
-                  } else if (page >= totalPages - 2) {
+                  } else if (currentPage >= totalPages - 2) {
                     pageNum = totalPages - 4 + i
                   } else {
-                    pageNum = page - 2 + i
+                    pageNum = currentPage - 2 + i
                   }
                   return (
                     <button
                       key={pageNum}
-                      onClick={() => setPage(pageNum)}
                       className={`w-8 h-8 rounded-lg text-sm font-medium transition-all ${
-                        page === pageNum
+                        currentPage === pageNum
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
                       }`}
@@ -553,8 +552,8 @@ export default function ReviewsPage() {
                 })}
               </div>
               <button
-                disabled={page === totalPages}
-                onClick={() => setPage(p => p + 1)}
+                disabled={!reviewsQuery.hasNextPage}
+                onClick={() => reviewsQuery.fetchNextPage()}
                 className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 <ChevronRight className="w-4 h-4" />

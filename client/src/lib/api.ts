@@ -771,5 +771,74 @@ export async function hasUserReviewed(productId: string): Promise<{ hasReviewed:
     return { hasReviewed: false };
   }
 }
+
+// ========== ADMIN REVIEWS API ==========
+export async function getAdminReviews(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  rating?: number;
+  search?: string;
+}): Promise<{
+  data: Review[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}> {
+  try {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        query.append(key, String(value));
+      }
+    });
+    const response = await api.get(`/reviews/admin${query.toString() ? `?${query.toString()}` : ''}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch admin reviews:', error);
+    toast.error('Failed to load reviews');
+    throw error;
+  }
+}
+
+export async function getAdminReviewStats(): Promise<{
+  total: number;
+  averageRating: number;
+}> {
+  try {
+    const response = await api.get('/reviews/admin/stats');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch review stats:', error);
+    return { total: 0, averageRating: 0 };
+  }
+}
+
+export async function updateReviewStatus(reviewId: string, status: 'pending' | 'approved' | 'rejected'): Promise<Review> {
+  try {
+    const response = await api.patch(`/reviews/admin/${reviewId}/status`, { status });
+    toast.success('Review status updated successfully');
+    return response.data;
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error || 'Failed to update review status';
+    toast.error(errorMessage);
+    throw error;
+  }
+}
+
+export async function deleteAdminReview(reviewId: string): Promise<void> {
+  try {
+    await api.delete(`/reviews/admin/${reviewId}`);
+    toast.success('Review deleted successfully');
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error || 'Failed to delete review';
+    toast.error(errorMessage);
+    throw error;
+  }
+}
 // Export the api instance for custom requests 
 export default api;
+

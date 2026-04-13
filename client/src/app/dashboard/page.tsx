@@ -115,16 +115,7 @@ export default function DashboardOverviewPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 shadow-xl">
-        <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{backgroundImage: "url('https://images.unsplash.com/photo-1581092160560-1c1e428e9d65?auto=format&fit=crop&w=800&q=80')"}} />
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-        <div className="relative">
-          <h2 className="text-xl sm:text-2xl font-bold text-white">Welcome back, {user?.name || 'Admin'}! 👋</h2>
-          <p className="text-blue-100 mt-1 text-sm sm:text-base">Here's what's happening with your store today.</p>
-        </div>
-      </div>
+      
 
       {/* Stats Grid */}
       {stats.length > 0 && (
