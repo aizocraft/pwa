@@ -1,4 +1,3 @@
-// app/auth/callback/page.tsx
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
@@ -11,6 +10,7 @@ function AuthCallbackContent() {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [redirectCountdown, setRedirectCountdown] = useState(3);
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -63,8 +63,18 @@ function AuthCallbackContent() {
         localStorage.setItem('user', JSON.stringify(user));
         
         setStatus('success');
-       
         
+        // Countdown redirect
+        const interval = setInterval(() => {
+          setRedirectCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(interval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
         // Determine redirect path
         let redirectPath = redirect || '/';
         if (redirectPath === '/' || !redirectPath) {
@@ -77,10 +87,10 @@ function AuthCallbackContent() {
           }
         }
         
-        // Small delay to show success state
+        // Redirect after countdown
         setTimeout(() => {
           router.push(redirectPath);
-        }, 1000);
+        }, 3000);
       } catch (err) {
         console.error('Callback handling failed:', err);
         setStatus('error');
@@ -98,22 +108,20 @@ function AuthCallbackContent() {
 
   if (status === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
-        <div className="text-center max-w-md mx-auto p-8">
-          <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center space-y-6">
+        <div className="w-24 h-24 bg-red-500/10 backdrop-blur-xl rounded-2xl flex items-center justify-center border-2 border-red-500/20 p-4 shadow-xl">
+          <AlertCircle className="w-12 h-12 text-red-400" />
+        </div>
+        <div className="space-y-3">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
             Authentication Failed
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-gray-300 max-w-sm leading-relaxed">
             {error || 'An error occurred during authentication'}
           </p>
-          <div className="animate-pulse">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Redirecting to login...
-            </p>
-          </div>
+        </div>
+        <div className="text-sm text-gray-500 animate-pulse">
+          Redirecting to login...
         </div>
       </div>
     );
@@ -121,39 +129,41 @@ function AuthCallbackContent() {
 
   if (status === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
-        <div className="text-center max-w-md mx-auto p-8">
-          <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
-            <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center space-y-6 animate-scaleIn">
+        <div className="relative">
+          <div className="w-28 h-28 bg-green-500/10 backdrop-blur-xl rounded-3xl flex items-center justify-center border-4 border-green-500/20 shadow-2xl p-6 animate-bounce-slow">
+            <CheckCircle className="w-16 h-16 text-green-400 drop-shadow-lg" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-            Sign In Successful!
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            You have been successfully authenticated.
+          <div className="absolute -inset-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-3xl blur-xl animate-pulse opacity-75"></div>
+        </div>
+        <div className="space-y-3">
+          <h1 className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 bg-clip-text text-transparent drop-shadow-lg">
+            Welcome!
+          </h1>
+          <p className="text-xl text-gray-200 font-semibold">
+            You are now signed in successfully
           </p>
-          <div className="animate-pulse">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Redirecting you to your dashboard...
-            </p>
-          </div>
+          <p className="text-sm text-gray-400">
+            Redirecting in <span className="font-mono text-green-400 font-bold text-lg">{redirectCountdown}</span>
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
-      <div className="text-center">
-        <div className="relative w-20 h-20 mx-auto mb-6">
-          <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
-          <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
-        </div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Completing Sign In
+    <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center space-y-6">
+      <div className="relative w-20 h-20">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 rounded-2xl backdrop-blur-sm animate-ping opacity-75"></div>
+        <div className="absolute inset-0 border-4 border-purple-500/30 rounded-2xl"></div>
+        <Loader2 className="w-12 h-12 text-purple-400 relative z-10 animate-spin" />
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-xl sm:text-2xl font-bold text-white">
+          Completing Authentication
         </h2>
-        <p className="text-gray-500 dark:text-gray-400">
-          Please wait while we authenticate you...
+        <p className="text-gray-400">
+          Finalizing your Google sign in...
         </p>
       </div>
     </div>
@@ -163,14 +173,25 @@ function AuthCallbackContent() {
 export default function AuthCallbackPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center space-y-6">
+        <Loader2 className="w-16 h-16 text-purple-400 animate-spin" />
+        <p className="text-gray-400 text-lg">Loading authentication...</p>
       </div>
     }>
       <AuthCallbackContent />
     </Suspense>
   );
 }
+
+<style jsx global>{`
+  @keyframes bounce-slow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .animate-bounce-slow { animation: bounce-slow 2s infinite; }
+  .animate-scaleIn { animation: scaleIn 0.5s ease-out; }
+`}</style>

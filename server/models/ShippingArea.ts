@@ -44,6 +44,6 @@ const shippingAreaSchema = new Schema<IShippingArea, IShippingAreaModel>({
 });
 
 shippingAreaSchema.index({ isActive: 1 });
-shippingAreaSchema.index({ name: 1 });
+
 
 export default mongoose.model<IShippingArea, IShippingAreaModel>('ShippingArea', shippingAreaSchema);

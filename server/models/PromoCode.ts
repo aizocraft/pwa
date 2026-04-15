@@ -70,7 +70,7 @@ promoCodeSchema.methods.canUse = function(subtotal: number): boolean {
          subtotal >= this.minSubtotal;
 };
 
-promoCodeSchema.index({ code: 1 });
+
 promoCodeSchema.index({ isActive: 1, expiryDate: 1 });
 
 export default mongoose.model<IPromoCode, IPromoModel>('PromoCode', promoCodeSchema);

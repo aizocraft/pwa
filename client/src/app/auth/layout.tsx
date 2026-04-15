@@ -1,4 +1,3 @@
-// app/auth/layout.tsx
 'use client'
 
 import Link from 'next/link'
@@ -41,43 +40,41 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   if (!mounted) return null
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 relative overflow-hidden">
-      {/* Animated Background Elements */}
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-950">
+      {/* Animated Background Elements - Dark theme */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-r from-indigo-500/20 to-blue-500/20 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob animation-delay-4000"></div>
       </div>
 
-      <div className="relative z-10 w-full max-w-md transform transition-all duration-500 animate-fadeInUp">
-       
-
+      <div className="relative z-10 w-full max-w-md sm:max-w-lg transform transition-all duration-500 animate-fadeInUp">
         {/* Tab Navigation - Hide on callback page */}
         {!isCallbackPage && (
-          <div className="relative bg-white/50 dark:bg-gray-800/50 backdrop-blur-md rounded-2xl p-1 mb-6 shadow-xl border border-white/20 dark:border-gray-700/50">
+          <div className="relative bg-gray-800/60 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl p-1 mb-6 shadow-2xl border border-gray-700/50">
             <div className="relative flex">
               <button
                 onClick={() => handleTabChange('login')}
-                className={`relative flex-1 py-3.5 px-4 rounded-xl font-semibold transition-all duration-300 z-10 ${
+                className={`relative flex-1 py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-300 z-10 ${
                   activeTab === 'login'
-                    ? 'text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25'
+                    : 'text-gray-300 hover:text-white hover:bg-gray-700/50 backdrop-blur-sm'
                 }`}
               >
                 Sign In
               </button>
               <button
                 onClick={() => handleTabChange('register')}
-                className={`relative flex-1 py-3.5 px-4 rounded-xl font-semibold transition-all duration-300 z-10 ${
+                className={`relative flex-1 py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-300 z-10 ${
                   activeTab === 'register'
-                    ? 'text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25'
+                    : 'text-gray-300 hover:text-white hover:bg-gray-700/50 backdrop-blur-sm'
                 }`}
               >
                 Sign Up
               </button>
               <div
-                className={`absolute top-1 bottom-1 w-1/2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl transition-all duration-300 ease-out ${
+                className={`absolute top-1 bottom-1 w-1/2 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl shadow-lg transition-all duration-300 ease-out ${
                   activeTab === 'login' ? 'left-1' : 'left-1/2'
                 }`}
               />
@@ -86,19 +83,19 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         )}
 
         {/* Content */}
-        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 border border-white/40 dark:border-gray-700/50 shadow-2xl transform transition-all duration-500 animate-scaleIn">
+        <div className="bg-gray-800/70 backdrop-blur-xl rounded-3xl p-8 sm:p-10 border border-gray-700/50 shadow-2xl">
           {children}
         </div>
 
         {/* Footer - Hide on callback page */}
         {!isCallbackPage && (
-          <p className="text-center mt-8 text-sm text-gray-600 dark:text-gray-400 animate-fadeIn animation-delay-200">
+          <p className="text-center mt-8 text-sm text-gray-400">
             By continuing, you agree to our{' '}
-            <Link href="/terms" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline font-medium transition-colors">
+            <Link href="/terms" className="text-purple-400 hover:text-purple-300 font-medium transition-colors">
               Terms of Service
             </Link>{' '}
             and{' '}
-            <Link href="/privacy" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline font-medium transition-colors">
+            <Link href="/privacy" className="text-purple-400 hover:text-purple-300 font-medium transition-colors">
               Privacy Policy
             </Link>.
           </p>
@@ -130,16 +127,6 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             transform: translateY(0);
           }
         }
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
         @keyframes scaleIn {
           from {
             opacity: 0;
@@ -153,17 +140,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         .animate-fadeInUp {
           animation: fadeInUp 0.6s ease-out;
         }
-        .animate-slideDown {
-          animation: slideDown 0.5s ease-out;
-        }
         .animate-scaleIn {
           animation: scaleIn 0.4s ease-out;
-        }
-        .animation-delay-100 {
-          animation-delay: 0.1s;
-        }
-        .animation-delay-200 {
-          animation-delay: 0.2s;
         }
       `}</style>
     </div>
