@@ -1,139 +1,53 @@
 // src/app/dashboard/shipping/page.tsx
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Truck, Tag } from 'lucide-react'
 import ShippingSettings from './components/ShippingSettings'
 import ShippingAreas from './components/ShippingAreas'
 import PromoCodes from './components/PromoCodes'
-
-export interface ShippingArea {
-  id: string
-  name: string
-  fee: number
-  estimatedDays: string
-  isActive: boolean
-}
-
-export interface PromoCode {
-  id: string
-  code: string
-  description: string
-  discountType: 'percentage' | 'fixed'
-  discountValue: number
-  minOrderAmount: number
-  maxDiscountAmount?: number
-  validFrom: Date
-  validTo: Date
-  usageLimit: number
-  usedCount: number
-  isActive: boolean
-}
-
-export interface ShippingSettingsType {
-  freeShippingThreshold: number
-  isFreeShippingEnabled: boolean
-  baseRate: number
-}
+import { ShippingArea, PromoCode } from '@/types/order'
+import { getShippingAreas, getPromoCodes } from '@/lib/api'
 
 export default function ShippingPage() {
-  const [activeTab, setActiveTab] = useState<'settings' | 'areas' | 'promos'>('settings')
-  const [settings, setSettings] = useState<ShippingSettingsType>({
-    freeShippingThreshold: 5000,
-    isFreeShippingEnabled: true,
-    baseRate: 99
-  })
-  const [areas, setAreas] = useState<ShippingArea[]>([
-    {
-      id: '1',
-      name: 'Nairobi CBD',
-      fee: 150,
-      estimatedDays: '1-2 business days',
-      isActive: true
-    },
-    {
-      id: '2',
-      name: 'Nairobi Suburbs',
-      fee: 250,
-      estimatedDays: '1-3 business days',
-      isActive: true
-    },
-    {
-      id: '3',
-      name: 'Major Cities (Mombasa, Kisumu, Nakuru)',
-      fee: 450,
-      estimatedDays: '2-4 business days',
-      isActive: true
-    },
-    {
-      id: '4',
-      name: 'Other Towns',
-      fee: 600,
-      estimatedDays: '3-5 business days',
-      isActive: true
-    },
-    {
-      id: '5',
-      name: 'Remote Areas',
-      fee: 1000,
-      estimatedDays: '5-7 business days',
-      isActive: false
-    }
-  ])
+  const [activeTab, setActiveTab] = useState<'areas' | 'promos'>('areas')
+  const [shippingAreas, setShippingAreas] = useState<ShippingArea[]>([])
+  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([
-    {
-      id: '1',
-      code: 'WELCOME20',
-      description: 'Welcome discount for new customers',
-      discountType: 'percentage',
-      discountValue: 20,
-      minOrderAmount: 1000,
-      maxDiscountAmount: 2000,
-      validFrom: new Date('2024-01-01'),
-      validTo: new Date('2024-12-31'),
-      usageLimit: 100,
-      usedCount: 45,
-      isActive: true
-    },
-    {
-      id: '2',
-      code: 'FREESHIP',
-      description: 'Free shipping on all orders',
-      discountType: 'fixed',
-      discountValue: 0,
-      minOrderAmount: 3000,
-      validFrom: new Date('2024-01-01'),
-      validTo: new Date('2024-06-30'),
-      usageLimit: 50,
-      usedCount: 23,
-      isActive: true
-    },
-    {
-      id: '3',
-      code: 'SAVE500',
-      description: 'Save KES 500 on orders above KES 2500',
-      discountType: 'fixed',
-      discountValue: 500,
-      minOrderAmount: 2500,
-      validFrom: new Date('2024-02-01'),
-      validTo: new Date('2024-05-31'),
-      usageLimit: 200,
-      usedCount: 78,
-      isActive: true
-    }
-  ])
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        const [areasResult, promosResult] = await Promise.all([
+          getShippingAreas(),
+          getPromoCodes()
+        ])
+        setShippingAreas(areasResult.areas || [])
+        setPromoCodes(promosResult.promos || [])
 
-  const updateSettings = (newSettings: ShippingSettingsType) => {
-    setSettings(newSettings)
-  }
+
+      } catch (error) {
+        console.error('Failed to load shipping data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadData()
+  }, [])
 
   const updateAreas = (newAreas: ShippingArea[]) => {
-    setAreas(newAreas)
+    setShippingAreas(newAreas)
   }
 
   const updatePromoCodes = (newPromoCodes: PromoCode[]) => {
     setPromoCodes(newPromoCodes)
+  }
+
+
+  if (loading) {
+    return <div>Loading...</div>
   }
 
   return (
@@ -153,19 +67,7 @@ export default function ShippingPage() {
         {/* Tabs */}
         <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
           <nav className="flex gap-4">
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                activeTab === 'settings'
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              Shipping Settings
-              {activeTab === 'settings' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
-              )}
-            </button>
+            {/* Settings tab hidden for now as no backend endpoint */}
             <button
               onClick={() => setActiveTab('areas')}
               className={`px-4 py-2 text-sm font-medium transition-colors relative ${
@@ -198,15 +100,14 @@ export default function ShippingPage() {
 
         {/* Content */}
         <div>
-          {activeTab === 'settings' && (
-            <ShippingSettings settings={settings} onUpdateSettings={updateSettings} />
-          )}
+          {/* ShippingSettings temporarily disabled */}
           {activeTab === 'areas' && (
-            <ShippingAreas areas={areas} onUpdateAreas={updateAreas} />
+            <ShippingAreas areas={shippingAreas} onUpdateAreas={updateAreas} />
           )}
-          {activeTab === 'promos' && (
-            <PromoCodes promoCodes={promoCodes} onUpdatePromoCodes={updatePromoCodes} />
+{activeTab === 'promos' && (
+            <PromoCodes promoCodes={promoCodes || []} onUpdatePromoCodes={updatePromoCodes} />
           )}
+
         </div>
       </div>
     </div>

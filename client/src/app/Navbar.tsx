@@ -14,7 +14,8 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const { totalItems } = useCartStore()
+  const { totalItems, loading: cartLoading } = useCartStore()
+
   const { user, isLoggedIn, loading: authLoading, logout, isAdmin } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const router = useRouter()
@@ -161,14 +162,18 @@ export default function Navbar() {
                 className="relative p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 group"
                 aria-label="Shopping cart"
               >
-
-                <ShoppingCart className="w-5 h-5 group-hover:scale-105 transition-transform" />
-                {totalItems > 0 && (
+                {cartLoading ? (
+                  <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <ShoppingCart className="w-5 h-5 group-hover:scale-105 transition-transform" />
+                )}
+                {totalItems > 0 && !cartLoading && (
                   <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-gradient-to-r from-red-500 to-pink-500 rounded-full shadow-md">
                     {totalItems > 99 ? '99+' : totalItems}
                   </span>
                 )}
               </Link>
+
 
               {/* Theme Toggle */}
               <button

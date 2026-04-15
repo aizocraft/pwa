@@ -32,6 +32,8 @@ export interface IOrder extends Document {
     cardBrand?: string;
   };
   stripeId?: string;
+  selectedShippingArea?: mongoose.Types.ObjectId;
+  appliedPromoCode?: mongoose.Types.ObjectId;
   shippingAddress: {
     fullName: string;
     address1: string;
@@ -101,6 +103,8 @@ const orderSchema = new Schema<IOrder, IOrderModel>({
     cardBrand: String
   },
   stripeId: String,
+  selectedShippingArea: { type: SchemaTypes.ObjectId, ref: 'ShippingArea' },
+  appliedPromoCode: { type: SchemaTypes.ObjectId, ref: 'PromoCode' },
   shippingAddress: {
     fullName: { type: String, required: true },
     address1: { type: String, required: true },
@@ -126,6 +130,8 @@ orderSchema.index({ createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ 'guestInfo.email': 1 });
 orderSchema.index({ paymentStatus: 1 });
+orderSchema.index({ selectedShippingArea: 1 });
+orderSchema.index({ appliedPromoCode: 1 });
 
 // Virtual for order number
 orderSchema.virtual('orderNumber').get(function() {

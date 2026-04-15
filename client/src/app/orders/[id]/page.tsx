@@ -71,16 +71,27 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
-          alignItems: 'center',
-          borderBottom: '2px solid #1a472a',
-          paddingBottom: '12px',
-          marginBottom: '12px'
+          alignItems: 'flex-start',
+          borderBottom: '3px solid #1a472a',
+          paddingBottom: '16px',
+          marginBottom: '16px',
+          pageBreakInside: 'avoid'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
             {logoUrl ? (
-              <img src={logoUrl} alt={companyName} style={{ height: '80px', width: 'auto', objectFit: 'contain' }} />
+              <img 
+                src={logoUrl} 
+                alt={companyName} 
+                style={{ 
+                  height: '90px', 
+                  width: 'auto', 
+                  maxWidth: '180px',
+                  objectFit: 'contain',
+                  imageRendering: 'crisp-edges'
+                }} 
+              />
             ) : (
-              <h2 style={{ fontSize: '18pt', fontWeight: 'bold', color: '#1a472a', margin: 0 }}>{companyName}</h2>
+              <h2 style={{ fontSize: '20pt', fontWeight: 'bold', color: '#1a472a', margin: 0, lineHeight: 1.1 }}>{companyName}</h2>
             )}
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -680,15 +691,20 @@ export default function UserOrderDetails() {
                     className="p-4 sm:p-6 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-all duration-300"
                   >
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                      <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-md mx-auto sm:mx-0">
+                      <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-50/80 via-white to-gray-50/80 dark:from-slate-800/60 dark:via-gray-900/30 dark:to-slate-800/60 shadow-lg ring-1 ring-gray-200/50 dark:ring-gray-700/50 hover:shadow-xl hover:ring-emerald-200/50 dark:hover:ring-emerald-400/30 mx-auto sm:mx-0 group/image transition-all duration-500 hover:scale-105">
                         <img 
                           src={item.image || '/logo.png'}
                           alt={item.name}
-                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
+                          className="w-full h-full object-cover group-hover/image:scale-110 transition-transform duration-500"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/logo.png'
+                            ;(e.target as HTMLImageElement).src = '/logo.png'
                           }}
+                          loading="lazy"
+                          draggable={false}
                         />
+                        {item.image && !item.image.startsWith('http') && (
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                        )}
                       </div>
                       
                       <div className="flex-1 min-w-0">
@@ -845,6 +861,18 @@ export default function UserOrderDetails() {
                     {order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod === 'mpesa' ? 'M-Pesa' : 'Card Payment'}
                   </span>
                 </div>
+                {order.shippingArea && (
+                  <div className="flex justify-between py-2 flex-wrap gap-2">
+                    <span className="text-gray-600 dark:text-gray-400">Shipping Area:</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">{order.shippingArea.name} (KES {order.shippingCost.toLocaleString()})</span>
+                  </div>
+                )}
+                {order.promoCode && (
+                  <div className="flex justify-between py-2 flex-wrap gap-2 bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded">
+                    <span className="text-gray-600 dark:text-gray-400">Promo:</span>
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-300">{order.promoCode.code} (-KES {order.discount.toLocaleString()})</span>
+                  </div>
+                )}
                 <div className="flex justify-between py-2 border-t border-gray-200/50 dark:border-gray-700 flex-wrap gap-2">
                   <span className="text-gray-600 dark:text-gray-400">Status:</span>
                   <span className={`font-semibold ${

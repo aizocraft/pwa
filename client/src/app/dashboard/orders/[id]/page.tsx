@@ -1101,6 +1101,24 @@ export default function AdminOrderDetails() {
               </h3>
               <div className="space-y-4">
                 <PaymentMethodBadge method={order.paymentMethod} status={order.paymentStatus} />
+                {(order as any).shippingArea && (
+                  <div className="space-y-1">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Shipping Area</div>
+                    <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      {(order as any).shippingArea.name}
+                      <span className="text-xs text-gray-500 ml-1">(KES {order.shippingCost.toLocaleString()})</span>
+                    </div>
+                  </div>
+                )}
+                {(order as any).promoCode && (
+                  <div className="space-y-1 bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-xl">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Promo Code</div>
+                    <div className="font-semibold text-emerald-700 dark:text-emerald-300">
+                      {(order as any).promoCode.code} <span className="text-xs">(-KES {((order as any).discount || 0).toLocaleString()})</span>
+                    </div>
+                  </div>
+                )}
                 
                 {order.paymentDetails?.transactionId && (
                   <div>

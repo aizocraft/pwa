@@ -1,12 +1,19 @@
-// src/app/dashboard/shipping/components/ShippingAreas.tsx
 "use client"
 
 import { useState } from 'react'
 import { 
   Plus, Trash2, Edit2, Save, X, MapPin, DollarSign, 
-  Truck, CheckCircle, AlertCircle 
+  CheckCircle, AlertCircle, Truck, ShoppingBag 
 } from 'lucide-react'
-import { ShippingArea } from '../page'
+import { ShippingArea, CreateShippingAreaRequest, UpdateShippingAreaRequest } from '@/types/order'
+import { 
+  getShippingAreas, 
+  createShippingArea, 
+  updateShippingArea, 
+  deleteShippingArea 
+} from '@/lib/api'
+
+import toast from 'react-hot-toast'
 
 interface ShippingAreasProps {
   areas: ShippingArea[]
@@ -16,79 +23,157 @@ interface ShippingAreasProps {
 export default function ShippingAreas({ areas, onUpdateAreas }: ShippingAreasProps) {
   const [editingArea, setEditingArea] = useState<ShippingArea | null>(null)
   const [isAddingArea, setIsAddingArea] = useState(false)
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
-  const [newArea, setNewArea] = useState<Partial<ShippingArea>>({
+  const [loading, setLoading] = useState(false)
+  const [newArea, setNewArea] = useState<Partial<CreateShippingAreaRequest>>({
     name: '',
-    fee: 0,
-    estimatedDays: '',
-    isActive: true
+    regions: [],
+    baseCost: 0,
+    freeThreshold: 0
   })
+  const [regionsInput, setRegionsInput] = useState('')
+  const [freeShippingEnabled, setFreeShippingEnabled] = useState(false)
 
-  const handleAddArea = () => {
-    if (newArea.name && newArea.fee && newArea.estimatedDays) {
-      const area: ShippingArea = {
-        id: Date.now().toString(),
+  const reloadAreas = async () => {
+    try {
+      const result = await getShippingAreas()
+      const freshAreas = result.areas || []
+      onUpdateAreas(freshAreas)
+      return freshAreas
+
+    } catch (error) {
+      toast.error('Failed to reload shipping areas')
+      return areas
+    }
+  }
+
+  const handleAddArea = async () => {
+    if (!newArea.name?.trim() || newArea.baseCost === undefined || newArea.baseCost < 0) {
+      toast.error('Name and base cost are required')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const regions = regionsInput.split(',').map(r => r.trim()).filter(Boolean)
+      const areaData: CreateShippingAreaRequest = {
         name: newArea.name,
-        fee: newArea.fee,
-        estimatedDays: newArea.estimatedDays,
-        isActive: newArea.isActive || true
+        regions,
+        baseCost: newArea.baseCost,
+        freeThreshold: freeShippingEnabled ? (newArea.freeThreshold || 0) : 0
       }
-      onUpdateAreas([...areas, area])
+
+      await createShippingArea(areaData)
+      await reloadAreas()
       setIsAddingArea(false)
-      setNewArea({ name: '', fee: 0, estimatedDays: '', isActive: true })
-      setShowSuccessMessage(true)
-      setTimeout(() => setShowSuccessMessage(false), 3000)
+      setNewArea({ name: '', regions: [], baseCost: 0, freeThreshold: 0 })
+      setRegionsInput('')
+      setFreeShippingEnabled(false)
+      toast.success('Shipping area created!')
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to create shipping area')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleUpdateArea = () => {
-    if (editingArea) {
-      onUpdateAreas(areas.map(area => 
-        area.id === editingArea.id ? editingArea : area
-      ))
+  const handleUpdateArea = async () => {
+    if (!editingArea) return
+
+    setLoading(true)
+    try {
+      const regions = regionsInput.split(',').map(r => r.trim()).filter(Boolean)
+      const updateData: UpdateShippingAreaRequest = {
+        name: editingArea.name,
+        regions,
+        baseCost: editingArea.baseCost,
+        freeThreshold: freeShippingEnabled ? editingArea.freeThreshold : 0,
+        isActive: editingArea.isActive
+      }
+
+      await updateShippingArea(editingArea._id, updateData)
+      await reloadAreas()
       setEditingArea(null)
-      setShowSuccessMessage(true)
-      setTimeout(() => setShowSuccessMessage(false), 3000)
+      setRegionsInput('')
+      setFreeShippingEnabled(false)
+      toast.success('Shipping area updated!')
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update shipping area')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleDeleteArea = (id: string) => {
-    if (confirm('Are you sure you want to delete this shipping area?')) {
-      onUpdateAreas(areas.filter(area => area.id !== id))
-      setShowSuccessMessage(true)
-      setTimeout(() => setShowSuccessMessage(false), 3000)
+  const handleDeleteArea = async (id: string) => {
+    if (!confirm('Are you sure? This cannot be undone.')) return
+
+    setLoading(true)
+    try {
+      await deleteShippingArea(id)
+      await reloadAreas()
+      toast.success('Shipping area deleted!')
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to delete')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleToggleAreaStatus = (id: string) => {
-    onUpdateAreas(areas.map(area =>
-      area.id === id ? { ...area, isActive: !area.isActive } : area
-    ))
+  const handleToggleAreaStatus = async (id: string) => {
+    setLoading(true)
+    try {
+      await updateShippingArea(id, { isActive: !areas.find(a => a._id === id)?.isActive })
+      await reloadAreas()
+      toast.success('Status updated!')
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update status')
+    } finally {
+      setLoading(false)
+    }
   }
+
+  const handleToggleFreeShipping = async (area: ShippingArea, enabled: boolean, threshold?: number) => {
+    setLoading(true)
+    try {
+      const updateData: UpdateShippingAreaRequest = {
+        name: area.name,
+        regions: area.regions,
+        baseCost: area.baseCost,
+        freeThreshold: enabled ? (threshold || area.freeThreshold || 5000) : 0,
+        isActive: area.isActive
+      }
+
+      await updateShippingArea(area._id, updateData)
+      await reloadAreas()
+      toast.success(enabled ? `Free shipping enabled (over KES ${threshold || area.freeThreshold})` : 'Free shipping disabled')
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update free shipping')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const startEditing = (area: ShippingArea) => {
+    setEditingArea(area)
+    setRegionsInput(area.regions.join(', '))
+    setFreeShippingEnabled(area.freeThreshold > 0)
+  }
+
+  const getRegionsDisplay = (regions: string[]) => regions.length > 0 ? regions.slice(0, 3).join(', ') + (regions.length > 3 ? ` +${regions.length - 3}` : '') : 'Nationwide'
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
-      {/* Success Message */}
-      {showSuccessMessage && (
-        <div className="fixed top-20 right-4 z-50 animate-slide-down">
-          <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-400 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2">
-            <CheckCircle className="w-5 h-5" />
-            <span>Changes saved successfully!</span>
-          </div>
-        </div>
-      )}
-
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-blue-600" />
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Shipping Areas & Rates
+              Shipping Areas ({areas.length})
             </h2>
           </div>
           <button
             onClick={() => setIsAddingArea(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all disabled:opacity-50"
           >
             <Plus className="w-4 h-4" />
             Add Area
@@ -96,72 +181,117 @@ export default function ShippingAreas({ areas, onUpdateAreas }: ShippingAreasPro
         </div>
       </div>
 
-      {/* Add Area Form */}
-      {isAddingArea && (
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-          <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Add New Shipping Area</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {(isAddingArea || editingArea) && (
+        <div className="p-6 border-b bg-gray-50 dark:bg-gray-900/30">
+          <h3 className="text-lg font-semibold mb-6">
+            {editingArea ? 'Edit' : 'New'} Shipping Area
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Area Name
-              </label>
+              <label className="block text-sm font-medium mb-2">Name *</label>
               <input
                 type="text"
-                value={newArea.name}
-                onChange={(e) => setNewArea({ ...newArea, name: e.target.value })}
-                placeholder="e.g., Nairobi West"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                value={editingArea?.name || newArea.name || ''}
+                onChange={(e) => editingArea ? setEditingArea({...editingArea, name: e.target.value}) : setNewArea({...newArea, name: e.target.value})}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
+                disabled={loading}
+                placeholder="e.g., Nairobi Metro"
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Shipping Fee (KES)
-              </label>
+              <label className="block text-sm font-medium mb-2">Base Cost (KES) *</label>
               <input
                 type="number"
-                value={newArea.fee}
-                onChange={(e) => setNewArea({ ...newArea, fee: Number(e.target.value) })}
-                placeholder="e.g., 200"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                step="0.01"
+                value={editingArea?.baseCost || newArea.baseCost || ''}
+                onChange={(e) => {
+                  const val = Number(e.target.value)
+                  editingArea ? setEditingArea({...editingArea, baseCost: val}) : setNewArea({...newArea, baseCost: val})
+                }}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
+                disabled={loading}
+                placeholder="0"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Estimated Delivery
-              </label>
-              <input
-                type="text"
-                value={newArea.estimatedDays}
-                onChange={(e) => setNewArea({ ...newArea, estimatedDays: e.target.value })}
-                placeholder="e.g., 2-3 business days"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-2">Regions (comma separated)</label>
+              <textarea
+                value={regionsInput}
+                onChange={(e) => setRegionsInput(e.target.value)}
+                rows={3}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
+                placeholder="Nairobi, Kiambu, Nakuru, Mombasa..."
+                disabled={loading}
               />
+              <p className="text-xs text-gray-500 mt-1">Leave empty for nationwide shipping</p>
             </div>
-            <div className="flex items-end">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={newArea.isActive}
-                  onChange={(e) => setNewArea({ ...newArea, isActive: e.target.checked })}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Active</span>
-              </label>
+
+            {/* Free Shipping Toggle Section */}
+            <div className="md:col-span-2 border-t pt-4 mt-2">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-purple-600" />
+                  <label className="text-sm font-medium">Free Shipping</label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFreeShippingEnabled(!freeShippingEnabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    freeShippingEnabled ? 'bg-purple-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      freeShippingEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              
+              {freeShippingEnabled && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Free Shipping Threshold (KES)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editingArea?.freeThreshold || newArea.freeThreshold || ''}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      editingArea ? setEditingArea({...editingArea, freeThreshold: val}) : setNewArea({...newArea, freeThreshold: val})
+                    }}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
+                    placeholder="5000"
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Orders above this amount get free shipping
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-          <div className="flex gap-3 mt-4">
+          
+          <div className="flex gap-3 mt-6">
             <button
-              onClick={handleAddArea}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              onClick={editingArea ? handleUpdateArea : handleAddArea}
+              disabled={loading}
+              className="flex-1 bg-blue-600 text-white p-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Add Area
+              {loading ? '...' : (editingArea ? <><Save className="w-4 h-4"/> Update</> : <><Plus className="w-4 h-4"/> Create</>)}
             </button>
             <button
               onClick={() => {
                 setIsAddingArea(false)
-                setNewArea({ name: '', fee: 0, estimatedDays: '', isActive: true })
+                setEditingArea(null)
+                setRegionsInput('')
+                setFreeShippingEnabled(false)
+                setNewArea({ name: '', regions: [], baseCost: 0, freeThreshold: 0 })
               }}
-              className="px-4 py-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-white rounded-lg transition-colors"
+              className="px-6 bg-gray-300 hover:bg-gray-400 text-gray-700 p-3 rounded-lg font-medium"
             >
               Cancel
             </button>
@@ -169,159 +299,95 @@ export default function ShippingAreas({ areas, onUpdateAreas }: ShippingAreasPro
         </div>
       )}
 
-      {/* Areas List */}
       <div className="divide-y divide-gray-200 dark:divide-gray-700">
-        {areas.length === 0 ? (
-          <div className="p-12 text-center">
-            <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500 dark:text-gray-400">No shipping areas configured</p>
-            <button
-              onClick={() => setIsAddingArea(true)}
-              className="mt-3 text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Add your first shipping area
-            </button>
-          </div>
-        ) : (
-          areas.map((area) => (
-            <div key={area.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
-              {editingArea?.id === area.id ? (
-                // Edit Mode
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Area Name
-                      </label>
-                      <input
-                        type="text"
-                        value={editingArea.name}
-                        onChange={(e) => setEditingArea({ ...editingArea, name: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Shipping Fee (KES)
-                      </label>
-                      <input
-                        type="number"
-                        value={editingArea.fee}
-                        onChange={(e) => setEditingArea({ ...editingArea, fee: Number(e.target.value) })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Estimated Delivery
-                      </label>
-                      <input
-                        type="text"
-                        value={editingArea.estimatedDays}
-                        onChange={(e) => setEditingArea({ ...editingArea, estimatedDays: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleUpdateArea}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <Save className="w-4 h-4" />
-                      Save Changes
-                    </button>
-                    <button
-                      onClick={() => setEditingArea(null)}
-                      className="px-4 py-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-white rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancel
-                    </button>
-                  </div>
+        {areas.map((area) => (
+          <div key={area._id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{area.name}</h3>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    area.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {area.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                  {area.freeThreshold > 0 && (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      Free Shipping Over KES {area.freeThreshold.toLocaleString()}
+                    </span>
+                  )}
                 </div>
-              ) : (
-                // View Mode
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-md font-semibold text-gray-900 dark:text-white">
-                        {area.name}
-                      </h3>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        area.isActive 
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-                      }`}>
-                        {area.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-4 text-sm">
-                      <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                        <DollarSign className="w-4 h-4" />
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          KES {area.fee.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                        <Truck className="w-4 h-4" />
-                        <span>{area.estimatedDays}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleToggleAreaStatus(area.id)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        area.isActive
-                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-200'
-                          : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200'
-                      }`}
-                      title={area.isActive ? 'Deactivate' : 'Activate'}
-                    >
-                      {area.isActive ? (
-                        <AlertCircle className="w-4 h-4" />
-                      ) : (
-                        <CheckCircle className="w-4 h-4" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setEditingArea(area)}
-                      className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 transition-colors"
-                      title="Edit"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteArea(area.id)}
-                      className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                <div className="flex flex-wrap gap-4 text-sm mb-2">
+                  <span className="font-semibold text-lg text-gray-900 dark:text-white">
+                    KES {area.baseCost.toLocaleString()}
+                  </span>
+                  <span className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                    <MapPin className="w-4 h-4" />
+                    {getRegionsDisplay(area.regions)}
+                  </span>
                 </div>
-              )}
+              </div>
+              <div className="flex gap-1">
+                {/* Free Shipping Toggle Button */}
+                <button
+                  onClick={() => {
+                    const enabled = area.freeThreshold === 0
+                    if (enabled) {
+                      const threshold = prompt('Enter free shipping threshold (KES):', '5000')
+                      if (threshold && !isNaN(Number(threshold))) {
+                        handleToggleFreeShipping(area, true, Number(threshold))
+                      }
+                    } else {
+                      handleToggleFreeShipping(area, false)
+                    }
+                  }}
+                  className={`p-2 rounded-lg transition-colors ${
+                    area.freeThreshold > 0 
+                      ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' 
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                  title={area.freeThreshold > 0 ? `Free shipping over KES ${area.freeThreshold}` : 'Click to enable free shipping'}
+                >
+                  <Truck className="w-4 h-4" />
+                </button>
+                
+                <button
+                  onClick={() => handleToggleAreaStatus(area._id)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    area.isActive ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  }`}
+                  title={area.isActive ? 'Deactivate' : 'Activate'}
+                >
+                  {area.isActive ? <AlertCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                </button>
+                
+                <button
+                  onClick={() => startEditing(area)}
+                  className="p-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors"
+                  title="Edit"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                
+                <button
+                  onClick={() => handleDeleteArea(area._id)}
+                  className="p-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          ))
-        )}
+          </div>
+        ))}
       </div>
 
-      <style jsx>{`
-        @keyframes slide-down {
-          from {
-            opacity: 0;
-            transform: translateY(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-slide-down {
-          animation: slide-down 0.3s ease-out;
-        }
-      `}</style>
+      {areas.length === 0 && !isAddingArea && (
+        <div className="p-12 text-center text-gray-500">
+          <MapPin className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p>No shipping areas. <button onClick={() => setIsAddingArea(true)} className="text-blue-600 hover:underline font-medium">Add one now</button></p>
+        </div>
+      )}
     </div>
   )
 }

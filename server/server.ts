@@ -23,6 +23,9 @@ import contactRoutes from './routes/contact.routes';
 import emailRoutes from './routes/email.routes';
 import auditRoutes from './routes/audit.routes';
 import healthzRoutes from './routes/healthz.routes';
+import shippingRoutes from './routes/shipping.routes';
+import promoRoutes from './routes/promo.routes';
+import orderCalcRoutes from './routes/orderCalc.routes';
 
 dotenv.config();
 
@@ -88,6 +91,9 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/shipping', shippingRoutes);
+app.use('/api/promo', promoRoutes);
+app.use('/api/order/calculate', orderCalcRoutes);
 app.use('/', healthzRoutes);
 
 // Health check (excluded from audit)

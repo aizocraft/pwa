@@ -8,6 +8,8 @@ import UserModel from '../models/User';
 import authMiddleware from '../middleware/auth';
 import optionalAuthMiddleware from '../middleware/optionalAuth';
 import { sendOrderConfirmation, sendAdminOrderNotification } from '../services/email.service';
+import ShippingAreaModel from '../models/ShippingArea';
+import PromoCodeModel from '../models/PromoCode';
 
 const router = Router();
 
@@ -30,21 +32,9 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
       paymentMethod, 
       guestInfo,
       notes,
-      subtotal: clientSubtotal,
-      shippingCost: clientShippingCost,
-      tax: clientTax,
-      total: clientTotal
+      shippingAreaId,
+      promoCode
     } = req.body;
-
-    // Debug logging
-    console.log('=== ORDER CREATION ===');
-    console.log('Client subtotal:', clientSubtotal);
-    console.log('Client shippingCost:', clientShippingCost);
-    console.log('Client tax:', clientTax);
-    console.log('Client total:', clientTotal);
-    console.log('User authenticated:', !!req.user);
-    console.log('User ID:', req.user?.userId);
-    console.log('Payment method:', paymentMethod);
 
     // Validation
     if (!items || !items.length) {
@@ -57,6 +47,10 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
 
     if (!paymentMethod || !['cod', 'mpesa', 'card'].includes(paymentMethod)) {
       return res.status(400).json({ error: 'Valid payment method is required' });
+    }
+
+    if (!shippingAreaId) {
+      return res.status(400).json({ error: 'Shipping area is required' });
     }
 
     // Handle user identification
@@ -89,6 +83,14 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
         name: guestInfo.name || shippingAddress.fullName
       };
     }
+
+    // Debug logging
+    console.log('=== ORDER CREATION ===');
+    console.log('ShippingAreaId:', shippingAreaId);
+    console.log('PromoCode:', promoCode);
+    console.log('User authenticated:', !!req.user);
+    console.log('User ID:', req.user?.userId);
+    console.log('Payment method:', paymentMethod);
 
     // Process items and verify stock
     let calculatedSubtotal = 0;
@@ -124,22 +126,48 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
       await product.save();
     }
 
-    // Use client-provided values or calculate fallbacks
-    const finalSubtotal = clientSubtotal !== undefined ? clientSubtotal : calculatedSubtotal;
-    const finalShippingCost = clientShippingCost !== undefined ? clientShippingCost : 0;
-    const finalTax = clientTax !== undefined ? clientTax : finalSubtotal * 0.16;
-    const finalTotal = clientTotal !== undefined ? clientTotal : finalSubtotal + finalShippingCost + finalTax;
+    console.log('Subtotal:', calculatedSubtotal);
 
-    console.log('Final values - Subtotal:', finalSubtotal, 'Shipping:', finalShippingCost, 'Tax:', finalTax, 'Total:', finalTotal);
+    // Use client-provided values or calculate fallbacks
+    // Server-side calculation for shipping and promo
+    const shippingArea = await ShippingAreaModel.findOne({ _id: shippingAreaId, isActive: true });
+    if (!shippingArea) {
+      return res.status(400).json({ error: 'Invalid shipping area' });
+    }
+
+    let discount = 0;
+    let appliedPromo = null;
+    if (promoCode) {
+      const promo = await PromoCodeModel.findOne({ code: promoCode.toUpperCase(), isActive: true });
+      if (promo && promo.canUse(calculatedSubtotal)) {
+        discount = promo.type === 'percent' 
+          ? calculatedSubtotal * (promo.value / 100)
+          : Math.min(promo.value, calculatedSubtotal);
+        appliedPromo = promo._id;
+        // Increment used count
+        promo.usedCount += 1;
+        await promo.save();
+      } else {
+        console.log('Promo not valid');
+      }
+    }
+
+    const shippingCost = (shippingArea.freeThreshold > 0 && calculatedSubtotal >= shippingArea.freeThreshold) ? 0 : shippingArea.baseCost;
+    const tax = calculatedSubtotal * 0.16;
+    const finalTotal = calculatedSubtotal + shippingCost - discount + tax;
+
+    console.log('Server calc - Subtotal:', calculatedSubtotal, 'Shipping:', shippingCost, 'Discount:', discount, 'Tax:', tax, 'Total:', finalTotal);
 
     // Create order
     const orderData: any = {
       items: orderItems,
-      subtotal: finalSubtotal,
-      shippingCost: finalShippingCost,
-      tax: finalTax,
-      discount: 0,
+      subtotal: calculatedSubtotal,
+      shippingCost,
+      tax,
+      discount,
       total: finalTotal,
+      selectedShippingArea: shippingArea._id,
+      appliedPromoCode: appliedPromo,
       shippingAddress: {
         ...shippingAddress,
         email: shippingAddress.email || guestInfoData?.email
@@ -214,7 +242,9 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
 
     // Populate product details for response
     const populatedOrder = await OrderModel.findById(order._id)
-      .populate('items.productId', 'name images slug');
+      .populate('items.productId', 'name images slug')
+      .populate('selectedShippingArea', 'name baseCost freeThreshold')
+      .populate('appliedPromoCode', 'code type value');
 
     res.status(201).json({
       success: true,
@@ -421,6 +451,8 @@ router.get('/admin/orders', authMiddleware, async (req: Request & { user?: any }
       OrderModel.find(query)
         .populate('userId', 'name email')
         .populate('items.productId', 'name slug images rating')
+        .populate('selectedShippingArea', 'name')
+        .populate('appliedPromoCode', 'code')
         .sort({ [sortField]: sortOrder })
         .limit(limit)
         .skip(skip),

@@ -1,6 +1,10 @@
 'use client'
 
-import { MapPin, User, Home, Building2, Phone, ArrowRight } from 'lucide-react'
+
+import { MapPin, User, Home, Building2, Phone, ArrowRight, Truck, Gift, Clock } from 'lucide-react'
+import Link from 'next/link'
+import { useCartStore } from '../../../store/cart'
+import { formatCurrency } from '../../../lib/utils'
 import { useEffect } from 'react'
 
 // Define the shipping address type
@@ -40,6 +44,7 @@ export default function ShippingForm({
   isGuestInfoValid,
   onContinue
 }: ShippingFormProps) {
+  const cart = useCartStore();
 
   // Load from localStorage on mount - ONLY ONCE
   useEffect(() => {
@@ -93,6 +98,8 @@ export default function ShippingForm({
   useEffect(() => {
     saveToLocalStorage();
   }, [shippingAddress, guestEmail, guestPhone, isGuest]);
+
+  // Shipping area handled globally by checkout/cart - no local override needed
 
   const handleFullNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setShippingAddress({ ...shippingAddress, fullName: e.target.value });
@@ -296,9 +303,12 @@ export default function ShippingForm({
             </div>
           </div>
 
+          {/* Read-only: Shipping & Promo from Cart (No Edit) */}
+    
+
           <button
             onClick={onContinue}
-            disabled={!isShippingValid() || (isGuest && !isGuestInfoValid())}
+            disabled={!isShippingValid() || (isGuest && !isGuestInfoValid()) || !cart.selectedShippingAreaId}
             className="w-full mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2 group"
           >
             <span>Continue to Payment</span>

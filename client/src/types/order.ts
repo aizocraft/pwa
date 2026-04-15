@@ -2,6 +2,27 @@
 import { Product } from './product';
 import { User } from './user';
 
+export interface ShippingArea {
+  _id: string;
+  name: string;
+  regions: string[];
+  baseCost: number;
+  freeThreshold: number;
+  isActive: boolean;
+}
+
+export interface PromoCode {
+  _id: string;
+  code: string;
+  type: 'percent' | 'fixed';
+  value: number;
+  usedCount: number;
+  maxUses: number;
+  minSubtotal: number;
+  expiryDate?: string;
+  isActive: boolean;
+}
+
 export interface OrderItem {
   _id?: string;
   productId: string;
@@ -67,12 +88,27 @@ export interface Order {
   orderNumber: string;
 }
 
+export interface CreateShippingAreaRequest {
+  name: string;
+  regions: string[];
+  baseCost: number;
+  freeThreshold?: number;
+  description?: string;
+}
+
+export interface UpdateShippingAreaRequest {
+  name?: string;
+  regions?: string[];
+  baseCost?: number;
+  freeThreshold?: number;
+  isActive?: boolean;
+  description?: string;
+}
+
 export interface CreateOrderRequest {
   items: Array<{ productId: string; qty: number; price: number }>;
-  subtotal: number;           
-  shippingCost: number;       
-  tax: number;                
-  total: number;              
+  shippingAreaId?: string;
+  promoCode?: string;
   shippingAddress: ShippingAddress;
   paymentMethod: PaymentMethod;
   guestInfo?: GuestInfo;

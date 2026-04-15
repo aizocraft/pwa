@@ -24,6 +24,9 @@ import type {
 
 import type { SendOrderEmailRequest, SendContactEmailRequest, SendStatusUpdateRequest, EmailResponse, SendOrderEmailsResponse
 } from '@/types/email';
+import type { ShippingArea, CreateShippingAreaRequest, UpdateShippingAreaRequest } from '@/types/order';
+import type { PromoCode } from '@/types/order';
+
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -44,17 +47,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor for errors
+// Response interceptor for errors - FIXED: Only "session expired" for REAL token expiry
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      toast.error('Session expired. Please log in again.');
-      if (typeof window !== 'undefined') {
-        window.location.href = '/auth/login';
-      }
+      const token = getToken();
+      if (token) {
+        // REAL session expiry (had token, now invalid)
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        toast.error('Session expired. Please log in again.');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth/login';
+        }
+      } 
+      // else: Guest 401 - silent fail (handled by app logic)
     }
     return Promise.reject(error);
   }
@@ -505,6 +513,185 @@ export async function getOrderStats(): Promise<{
     return response.data;
   } catch (error: any) {
     console.error('Failed to fetch order stats:', error);
+    throw error;
+  }
+}
+
+
+// ========== SHIPPING AREAS API ==========
+export async function getShippingAreas(params?: { page?: number; limit?: number; search?: string }): Promise<{ areas: ShippingArea[]; pagination: any }> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.search) query.append('search', params.search);
+    
+    const response = await api.get(`/shipping?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    toast.error('Failed to fetch shipping areas');
+    throw error;
+  }
+}
+
+// Public endpoint for customers
+export async function getPublicShippingAreas(): Promise<ShippingArea[]> {
+  try {
+    const response = await api.get('/shipping/public');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch shipping areas:', error);
+    throw error;
+  }
+}
+
+export async function createShippingArea(data: CreateShippingAreaRequest): Promise<ShippingArea> {
+  try {
+    const response = await api.post('/shipping', data);
+    toast.success('Shipping area created');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to create shipping area');
+    throw error;
+  }
+}
+
+export async function updateShippingArea(id: string, data: UpdateShippingAreaRequest): Promise<ShippingArea> {
+  try {
+    const response = await api.put(`/shipping/${id}`, data);
+    toast.success('Shipping area updated');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to update shipping area');
+    throw error;
+  }
+}
+
+export async function deleteShippingArea(id: string): Promise<void> {
+  try {
+    await api.delete(`/shipping/${id}`);
+    toast.success('Shipping area deleted');
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to delete shipping area');
+    throw error;
+  }
+}
+
+// ========== PROMO CODES API ==========
+export async function getPromoCodes(params?: { page?: number; limit?: number; search?: string }): Promise<{ promos: PromoCode[]; pagination: any }> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.search) query.append('search', params.search);
+    
+    const response = await api.get(`/promo?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    toast.error('Failed to fetch promo codes');
+    throw error;
+  }
+}
+
+export async function validatePromo(code: string, subtotal: number): Promise<{ 
+  valid: boolean; 
+  discount?: number;
+  code?: string;
+  type?: string;
+  value?: number;
+  maxDiscount?: number;
+  error?: string;
+}> {
+  try {
+    const response = await api.get(`/promo/validate/${code}`, {
+      params: { subtotal }
+    });
+    return response.data;
+  } catch (error: any) {
+    return { 
+      valid: false, 
+      discount: 0, 
+      error: error.response?.data?.error || 'Invalid promo code' 
+    };
+  }
+}
+
+export async function createPromoCode(data: {
+  code: string;
+  type: 'percent' | 'fixed';
+  value: number;
+  maxUses?: number;
+  minSubtotal?: number;
+  expiryDate?: string;
+  description?: string;
+}): Promise<PromoCode> {
+  try {
+    const response = await api.post('/promo', data);
+    toast.success('Promo code created');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to create promo code');
+    throw error;
+  }
+}
+
+export async function updatePromoCode(id: string, data: Partial<{
+  code: string;
+  type: 'percent' | 'fixed';
+  value: number;
+  maxUses: number;
+  minSubtotal: number;
+  expiryDate: string;
+  isActive: boolean;
+  description: string;
+}>): Promise<PromoCode> {
+  try {
+    const response = await api.put(`/promo/${id}`, data);
+    toast.success('Promo code updated');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to update promo code');
+    throw error;
+  }
+}
+
+export async function deletePromoCode(id: string): Promise<void> {
+  try {
+    await api.delete(`/promo/${id}`);
+    toast.success('Promo code deleted');
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to delete promo code');
+    throw error;
+  }
+}
+
+// ========== ORDER CALCULATION API ==========
+export async function calculateOrderTotals(
+  items: Array<{productId: string; qty: number}>,
+  subtotal: number,
+  shippingAreaId?: string, 
+  promoCode?: string
+): Promise<{
+  subtotal: number;
+  shippingCost: number;
+  discount: number;
+  tax: number;
+  total: number;
+  validPromo: boolean;
+  validShippingArea: boolean;
+  errors: string[];
+}> {
+  try {
+    const response = await api.post('/order/calculate', { 
+      items, 
+      subtotal, 
+      shippingAreaId, 
+      promoCode 
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error('Calculation error:', error);
+    toast.error('Failed to calculate totals');
     throw error;
   }
 }

@@ -24,91 +24,138 @@ import {
 } from 'lucide-react';
 import { useCartStore } from '../../store/cart';
 import { formatCurrency } from '../../lib/utils';
+import { validatePromo } from '../../lib/api';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import toast from 'react-hot-toast';
 
 export default function CartPage() {
   const router = useRouter();
-  const { items, totalItems, subtotal, removeItem, updateQty, clearCart } = useCartStore();
-  const [promoCode, setPromoCode] = useState('');
-  const [promoApplied, setPromoApplied] = useState(false);
-  const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const { 
+    items, 
+    totalItems, 
+    subtotal, 
+    shippingCost,
+    discount: storeDiscount,
+    totals,
+    shippingAreas, 
+    selectedShippingAreaId,
+    loading: cartLoading,
+    removeItem, 
+    updateQty, 
+    clearCart,
+    setPromoCode: setStorePromoCode,
+    promoCode: appliedPromoCode,
+    promoValid,
+    recalculateTotals
+  } = useCartStore();
+
+  
+  const [promoInput, setPromoInput] = useState('');
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [mounted, setMounted] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  // Handle hydration mismatch
+  // Handle hydration mismatch + auto-rehydrate cart
   useEffect(() => {
     setMounted(true);
-  }, []);
+    // Ensure cart fully loaded on mount
+    const cart = useCartStore.getState();
+    cart.loadInitialData().catch(console.error);
+  }, []); 
 
-  // Calculate shipping and totals
-  const FREE_SHIPPING_THRESHOLD = 50000;
-  const shipping = subtotal > FREE_SHIPPING_THRESHOLD ? 0 : 500;
-  const tax = subtotal * 0.16;
-  const discount = promoApplied ? subtotal * 0.1 : 0;
-  const total = subtotal + shipping + tax - discount;
-  const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
+  // Auto-load shipping areas if empty
+  useEffect(() => {
+    if (shippingAreas.length === 0 && !cartLoading) {
+      useCartStore.getState().loadShippingAreas().catch(console.error);
+    }
+  }, [shippingAreas.length, cartLoading]);
+
+
+  const tax = totals.tax || (subtotal * 0.16);
+  const total = totals.total || (subtotal + shippingCost + (subtotal * 0.16) - storeDiscount);
+  const selectedArea = shippingAreas.find(area => area._id === selectedShippingAreaId);
+  
+  // FIXED: Calculate remaining for free shipping only if free shipping is enabled (threshold > 0)
+  const remainingForFreeShipping = selectedArea && selectedArea.freeThreshold > 0
+    ? Math.max(0, selectedArea.freeThreshold - subtotal)
+    : 0;
+  
+  const freeShippingThreshold = selectedArea?.freeThreshold || 0;
+  const isFreeShippingEnabled = freeShippingThreshold > 0;
+  
+  // Check if free shipping applies (threshold > 0 AND subtotal >= threshold)
+  const qualifiesForFreeShipping = isFreeShippingEnabled && subtotal >= freeShippingThreshold;
+  
+  // Calculate actual shipping cost to display
+  const displayShippingCost = qualifiesForFreeShipping ? 0 : shippingCost;
 
   // Memoized values
   const progressPercentage = useMemo(() => {
-    return Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100);
-  }, [subtotal]);
+    return isFreeShippingEnabled && freeShippingThreshold > 0 
+      ? Math.min(100, (subtotal / freeShippingThreshold) * 100) 
+      : 0;
+  }, [subtotal, freeShippingThreshold, isFreeShippingEnabled]);
+
+
 
   const handleImageError = useCallback((productId: string) => {
     setImageErrors(prev => ({ ...prev, [productId]: true }));
   }, []);
 
-  const handleApplyPromo = useCallback(() => {
-    if (promoApplied) {
-      setPromoMessage({ type: 'error', message: 'Promo code already applied!' });
-      setTimeout(() => setPromoMessage(null), 3000);
+  const handleApplyPromo = useCallback(async () => {
+    if (!promoInput.trim()) {
+      toast.error('Please enter a promo code');
       return;
     }
 
-    if (promoCode.toUpperCase() === 'SAVE10') {
-      setPromoApplied(true);
-      setPromoMessage({ type: 'success', message: '10% discount applied successfully!' });
-      setPromoCode('');
-      setTimeout(() => setPromoMessage(null), 3000);
-    } else if (promoCode.toUpperCase() === 'WELCOME20') {
-      setPromoApplied(true);
-      setPromoMessage({ type: 'success', message: '20% welcome discount applied!' });
-      setPromoCode('');
-      setTimeout(() => setPromoMessage(null), 3000);
-    } else {
-      setPromoMessage({ type: 'error', message: 'Invalid promo code. Try "SAVE10" or "WELCOME20"' });
-      setTimeout(() => setPromoMessage(null), 3000);
+    if (promoValid) {
+      toast.error('Promo code already applied!');
+      return;
     }
-  }, [promoCode, promoApplied]);
 
-  const handleRemovePromo = useCallback(() => {
-    setPromoApplied(false);
-    setPromoMessage({ type: 'success', message: 'Promo code removed' });
-    setTimeout(() => setPromoMessage(null), 3000);
-  }, []);
+    setIsApplyingPromo(true);
+    try {
+      await setStorePromoCode(promoInput);
+      toast.success('Promo code applied!');
+      setPromoInput('');
+    } catch (error) {
+      console.error('Error applying promo:', error);
+      toast.error('Failed to apply promo code');
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  }, [promoInput, promoValid, setStorePromoCode]);
+
+
+  const handleRemovePromo = useCallback(async () => {
+    await setStorePromoCode('');
+    await recalculateTotals();
+    toast.success('Promo code removed');
+  }, [setStorePromoCode, recalculateTotals]);
 
   const handleCheckout = useCallback(async () => {
+    // Validate shipping area is selected
+    if (!selectedShippingAreaId) {
+      toast.error('Please select a shipping area');
+      return;
+    }
+    
     setIsLoading(true);
-    // Simulate loading for better UX
-    await new Promise(resolve => setTimeout(resolve, 500));
     router.push('/checkout');
-  }, [router]);
+  }, [router, selectedShippingAreaId]);
 
   const handleUpdateQty = useCallback(async (id: string, qty: number) => {
     setUpdatingId(id);
-    // Simulate async update
-    await new Promise(resolve => setTimeout(resolve, 200));
-    updateQty(id, qty);
+    await updateQty(id, qty);
     setUpdatingId(null);
   }, [updateQty]);
 
   const handleRemoveItem = useCallback(async (id: string) => {
     setRemovingId(id);
-    // Simulate async removal
-    await new Promise(resolve => setTimeout(resolve, 300));
-    removeItem(id);
+    await removeItem(id);
     setRemovingId(null);
   }, [removeItem]);
 
@@ -118,6 +165,14 @@ export default function CartPage() {
     }
   }, [clearCart]);
 
+  // Helper function to get shipping display text
+  const getShippingDisplay = (area: any, subtotal: number) => {
+    if (area.freeThreshold > 0 && subtotal >= area.freeThreshold) {
+      return { text: 'FREE', isFree: true, cost: 0 };
+    }
+    return { text: formatCurrency(area.baseCost), isFree: false, cost: area.baseCost };
+  };
+
   if (!mounted) return null;
 
   if (totalItems === 0) {
@@ -125,7 +180,6 @@ export default function CartPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-32">
           <div className="flex flex-col items-center justify-center text-center">
-            {/* Animated empty state */}
             <div className="relative mb-8">
               <div className="absolute inset-0 animate-ping rounded-full bg-blue-400/20" />
               <div className="relative bg-white dark:bg-gray-800 rounded-full p-8 shadow-xl">
@@ -187,30 +241,6 @@ export default function CartPage() {
           </div>
         </div>
 
-        {/* Promo Message Toast */}
-        {promoMessage && (
-          <div className={`fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 fade-in duration-300 max-w-sm`}>
-            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg ${
-              promoMessage.type === 'success' 
-                ? 'bg-green-50 dark:bg-green-950/90 border border-green-200 dark:border-green-800' 
-                : 'bg-red-50 dark:bg-red-950/90 border border-red-200 dark:border-red-800'
-            }`}>
-              {promoMessage.type === 'success' ? (
-                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-              ) : (
-                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-              )}
-              <span className={`text-sm font-medium ${
-                promoMessage.type === 'success' 
-                  ? 'text-green-800 dark:text-green-200' 
-                  : 'text-red-800 dark:text-red-200'
-              }`}>
-                {promoMessage.message}
-              </span>
-            </div>
-          </div>
-        )}
-
         <div className="grid lg:grid-cols-3 gap-6 lg:gap-8 xl:gap-12">
           
           {/* Cart Items */}
@@ -227,23 +257,31 @@ export default function CartPage() {
                     
                     {/* Product Image */}
                     <div className="relative flex-shrink-0">
-                      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 group-hover:scale-105 transition-transform duration-500">
+                      <div className="relative w-40 h-40 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-50/70 via-white to-gray-50/70 dark:from-slate-800/50 dark:via-gray-900/20 dark:to-slate-800/50 shadow-lg ring-1 ring-gray-200/50 dark:ring-gray-700/50 hover:shadow-2xl hover:ring-emerald-200/50 dark:hover:ring-emerald-400/30 group/image transition-all duration-500 hover:scale-105 hover:rotate-1 hover:shadow-emerald-500/10">
                         {!imageErrors[item.id] && item.image ? (
                           <img
                             src={item.image}
                             alt={item.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 group-hover:shadow-2xl"
                             onError={() => handleImageError(item.id)}
                             loading="lazy"
+                            draggable={false}
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Package className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-emerald-50/80 to-blue-50/80 dark:from-emerald-950/40 dark:to-blue-950/40">
+                            <Package className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-500/80 dark:text-emerald-400 mb-1" />
+                            <div className="text-xs font-medium text-gray-600 dark:text-gray-400 text-center leading-tight">
+                              {item.name.split(' ').slice(0, 3).join(' ')}
+                            </div>
                           </div>
                         )}
+                        {/* Loading shimmer overlay */}
+                        {imageErrors[item.id] && (
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer group/image" />
+                        )}
                       </div>
-                      {/* Quantity badge on mobile */}
-                      <div className="absolute -top-2 -right-2 sm:hidden bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                      {/* Enhanced Quantity Badge */}
+                      <div className="absolute -top-3 -right-3 bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-500 dark:to-teal-400 text-white text-xs sm:text-sm font-bold rounded-2xl w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shadow-lg ring-2 ring-white/50 -rotate-6 group-hover:rotate-0 transition-all duration-500 hover:scale-110 hover:shadow-emerald-500/25">
                         {item.qty}
                       </div>
                     </div>
@@ -316,8 +354,37 @@ export default function CartPage() {
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              {/* Free Shipping Progress */}
-              {shipping > 0 && (
+              {/* Shipping Area Selection - FIXED */}
+              {shippingAreas.length > 0 && (
+                <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-2xl border border-green-200 dark:border-green-800">
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-green-600" />
+                    Select Shipping Area
+                  </h3>
+                  <select
+                    value={selectedShippingAreaId || ''}
+                    onChange={async (e) => {
+                      await useCartStore.getState().setShippingArea(e.target.value);
+                    }}
+                    disabled={cartLoading}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    <option value="">Select a shipping area</option>
+                    {shippingAreas.map(area => {
+                      const { text, isFree } = getShippingDisplay(area, subtotal);
+                      return (
+                        <option key={area._id} value={area._id}>
+                          {area.name} - {text}
+                          {area.freeThreshold > 0 && ` (Free over ${formatCurrency(area.freeThreshold)})`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+
+              {/* Free Shipping Progress - FIXED: Only show if free shipping is enabled AND not already qualified */}
+              {selectedArea && isFreeShippingEnabled && !qualifiesForFreeShipping && remainingForFreeShipping > 0 && (
                 <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-2xl border border-blue-200 dark:border-blue-800">
                   <div className="flex items-center gap-2 mb-2">
                     <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-pulse" />
@@ -329,15 +396,38 @@ export default function CartPage() {
                     <div 
                       className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-500 ease-out"
                       style={{ width: `${progressPercentage}%` }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/20 animate-shimmer" />
-                    </div>
+                    />
                   </div>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                    {progressPercentage === 100 ? '✨ You qualify for free shipping!' : `${Math.round(progressPercentage)}% to free shipping`}
+                    {progressPercentage >= 100 ? '✨ You qualify for free shipping!' : `${Math.round(progressPercentage)}% to free shipping`}
                   </p>
                 </div>
               )}
+
+              {/* Free Shipping Achieved Message */}
+              {selectedArea && qualifiesForFreeShipping && (
+                <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-2xl border border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-green-600 dark:text-green-400 animate-pulse" />
+                    <span className="text-sm font-semibold text-green-800 dark:text-green-300">
+                      ✨ You qualify for FREE shipping! ✨
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* No Free Shipping Available Message */}
+              {selectedArea && !isFreeShippingEnabled && (
+                <div className="mb-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-800/30 rounded-2xl border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Free shipping not available for this area
+                    </span>
+                  </div>
+                </div>
+              )}
+
 
               <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-lg p-5 sm:p-6 lg:p-8 transition-all duration-300 hover:shadow-xl">
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
@@ -354,18 +444,19 @@ export default function CartPage() {
                     </span>
                   </div>
                   
+                  {/* FIXED: Shipping display logic */}
                   <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
                     <div className="flex items-center gap-1">
                       <span>Shipping</span>
-                      {shipping === 0 && <CheckCircle className="w-3 h-3 text-green-600" />}
+                      {displayShippingCost === 0 && qualifiesForFreeShipping && <Sparkles className="w-3 h-3 text-green-600" />}
                     </div>
-                    {shipping === 0 ? (
+                    {displayShippingCost === 0 ? (
                       <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
-                        FREE <Sparkles className="w-3 h-3" />
+                        FREE {qualifiesForFreeShipping && <Sparkles className="w-3 h-3" />}
                       </span>
                     ) : (
                       <span className="font-medium text-gray-900 dark:text-white">
-                        {formatCurrency(shipping)}
+                        {formatCurrency(displayShippingCost)}
                       </span>
                     )}
                   </div>
@@ -377,14 +468,14 @@ export default function CartPage() {
                     </span>
                   </div>
 
-                  {promoApplied && (
+                  {promoValid && storeDiscount > 0 && (
                     <div className="flex justify-between items-center text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 p-3 rounded-xl -mx-1">
                       <div className="flex items-center gap-2">
                         <Gift className="w-4 h-4" />
-                        <span className="font-medium">Discount (10%)</span>
+                        <span className="font-medium">Discount</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span>-{formatCurrency(discount)}</span>
+                        <span>-{formatCurrency(storeDiscount)}</span>
                         <button
                           onClick={handleRemovePromo}
                           className="p-1 hover:bg-green-100 dark:hover:bg-green-900 rounded transition-colors"
@@ -404,6 +495,7 @@ export default function CartPage() {
                       </span>
                     </div>
                   </div>
+
                 </div>
 
                 {/* Promo Code Input */}
@@ -414,24 +506,28 @@ export default function CartPage() {
                       <input
                         type="text"
                         placeholder="Enter promo code"
-                        value={promoCode}
-                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                        disabled={promoApplied}
+                        value={promoInput}
+                        onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                        disabled={promoValid || isApplyingPromo}
                         className="w-full pl-10 pr-4 py-3 bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       />
                     </div>
                     <button
                       onClick={handleApplyPromo}
-                      disabled={promoApplied || !promoCode}
+                      disabled={promoValid || !promoInput.trim() || isApplyingPromo}
                       className="px-6 py-3 bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-700 dark:to-gray-600 text-white rounded-xl text-sm font-medium hover:from-gray-800 hover:to-gray-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
                     >
-                      Apply
+                      {isApplyingPromo ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        'Apply'
+                      )}
                     </button>
                   </div>
-                  {!promoApplied && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" />
-                      Try "SAVE10" for 10% off or "WELCOME20" for 20% off!
+                  {appliedPromoCode && (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Promo code "{appliedPromoCode}" applied!
                     </p>
                   )}
                 </div>
@@ -439,7 +535,7 @@ export default function CartPage() {
                 {/* Checkout Button */}
                 <button
                   onClick={handleCheckout}
-                  disabled={isLoading}
+                  disabled={isLoading || !selectedShippingAreaId}
                   className="group w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2 relative overflow-hidden"
                 >
                   <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
@@ -456,6 +552,12 @@ export default function CartPage() {
                     </>
                   )}
                 </button>
+
+                {!selectedShippingAreaId && shippingAreas.length > 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
+                    Please select a shipping area to continue
+                  </p>
+                )}
 
                 <Link href="/products">
                   <button className="w-full mt-3 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200 hover:scale-[1.02] active:scale-95">
@@ -476,7 +578,7 @@ export default function CartPage() {
                       <div className="p-1 bg-blue-100 dark:bg-blue-950/50 rounded-lg group-hover:scale-110 transition-transform">
                         <Truck className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <span>Free Shipping KSh 50k+</span>
+                      <span>Free Shipping Available</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 group">
                       <div className="p-1 bg-yellow-100 dark:bg-yellow-950/50 rounded-lg group-hover:scale-110 transition-transform">
@@ -508,7 +610,6 @@ export default function CartPage() {
         </div>
       </div>
 
-      {/* Add custom CSS for shimmer animation */}
       <style jsx>{`
         @keyframes shimmer {
           0% {
