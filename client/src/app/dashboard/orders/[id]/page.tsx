@@ -232,34 +232,51 @@ const InvoiceTemplate = ({ order, settings, logoUrl, isPaid }: { order: Order; s
 
         {/* Order Summary */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px', marginBottom: '15px' }}>
-          <div style={{ width: '220px', fontSize: '9pt' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-              <span style={{ color: '#666' }}>Subtotal:</span>
-              <span>Ksh {subtotal.toLocaleString()}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-              <span style={{ color: '#666' }}>Shipping:</span>
-              <span>Ksh {shippingCost.toLocaleString()}</span>
-            </div>
-            {tax > 0 && (
+            <div style={{ width: '220px', fontSize: '9pt' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-                <span style={{ color: '#666' }}>VAT (16%):</span>
-                <span>Ksh {tax.toLocaleString()}</span>
+                <span style={{ color: '#666' }}>Subtotal:</span>
+                <span>Ksh {subtotal.toLocaleString()}</span>
               </div>
-            )}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: '6px 0 3px', 
-              marginTop: '3px',
-              borderTop: '2px solid #1a472a',
-              fontSize: '11pt',
-              fontWeight: 'bold'
-            }}>
-              <span>Total:</span>
-              <span style={{ color: '#1a472a' }}>Ksh {total.toLocaleString()}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+                <span style={{ color: '#666' }}>Shipping:</span>
+                <span>Ksh {shippingCost.toLocaleString()}</span>
+              </div>
+              {tax > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+                  <span style={{ color: '#666' }}>VAT (16%):</span>
+                  <span>Ksh {tax.toLocaleString()}</span>
+                </div>
+              )}
+              {order.discount > 0 && (
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  padding: '3px 0',
+                  backgroundColor: '#d1fae5',
+                  borderRadius: '4px',
+                  margin: '3px 0'
+                }}>
+                  <span style={{ color: '#065f46', fontWeight: '500' }}>
+                    Discount: {(order as any).promoCode?.code || 'Promo'}
+                  </span>
+                  <span style={{ color: '#065f46', fontWeight: 'bold' }}>
+                    -Ksh {order.discount.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                padding: '6px 0 3px', 
+                marginTop: '3px',
+                borderTop: '2px solid #1a472a',
+                fontSize: '11pt',
+                fontWeight: 'bold'
+              }}>
+                <span>Total:</span>
+                <span style={{ color: '#1a472a' }}>Ksh {total.toLocaleString()}</span>
+              </div>
             </div>
-          </div>
         </div>
 
         {/* Payment Info */}
@@ -828,32 +845,42 @@ export default function AdminOrderDetails() {
               {/* Order Summary */}
               <div className="p-4 sm:p-6 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/30 dark:to-gray-900/30 border-t border-gray-200/50 dark:border-gray-700">
                 <div className="flex justify-end">
-                  <div className="space-y-2 text-right">
+                <div className="space-y-2 text-right">
+                  <div className="flex gap-8 text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+                    <span className="font-medium">Ksh {(order.subtotal || order.total).toLocaleString()}</span>
+                  </div>
+                  {order.shippingCost > 0 && (
                     <div className="flex gap-8 text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
-                      <span className="font-medium">Ksh {(order.subtotal || order.total).toLocaleString()}</span>
+                      <span className="text-gray-600 dark:text-gray-400">Shipping:</span>
+                      <span className="font-medium">Ksh {order.shippingCost.toLocaleString()}</span>
                     </div>
-                    {order.shippingCost > 0 && (
-                      <div className="flex gap-8 text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Shipping:</span>
-                        <span className="font-medium">Ksh {order.shippingCost.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {order.tax > 0 && (
-                      <div className="flex gap-8 text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Tax (16% VAT):</span>
-                        <span className="font-medium">Ksh {order.tax.toLocaleString()}</span>
-                      </div>
-                    )}
-                    <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex gap-8 text-xl font-black">
-                        <span className="text-gray-900 dark:text-white">Total:</span>
-                        <span className="bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
-                          Ksh {order.total.toLocaleString()}
-                        </span>
-                      </div>
+                  )}
+                  {order.tax > 0 && (
+                    <div className="flex gap-8 text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Tax (16% VAT):</span>
+                      <span className="font-medium">Ksh {order.tax.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {order.discount > 0 && (
+                    <div className="flex gap-8 text-sm bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-xl">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Discount {(order as any).promoCode?.code || 'Promo'}
+                      </span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        -Ksh {order.discount.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex gap-8 text-xl font-black">
+                      <span className="text-gray-900 dark:text-white">Total:</span>
+                      <span className="bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+                        Ksh {order.total.toLocaleString()}
+                      </span>
                     </div>
                   </div>
+                </div>
                 </div>
               </div>
             </div>

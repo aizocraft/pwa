@@ -8,10 +8,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 import toast, { Toaster } from 'react-hot-toast'
 import { 
-  LayoutDashboard, Package, ShoppingCart, Users, Settings, 
+  LayoutDashboard, Package, ShoppingCart, Users, Settings, Truck,
   Menu, X, Search, Star, ChevronRight, Bell, User, LogOut, 
   BarChart3, AlertCircle, Moon, ClipboardList, Sun, AlertTriangle,
   Receipt, MessageSquare, Mail
+
 } from 'lucide-react'
 import { useCompanySettings } from '@/lib/use-company-settings'
 import { getFaviconUrl, getLogoUrl } from '@/lib/company'
@@ -44,6 +45,7 @@ export default function DashboardLayout({
     if (path === '/dashboard' || path === '/dashboard/') return 'overview'
     if (path.startsWith('/dashboard/products')) return 'products'
     if (path.startsWith('/dashboard/orders')) return 'orders'
+    if (path.startsWith('/dashboard/shipping')) return 'shipping'
     if (path.startsWith('/dashboard/users')) return 'users'
     if (path.startsWith('/dashboard/transactions')) return 'transactions'
     if (path.startsWith('/dashboard/reviews')) return 'reviews'
@@ -54,7 +56,7 @@ export default function DashboardLayout({
     return 'overview'
   }
 
-  const [activePage, setActivePage] = useState<'overview'|'products'|'orders'|'users'|'emails'|'submissions'|'transactions'|'reviews'|'auditlog'|'settings'>(
+  const [activePage, setActivePage] = useState<'overview'|'products'|'orders'|'shipping'|'users'|'emails'|'submissions'|'transactions'|'reviews'|'auditlog'|'settings'>(
     getActivePageFromPath(pathname)
   )
 
@@ -105,6 +107,7 @@ export default function DashboardLayout({
     { name: 'Overview', icon: LayoutDashboard, page: 'overview' as const, path: '/dashboard', color: 'text-blue-500' },
     { name: 'Products', icon: Package, page: 'products' as const, path: '/dashboard/products', color: 'text-emerald-500' },
     { name: 'Orders', icon: ShoppingCart, page: 'orders' as const, path: '/dashboard/orders', color: 'text-purple-500' },
+    { name: 'Shipping', icon: Truck, page: 'shipping' as const, path: '/dashboard/shipping', color: 'text-indigo-500' },
     { name: 'Transactions', icon: Receipt, page: 'transactions' as const, path: '/dashboard/transactions', color: 'text-amber-500' },
     { name: 'Users', icon: Users, page: 'users' as const, path: '/dashboard/users', color: 'text-orange-500' },
     { name: 'Reviews', icon: MessageSquare, page: 'reviews' as const, path: '/dashboard/reviews', color: 'text-pink-500' },

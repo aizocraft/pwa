@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPin, CreditCard, CheckCircle, ArrowRight, ArrowLeft } from "lucide-react"
+import { MapPin, CreditCard, CheckCircle, ArrowRight, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useCartStore } from "../../store/cart"
 import { formatCurrency } from "../../lib/utils"
@@ -201,9 +201,9 @@ const finalDiscount = cart.totals.discount || discount
           image: item.image
         })),
         subtotal: Number(subtotal),
-        shippingCost: Number(shippingCost),
-        discount: Number(discount),
-        tax: Number(calculatedTax),
+        shippingCost: Number(shipping),
+        discount: Number(finalDiscount),
+        tax: Number(tax),
         total: Number(totals.total),
         shippingAreaId: cart.selectedShippingAreaId!, // Non-null guaranteed
         promoCode: cart.promoCode || "",
@@ -226,8 +226,10 @@ const finalDiscount = cart.totals.discount || discount
         shippingAreaId: orderData.shippingAreaId,
         promoCode: orderData.promoCode,
         subtotal: orderData.subtotal,
+        discount: orderData.discount,
         total: orderData.total
       });
+      console.log('✅ FIXED: discount sent to backend:', finalDiscount);
 
       if (isGuestUser) {
         orderData.guestInfo = {
@@ -469,10 +471,10 @@ const finalDiscount = cart.totals.discount || discount
                           disabled={loading}
                           className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
                         >
-                          {loading ? (
+{loading ? (
                             <>
-                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              Placing Order...
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                              Processing Order...
                             </>
                           ) : (
                             <>

@@ -174,7 +174,7 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
 
         {/* Summary - Minimal */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-          <div style={{ width: '220px', fontSize: '9pt' }}>
+            <div style={{ width: '220px', fontSize: '9pt' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
               <span style={{ color: '#666' }}>Subtotal:</span>
               <span>Ksh {subtotal.toLocaleString()}</span>
@@ -189,6 +189,23 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
                 <span style={{ color: '#666' }}>VAT (16%):</span>
                 <span>Ksh {tax.toLocaleString()}</span>
+              </div>
+            )}
+            {order.discount > 0 && (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                padding: '4px 0',
+                backgroundColor: '#d1fae5',
+                borderRadius: '4px',
+                margin: '4px 0'
+              }}>
+                <span style={{ color: '#065f46', fontWeight: '500' }}>
+                  Discount: {(order as any).promoCode?.code || 'Promo'}
+                </span>
+                <span style={{ color: '#065f46', fontWeight: 'bold' }}>
+                  -Ksh {order.discount.toLocaleString()}
+                </span>
               </div>
             )}
             <div style={{ 
@@ -735,7 +752,7 @@ export default function UserOrderDetails() {
               </div>
 
               <div className="p-4 sm:p-6 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/30 dark:to-gray-900/30 border-t border-gray-200/50 dark:border-gray-700">
-                <div className="space-y-2 max-w-md ml-auto">
+                  <div className="space-y-2 max-w-md ml-auto">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
                     <span className="font-medium">Ksh {(order.subtotal || order.total).toLocaleString()}</span>
@@ -750,6 +767,16 @@ export default function UserOrderDetails() {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600 dark:text-gray-400">Tax (16% VAT)</span>
                       <span className="font-medium">Ksh {order.tax.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {order.discount > 0 && (
+                    <div className="flex justify-between text-sm bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Discount {(order as any).promoCode?.code || 'Promo'}
+                      </span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        -Ksh {order.discount.toLocaleString()}
+                      </span>
                     </div>
                   )}
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
@@ -861,16 +888,16 @@ export default function UserOrderDetails() {
                     {order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod === 'mpesa' ? 'M-Pesa' : 'Card Payment'}
                   </span>
                 </div>
-                {order.shippingArea && (
+                {(order as any).shippingArea && (
                   <div className="flex justify-between py-2 flex-wrap gap-2">
                     <span className="text-gray-600 dark:text-gray-400">Shipping Area:</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">{order.shippingArea.name} (KES {order.shippingCost.toLocaleString()})</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">{(order as any).shippingArea.name} (KES {order.shippingCost.toLocaleString()})</span>
                   </div>
                 )}
-                {order.promoCode && (
+                {(order as any).promoCode && (
                   <div className="flex justify-between py-2 flex-wrap gap-2 bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded">
                     <span className="text-gray-600 dark:text-gray-400">Promo:</span>
-                    <span className="font-semibold text-emerald-700 dark:text-emerald-300">{order.promoCode.code} (-KES {order.discount.toLocaleString()})</span>
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-300">{(order as any).promoCode.code} (-KES {(order as any).discount?.toLocaleString()})</span>
                   </div>
                 )}
                 <div className="flex justify-between py-2 border-t border-gray-200/50 dark:border-gray-700 flex-wrap gap-2">
