@@ -120,7 +120,6 @@ export const useCartStore = create<CartState>()(
         
         await get().recalculateTotals();
         await get().syncToAllStorage();
-        console.log('🛒 Added to cart + synced:', get().totalItems, 'items');
         onSuccess?.();
       },
 
@@ -173,7 +172,6 @@ export const useCartStore = create<CartState>()(
           localStorage.removeItem('cart-storage');
           sessionStorage.removeItem('cart-session');
           document.cookie = 'cartData=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-          console.log('🗑️ Cart cleared from all storage');
         } catch (e) {
           console.warn('Error clearing storage:', e);
         }

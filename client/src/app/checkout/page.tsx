@@ -179,13 +179,6 @@ const finalDiscount = cart.totals.discount || discount
       
       const calculatedTax = subtotal * 0.16
       
-      console.log("=== ORDER CALCULATIONS (Dynamic) ===")
-      console.log("Subtotal:", subtotal)
-      console.log("Shipping:", shippingCost)
-      console.log("Discount:", discount)
-      console.log("Tax:", calculatedTax)
-      console.log("Total:", totals.total)
-      
       // Validate required fields
       if (!cart.selectedShippingAreaId) {
         toast.error('Please select a shipping area');
@@ -222,15 +215,6 @@ const finalDiscount = cart.totals.discount || discount
         notes: ""
       }
 
-      console.log('🚀 Validated orderData:', {
-        shippingAreaId: orderData.shippingAreaId,
-        promoCode: orderData.promoCode,
-        subtotal: orderData.subtotal,
-        discount: orderData.discount,
-        total: orderData.total
-      });
-      console.log('✅ FIXED: discount sent to backend:', finalDiscount);
-
       if (isGuestUser) {
         orderData.guestInfo = {
           email: guestEmail,
@@ -239,12 +223,7 @@ const finalDiscount = cart.totals.discount || discount
         }
       }
 
-
-      console.log("Order data:", orderData)
-
       const response = await createOrder(orderData as any)
-
-      console.log("Order created:", response)
 
       const newOrderId = response._id
       if (!newOrderId) {
@@ -270,7 +249,6 @@ const finalDiscount = cart.totals.discount || discount
       cart.clearCart()
       setOrderSuccess(true)
     } catch (error: any) {
-      console.error("Order error:", error)
       const msg = error.response?.data?.error || error.message || "Order failed"
       
       if (paymentMethod === "mpesa") {
