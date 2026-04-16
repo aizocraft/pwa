@@ -1,7 +1,9 @@
 // server/middleware/auditMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
 import AuditLog from '../models/AuditLog';
+import User from '../models/User';
 import { Types } from 'mongoose';
+
 
 // Removed duplicate global declaration - use server/types/express.d.ts
 // Local AuditRequest type for type safety
@@ -83,7 +85,7 @@ export const createAuditLog = async (req: AuditRequest, options: AuditLogOptions
       return null;
     }
 
-    const userAgent = req.get('user-agent') || 'unknown';
+    const userAgent = req.get('User-Agent') || 'unknown';
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
     const location = await getLocationFromIp(ipAddress);
 
@@ -92,13 +94,13 @@ export const createAuditLog = async (req: AuditRequest, options: AuditLogOptions
     
     if (req.user) {
       try {
-        const user = await (await import('../models/User')).default.findById(req.user.userId);
+        const user = await User.findById(req.user.userId).select('email name');
         if (user) {
           userEmail = user.email;
           userName = user.name || user.email;
         }
       } catch (err) {
-        console.error('Failed to fetch user:', err);
+        console.error('Failed to fetch user for audit:', err);
       }
     }
 
