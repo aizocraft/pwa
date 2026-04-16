@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useCartStore } from '../../../store/cart'
 import { formatCurrency } from '../../../lib/utils'
 import { useEffect } from 'react'
+import { motion } from 'framer-motion'
 
 // Define the shipping address type
 interface ShippingAddress {
@@ -304,14 +305,19 @@ export default function ShippingForm({
           {/* Read-only: Shipping & Promo from Cart (No Edit) */}
     
 
-          <button
+          <motion.button
             onClick={onContinue}
             disabled={!isShippingValid() || (isGuest && !isGuestInfoValid()) || !cart.selectedShippingAreaId}
-            className="w-full mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2 group"
+            className="group relative w-full mt-6 overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 p-1 shadow-xl ring-1 ring-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/30 hover:ring-blue-400/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-clip-padding shadow-lg"
+  whileHover={{ scale: 1.02, boxShadow: '0 20px 40px -10px rgba(59,130,246,0.4)' }}
+  whileTap={{ scale: 0.98 }}
+  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
           >
             <span>Continue to Payment</span>
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </button>
+            <motion.div animate={{ x: [0, 4, 0] }} transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}>
+              <ArrowRight className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            </motion.div>
+          </motion.button>
         </div>
       </div>
     </div>

@@ -166,7 +166,7 @@ const promoValid = cart.promoValid
             <div className="flex justify-between items-end">
               <span className="text-xl font-bold text-gray-900 dark:text-white">Total</span>
               <div className="text-right">
-                <span className="text-3xl font-black bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent tracking-tight">
+  <span className="text-3xl font-black bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 bg-clip-text text-transparent tracking-tight">
                   {formatCurrency(total)}
                 </span>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">incl. VAT</p>

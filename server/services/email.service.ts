@@ -25,7 +25,12 @@ export interface OrderEmailData {
   orderId: string;
   customerName: string;
   customerEmail: string;
+  subtotal: number;
+  shippingCost: number;
+  tax: number;
+  discount: number;
   total: number;
+  promoCode?: string;
   status: string;
   items: Array<{ name: string; quantity: number; price: number }>;
 }
@@ -36,7 +41,12 @@ export interface AdminOrderNotificationData {
   customerEmail: string;
   customerPhone: string;
   shippingAddress: string;
+  subtotal: number;
+  shippingCost: number;
+  tax: number;
+  discount: number;
   total: number;
+  promoCode?: string;
   paymentMethod: string;
   status: string;
   items: Array<{ name: string; quantity: number; price: number }>;
@@ -203,13 +213,24 @@ export const sendOrderConfirmation = async (data: OrderEmailData) => {
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .header { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
           .content { padding: 30px; background: #f9fafb; }
           .order-details { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-          table { width: 100%; border-collapse: collapse; }
-          th { background: #f3f4f6; padding: 12px; text-align: left; font-weight: 600; }
-          td { padding: 12px; border-bottom: 1px solid #e5e7eb; }
-          .total { font-size: 20px; font-weight: bold; text-align: right; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e5e7eb; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 15px 12px; text-align: left; font-weight: 600; font-size: 14px; color: #475569; border-bottom: 2px solid #e2e8f0; }
+          td { padding: 15px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+          .order-summary { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0,0, 0.1); }
+          .summary-row { display: flex; justify-content: space-between; padding: 12px 0; font-size: 15px; border-bottom: 1px solid #f1f5f9; }
+          .summary-row:last-child { border-bottom: none; }
+          .discount .summary-row { color: #ef4444; }
+          .summary-total { margin-top: 15px; padding-top: 15px; border-top: 2px solid #3b82f6; font-size: 22px; font-weight: 700; color: #1e293b; }
+          @media (max-width: 600px) {
+            .container { padding: 10px !important; }
+            table { font-size: 14px; }
+            th, td { padding: 10px 8px; }
+            .summary-row { font-size: 14px; flex-direction: column; align-items: flex-start; gap: 4px; }
+            .summary-total { font-size: 20px; }
+          }
           .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
         </style>
       </head>
@@ -230,15 +251,41 @@ export const sendOrderConfirmation = async (data: OrderEmailData) => {
               
               <table>
                 <thead>
-                  <tr><th>Product</th><th>Quantity</th><th>Price</th><th>Total</th></tr>
+                  <tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>
                 </thead>
                 <tbody>
                   ${itemsHtml}
                 </tbody>
               </table>
               
-              <div class="total">
-                <p><strong>Total: KES ${data.total.toFixed(2)}</strong></p>
+              <div class="order-summary">
+                <div class="summary-row">
+                  <span>Subtotal</span>
+                  <span>KES ${data.subtotal.toFixed(2)}</span>
+                </div>
+                <div class="summary-row">
+                  <span>Shipping</span>
+                  <span>KES ${data.shippingCost.toFixed(2)}</span>
+                </div>
+                ${data.promoCode ? `
+                <div class="summary-row discount">
+                  <span>Discount (${data.promoCode})</span>
+                  <span>-KES ${data.discount.toFixed(2)}</span>
+                </div>
+                ` : `
+                <div class="summary-row">
+                  <span>Discount</span>
+                  <span>-KES ${data.discount.toFixed(2)}</span>
+                </div>
+                `}
+                <div class="summary-row">
+                  <span>Tax</span>
+                  <span>KES ${data.tax.toFixed(2)}</span>
+                </div>
+                <div class="summary-total">
+                  <span>Total</span>
+                  <span>KES ${data.total.toFixed(2)}</span>
+                </div>
               </div>
             </div>
             
@@ -281,7 +328,7 @@ export const sendAdminOrderNotification = async (data: AdminOrderNotificationDat
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; }
           .container { max-width: 700px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .header { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
           .content { padding: 30px; background: #f9fafb; }
           .alert-badge { background: #ef4444; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; display: inline-block; }
           .order-info { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -350,15 +397,41 @@ export const sendAdminOrderNotification = async (data: AdminOrderNotificationDat
               <h3>🛍️ Order Items</h3>
               <table>
                 <thead>
-                  <tr><th>Product</th><th>Quantity</th><th>Unit Price</th><th>Total</th></tr>
+                  <tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr>
                 </thead>
                 <tbody>
                   ${itemsHtml}
                 </tbody>
               </table>
               
-              <div class="total">
-                <p><strong>Grand Total: KES ${data.total.toFixed(2)}</strong></p>
+              <div class="order-summary">
+                <div class="summary-row">
+                  <span>Subtotal</span>
+                  <span>KES ${data.subtotal.toFixed(2)}</span>
+                </div>
+                <div class="summary-row">
+                  <span>Shipping</span>
+                  <span>KES ${data.shippingCost.toFixed(2)}</span>
+                </div>
+                ${data.promoCode ? `
+                <div class="summary-row discount">
+                  <span>Discount (${data.promoCode})</span>
+                  <span>-KES ${data.discount.toFixed(2)}</span>
+                </div>
+                ` : `
+                <div class="summary-row">
+                  <span>Discount</span>
+                  <span>-KES ${data.discount.toFixed(2)}</span>
+                </div>
+                `}
+                <div class="summary-row">
+                  <span>Tax</span>
+                  <span>KES ${data.tax.toFixed(2)}</span>
+                </div>
+                <div class="summary-total">
+                  <span>Grand Total</span>
+                  <span>KES ${data.total.toFixed(2)}</span>
+                </div>
               </div>
             </div>
 
@@ -392,7 +465,7 @@ export const sendWelcomeEmail = async (email: string, name: string) => {
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+          .header { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
           .content { padding: 30px; background: #f9fafb; }
           .button { display: inline-block; padding: 12px 24px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
           .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
@@ -438,7 +511,7 @@ export const sendPasswordResetEmail = async (email: string, resetToken: string) 
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #ef4444; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+          .header { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
           .content { padding: 30px; background: #f9fafb; }
           .warning { background: #fef2f2; padding: 15px; border-left: 4px solid #ef4444; margin: 20px 0; border-radius: 5px; }
           .button { display: inline-block; padding: 12px 24px; background: #3b82f6; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }

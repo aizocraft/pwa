@@ -43,6 +43,7 @@ router.get('/', async (req: Request, res: Response) => {
         website: '',
         footerText: '',
         socialLinks: [],
+        taxRate: 0.16,
         logo: {
           type: 'url',
           url: DEFAULT_LOGO_URL
@@ -545,6 +546,18 @@ router.post('/reset', authMiddleware, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Reset error:', error);
     res.status(500).json({ error: 'Failed to reset settings' });
+  }
+});
+
+// GET /api/company/tax-rate
+router.get('/tax-rate', async (req: Request, res: Response) => {
+  try {
+    const settings = await CompanySettings.findOne();
+    const taxRate = settings?.taxRate ?? 0.16; // Default to 16% if not set
+    res.json({ taxRate });
+  } catch (error: any) {
+    console.error('GET tax rate error:', error);
+    res.status(500).json({ error: 'Failed to fetch tax rate' });
   }
 });
 

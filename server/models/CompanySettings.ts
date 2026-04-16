@@ -33,6 +33,7 @@ export interface ICompanySettings extends Document {
     platform: string;
     url: string;
   }>;
+  taxRate: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -96,8 +97,12 @@ const companySettingsSchema = new Schema<ICompanySettings>(
         url: { type: String, required: true }
       }],
       default: []
-    },
-    logo: {
+    },    taxRate: {
+      type: Number,
+      default: 0.16,
+      min: [0, 'Tax rate cannot be negative'],
+      max: [1, 'Tax rate cannot exceed 100%']
+    },    logo: {
       type: LogoSchema,
       default: () => ({
         type: 'url',

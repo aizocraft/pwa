@@ -10,6 +10,7 @@ import optionalAuthMiddleware from '../middleware/optionalAuth';
 import { sendOrderConfirmation, sendAdminOrderNotification } from '../services/email.service';
 import ShippingAreaModel from '../models/ShippingArea';
 import PromoCodeModel from '../models/PromoCode';
+import { CompanySettings } from '../models/CompanySettings';
 
 const router = Router();
 
@@ -137,6 +138,7 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
 
     let discount = 0;
     let appliedPromo = null;
+    let promoCodeStr = promoCode;
     if (promoCode) {
       const promo = await PromoCodeModel.findOne({ code: promoCode.toUpperCase(), isActive: true });
       if (promo && promo.canUse(calculatedSubtotal)) {
@@ -144,16 +146,20 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
           ? calculatedSubtotal * (promo.value / 100)
           : Math.min(promo.value, calculatedSubtotal);
         appliedPromo = promo._id;
+        promoCodeStr = promo.code;
         // Increment used count
         promo.usedCount += 1;
         await promo.save();
       } else {
         console.log('Promo not valid');
+        promoCodeStr = undefined;
       }
     }
 
     const shippingCost = (shippingArea.freeThreshold > 0 && calculatedSubtotal >= shippingArea.freeThreshold) ? 0 : shippingArea.baseCost;
-    const tax = calculatedSubtotal * 0.16;
+    const settings = await CompanySettings.findOne();
+    const taxRate = settings?.taxRate ?? 0.16;
+    const tax = calculatedSubtotal * taxRate;
     const finalTotal = calculatedSubtotal + shippingCost - discount + tax;
 
     console.log('Server calc - Subtotal:', calculatedSubtotal, 'Shipping:', shippingCost, 'Discount:', discount, 'Tax:', tax, 'Total:', finalTotal);
@@ -215,30 +221,40 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
     }));
 
     // Send order confirmation to customer (don't await - let it run in background)
-    sendOrderConfirmation({
-      orderId: order.orderNumber,
-      customerName: customerName,
-      customerEmail: customerEmail,
-      total: finalTotal,
-      status: order.status,
-      items: emailItems
-    }).catch(err => console.error('Failed to send customer confirmation:', err));
+sendOrderConfirmation({
+  orderId: order._id.toString(),
+  customerName: customerName,
+  customerEmail: customerEmail,
+  subtotal: calculatedSubtotal,
+  shippingCost: shippingCost,
+  discount: discount,
+  tax: tax,
+  total: finalTotal,
+  promoCode: promoCodeStr,
+  status: order.status,
+  items: emailItems
+}).catch(err => console.error('Failed to send customer confirmation:', err));
 
-    // Send admin notification (don't await - let it run in background)
-    if (process.env.ADMIN_EMAIL) {
-      sendAdminOrderNotification({
-        orderId: order.orderNumber,
-        customerName: customerName,
-        customerEmail: customerEmail,
-        customerPhone: customerPhone,
-        shippingAddress: formattedAddress,
-        total: finalTotal,
-        paymentMethod: paymentMethod,
-        status: order.status,
-        items: emailItems,
-        orderDate: order.createdAt || new Date()
-      }).catch(err => console.error('Failed to send admin notification:', err));
-    }
+// Send admin notification (don't await - let it run in background)
+if (process.env.ADMIN_EMAIL) {
+  sendAdminOrderNotification({
+    orderId: order._id.toString(),
+    customerName: customerName,
+    customerEmail: customerEmail,
+    customerPhone: customerPhone,
+    shippingAddress: formattedAddress,
+    subtotal: calculatedSubtotal,
+    shippingCost: shippingCost,
+    discount: discount,
+    tax: tax,
+    total: finalTotal,
+    promoCode: promoCodeStr,
+    paymentMethod: paymentMethod,
+    status: order.status,
+    items: emailItems,
+    orderDate: order.createdAt || new Date()
+  }).catch(err => console.error('Failed to send admin notification:', err));
+}
 
     // Populate product details for response
     const populatedOrder = await OrderModel.findById(order._id)

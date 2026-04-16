@@ -28,7 +28,7 @@ export default function CompanySettings() {
   // Initialize form when company data loads
   useEffect(() => {
     if (company) {
-      setFormData({
+        setFormData({
         companyName: company.companyName || '',
         slogan: company.slogan || '',
         description: company.description || '',
@@ -37,6 +37,7 @@ export default function CompanySettings() {
         email: company.email || '',
         website: company.website || '',
         footerText: company.footerText || '',
+        taxRate: company.taxRate || 0.16,
         socialLinks: company.socialLinks || []
       })
     }
@@ -60,6 +61,7 @@ export default function CompanySettings() {
         email: formData.email || undefined,
         website: formData.website || undefined,
         footerText: formData.footerText || undefined,
+        taxRate: formData.taxRate !== undefined ? formData.taxRate : undefined,
         socialLinks: filteredSocialLinks.length > 0 ? filteredSocialLinks : undefined
       }
       
@@ -95,6 +97,7 @@ export default function CompanySettings() {
 
   const tabs = [
     { id: 'basic', label: 'Basic Info', icon: Building2 },
+    { id: 'tax', label: 'Tax', icon: FileText },
     { id: 'contact', label: 'Contact', icon: MapPin },
     { id: 'social', label: 'Social', icon: Link2 },
     { id: 'branding', label: 'Branding', icon: ImageIcon },
@@ -204,6 +207,35 @@ export default function CompanySettings() {
                   disabled={!editing}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 disabled:bg-gray-100 dark:disabled:bg-gray-700 focus:ring-2 focus:ring-blue-500 resize-vertical"
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Tax Tab */}
+          {activeTab === 'tax' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Tax Rate (%)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={formData.taxRate || ''}
+                    onChange={(e) => setFormData({...formData, taxRate: parseFloat(e.target.value) || 0 })}
+                    disabled={!editing}
+                    className="w-full pl-10 pr-12 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 disabled:bg-gray-100 dark:disabled:bg-gray-700 focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.16"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 dark:text-gray-400">%</span>
+                </div>
+                <p className={`mt-1 text-xs ${editing ? 'text-gray-500 dark:text-gray-400' : 'font-medium text-gray-900 dark:text-white'}`}>
+                  Enter as decimal (e.g. 16% = 0.16)
+                </p>
               </div>
             </div>
           )}
@@ -366,17 +398,18 @@ export default function CompanySettings() {
               onClick={() => {
                 setEditing(false)
                 if (company) {
-                  setFormData({
-                    companyName: company.companyName || '',
-                    slogan: company.slogan || '',
-                    description: company.description || '',
-                    address: company.address || '',
-                    phone: company.phone || '',
-                    email: company.email || '',
-                    website: company.website || '',
-                    footerText: company.footerText || '',
-                    socialLinks: company.socialLinks || []
-                  })
+                setFormData({
+                  companyName: company.companyName || '',
+                  slogan: company.slogan || '',
+                  description: company.description || '',
+                  address: company.address || '',
+                  phone: company.phone || '',
+                  email: company.email || '',
+                  website: company.website || '',
+                  footerText: company.footerText || '',
+                  taxRate: company.taxRate || 0.16,
+                  socialLinks: company.socialLinks || []
+                })
                 }
               }}
               disabled={loading}

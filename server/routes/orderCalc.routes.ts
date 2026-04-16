@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import optionalAuthMiddleware from '../middleware/optionalAuth';
 import ShippingAreaModel from '../models/ShippingArea';
 import PromoCodeModel from '../models/PromoCode';
+import { CompanySettings } from '../models/CompanySettings';
 import mongoose from 'mongoose';
 
 interface CalcRequest {
@@ -87,8 +88,10 @@ router.post('/', optionalAuthMiddleware, async (req: Request<{}, CalcResponse, C
       }
     }
 
-    // Calculate tax (16% Kenya VAT)
-    const tax = subtotal * 0.16;
+    // Calculate tax
+    const settings = await CompanySettings.findOne();
+    const taxRate = settings?.taxRate ?? 0.16;
+    const tax = subtotal * taxRate;
 
     // Final total
     const total = subtotal + shippingCost - discount + tax;

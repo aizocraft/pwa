@@ -60,12 +60,16 @@ export default function CheckoutPage() {
   const [mpesaError, setMpesaError] = useState("")
   const [countdown, setCountdown] = useState(60)
   
-  // Card payment state
+// Card payment state
   const [cardNumber, setCardNumber] = useState("")
   const [cardExpiry, setCardExpiry] = useState("")
   const [cardCvc, setCardCvc] = useState("")
   const [cardName, setCardName] = useState("")
   const [cardError, setCardError] = useState("")
+
+  // Add this state at the top with other state declarations
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitTimeout, setSubmitTimeout] = useState<NodeJS.Timeout | null>(null)
   
   // Shipping address state
   const [shippingAddress, setShippingAddress] = useState({
@@ -85,7 +89,7 @@ export default function CheckoutPage() {
     setIsGuest(!token)
   }, [])
 
-const tax = cart.totals.tax || (subtotal * 0.16)
+const tax = cart.totals.tax || (subtotal * cart.taxRate)
 const total = cart.totals.total || totals.total
 const shipping = cart.totals.shippingCost || shippingCost
 const finalDiscount = cart.totals.discount || discount
@@ -106,13 +110,19 @@ const finalDiscount = cart.totals.discount || discount
     return !!(guestEmail && guestPhone && guestEmail.includes("@"))
   }
 
+  // Update the M-PESA request function
   const handleMpesaRequest = () => {
     if (!mpesaPhone || mpesaPhone.length < 10) {
       setMpesaError("Please enter a valid phone number (e.g., 254700000000)")
       return
     }
+    
+    // Prevent double request
+    if (isSubmitting) return
+    
     setMpesaError("")
     setMpesaStep("processing")
+    
     setTimeout(() => {
       setMpesaStep("verify")
       let timer = 60
@@ -129,23 +139,32 @@ const finalDiscount = cart.totals.discount || discount
     }, 1500)
   }
 
+  // Update the M-PESA verify function
   const handleMpesaVerify = async () => {
     if (!mpesaCode || mpesaCode.length < 4) {
       setMpesaError("Please enter the 4-digit verification code")
       return
     }
     setMpesaError("")
+    
+    // Prevent double submission
+    if (isSubmitting || loading) return
+    
+    setIsSubmitting(true)
     setLoading(true)
+    
     setTimeout(async () => {
       if (mpesaCode.length === 4 && /^\d+$/.test(mpesaCode)) {
         await handlePlaceOrder()
       } else {
         setMpesaError("Invalid verification code. Please try again.")
+        setIsSubmitting(false)
         setLoading(false)
       }
     }, 1500)
   }
 
+  // Update the card payment function
   const handleCardPayment = async () => {
     const cleanCardNumber = cardNumber.replace(/\s/g, "")
     if (!cleanCardNumber || cleanCardNumber.length < 15) {
@@ -165,24 +184,42 @@ const finalDiscount = cart.totals.discount || discount
       return
     }
     setCardError("")
+    
+    // Prevent double submission
+    if (isSubmitting || loading) return
+    
+    setIsSubmitting(true)
     setLoading(true)
+    
     setTimeout(async () => {
       await handlePlaceOrder()
     }, 2000)
   }
 
+  // Replace the handlePlaceOrder function with this optimized version
   const handlePlaceOrder = async () => {
+    // Prevent multiple submissions
+    if (isSubmitting || loading) {
+      toast.error('Please wait, order is already being processed...')
+      return
+    }
+
     try {
+      setIsSubmitting(true)
+      setLoading(true)
+      
       const token = getToken()
       const isGuestUser = !token
       const apiPaymentMethod = paymentMethod === "cod" ? "cod" : paymentMethod
       
-      const calculatedTax = subtotal * 0.16
+      const calculatedTax = subtotal * cart.taxRate
       
       // Validate required fields
       if (!cart.selectedShippingAreaId) {
-        toast.error('Please select a shipping area');
-        return;
+        toast.error('Please select a shipping area')
+        setIsSubmitting(false)
+        setLoading(false)
+        return
       }
 
       const orderData: any = {
@@ -198,7 +235,7 @@ const finalDiscount = cart.totals.discount || discount
         discount: Number(finalDiscount),
         tax: Number(tax),
         total: Number(totals.total),
-        shippingAreaId: cart.selectedShippingAreaId!, // Non-null guaranteed
+        shippingAreaId: cart.selectedShippingAreaId!,
         promoCode: cart.promoCode || "",
         shippingAddress: {
           fullName: shippingAddress.fullName.trim(),
@@ -248,6 +285,7 @@ const finalDiscount = cart.totals.discount || discount
 
       cart.clearCart()
       setOrderSuccess(true)
+      
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message || "Order failed"
       
@@ -258,7 +296,7 @@ const finalDiscount = cart.totals.discount || discount
       }
       
       toast.error(msg)
-    } finally {
+      setIsSubmitting(false)
       setLoading(false)
     }
   }
@@ -288,6 +326,15 @@ const finalDiscount = cart.totals.discount || discount
     setGuestPhone("")
   }
 
+  // Add cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (submitTimeout) {
+        clearTimeout(submitTimeout)
+      }
+    }
+  }, [submitTimeout])
+
   if (orderSuccess) return <OrderSuccess orderId={orderId} />
   if (items.length === 0) return <EmptyCart />
 
@@ -308,7 +355,7 @@ const finalDiscount = cart.totals.discount || discount
               >
                 Clear Data
               </button>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-blue-700 flex items-center justify-center shadow-lg ring-1 ring-blue-500/30">
                 <span className="text-white text-xs font-bold">{items.length}</span>
               </div>
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Items</span>
@@ -408,6 +455,7 @@ const finalDiscount = cart.totals.discount || discount
                         paymentMethod={paymentMethod}
                         setPaymentMethod={setPaymentMethod}
                         resetMpesa={resetMpesa}
+                        disabled={isSubmitting || loading}
                       />
 
                       {paymentMethod === "mpesa" && (
@@ -443,24 +491,27 @@ const finalDiscount = cart.totals.discount || discount
                         />
                       )}
 
-                      {paymentMethod === "cod" && (
-                        <button
-                          onClick={handlePlaceOrder}
-                          disabled={loading}
-                          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
-                        >
-{loading ? (
-                            <>
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              Processing Order...
-                            </>
-                          ) : (
-                            <>
-                              <span>Place Order - {formatCurrency(total)}</span>
-                            </>
-                          )}
-                        </button>
-                      )}
+{paymentMethod === "cod" && (
+  <motion.button
+    onClick={handlePlaceOrder}
+    disabled={isSubmitting || loading}
+    className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 p-1 shadow-xl ring-1 ring-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/30 hover:ring-blue-400/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-clip-padding shadow-lg"
+    whileHover={{ scale: 1.02, boxShadow: '0 20px 40px -10px rgba(59,130,246,0.4)' }}
+    whileTap={{ scale: 0.98 }}
+    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+  >
+    {(isSubmitting || loading) ? (
+      <>
+        <Loader2 className="w-5 h-5 animate-spin" />
+        Processing Order...
+      </>
+    ) : (
+      <>
+        <span>Place Order - {formatCurrency(total)}</span>
+      </>
+    )}
+  </motion.button>
+)}
 
                       <button
                         onClick={() => setStep("shipping")}

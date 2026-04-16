@@ -104,14 +104,19 @@ router.post('/send-order-confirmation', async (req: Request, res: Response) => {
       });
     }
     
-    const result = await sendOrderConfirmation({
+   const result = await sendOrderConfirmation({
       orderId,
       customerName,
       customerEmail,
+      subtotal: total,
+      shippingCost: 0,
+      discount: 0,
+      tax: 0,
       total,
       status: status || 'confirmed',
       items
     });
+    
     
     if (result.success) {
       res.json({ 

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useCartStore } from '../../store/cart';
 import { formatCurrency } from '../../lib/utils';
+import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 
@@ -39,6 +40,7 @@ export default function CartPage() {
     shippingAreas, 
     selectedShippingAreaId,
     loading: cartLoading,
+    taxRate,
     removeItem, 
     updateQty, 
     clearCart,
@@ -72,8 +74,8 @@ export default function CartPage() {
   }, [shippingAreas.length, cartLoading]);
 
 
-  const tax = totals.tax || (subtotal * 0.16);
-  const total = totals.total || (subtotal + shippingCost + (subtotal * 0.16) - storeDiscount);
+  const tax = totals.tax || (subtotal * taxRate);
+  const total = totals.total || (subtotal + shippingCost + (subtotal * taxRate) - storeDiscount);
   const selectedArea = shippingAreas.find(area => area._id === selectedShippingAreaId);
   
   const remainingForFreeShipping = selectedArea && selectedArea.freeThreshold > 0
@@ -452,7 +454,7 @@ export default function CartPage() {
                   </div>
                   
                   <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
-                    <span>Tax (16% VAT)</span>
+                    <span>Tax (VAT)</span>
                     <span className="font-medium text-gray-900 dark:text-white">
                       {formatCurrency(tax)}
                     </span>
@@ -537,10 +539,13 @@ export default function CartPage() {
                 </div>
 
                 {/* Checkout Button */}
-                <button
+<motion.button
                   onClick={handleCheckout}
                   disabled={isLoading || !selectedShippingAreaId}
-                  className="group w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2 relative overflow-hidden"
+                  className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 p-1 shadow-xl ring-1 ring-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/30 hover:ring-blue-400/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-clip-padding shadow-lg"
+                  whileHover={{ scale: 1.02, boxShadow: '0 20px 40px -10px rgba(59,130,246,0.4)' }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
                   <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
                   {isLoading ? (
@@ -555,7 +560,7 @@ export default function CartPage() {
                       <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </>
                   )}
-                </button>
+                </motion.button>
 
                 {!selectedShippingAreaId && shippingAreas.length > 0 && (
                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">

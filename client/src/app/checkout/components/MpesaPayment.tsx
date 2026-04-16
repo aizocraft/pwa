@@ -31,113 +31,15 @@ export default function MpesaPayment({
   onReset
 }: MpesaPaymentProps) {
   return (
-    <div className="space-y-4 mb-6">
-      {mpesaStep === 'request' && (
-        <>
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-200 dark:border-green-800 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <Shield className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-green-800 dark:text-green-300">Secure M-PESA Payment</p>
-                <p className="text-xs text-green-700 dark:text-green-400 mt-1">You will receive a payment request on your M-PESA registered phone number</p>
-              </div>
-            </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">M-PESA Phone Number *</label>
-            <input
-              type="tel"
-              value={mpesaPhone}
-              onChange={(e) => setMpesaPhone(e.target.value)}
-              placeholder="254700000000"
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-shadow"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Format: 254700000000 (without +)</p>
-          </div>
-          
-          {mpesaError && (
-            <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl p-3">
-              <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-300">
-                <AlertCircle className="w-4 h-4" />
-                <span>{mpesaError}</span>
-              </div>
-            </div>
-          )}
-          
-          <button
-            onClick={onRequest}
-            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
-          >
-            <Smartphone className="w-5 h-5" />
-            Request Payment
-          </button>
-        </>
-      )}
-
-      {mpesaStep === 'processing' && (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 mx-auto mb-4">
-            <div className="w-full h-full border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <p className="text-gray-700 dark:text-gray-300 font-medium">Sending payment request...</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Please wait</p>
+    <div className="space-y-6 mb-8 p-6 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl bg-gradient-to-br from-gray-50/50 to-white/50 dark:from-gray-900/50 dark:to-gray-800/50">
+      <div className="flex flex-col items-center text-center py-8">
+        <div className="w-20 h-20 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-2xl flex items-center justify-center mb-4">
+          <Smartphone className="w-10 h-10 text-gray-500 dark:text-gray-400" />
         </div>
-      )}
-
-      {mpesaStep === 'verify' && (
-        <>
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Code expires in: {countdown} seconds</p>
-                <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">Enter the 4-digit code sent to {mpesaPhone}</p>
-              </div>
-              <button onClick={onReset} className="text-xs text-blue-600 hover:text-blue-700">Cancel</button>
-            </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Verification Code *</label>
-            <input
-              type="text"
-              value={mpesaCode}
-              onChange={(e) => setMpesaCode(e.target.value)}
-              placeholder="Enter 4-digit code"
-              maxLength={4}
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/50 text-center text-2xl tracking-widest"
-            />
-          </div>
-          
-          {mpesaError && (
-            <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl p-3">
-              <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-300">
-                <AlertCircle className="w-4 h-4" />
-                <span>{mpesaError}</span>
-              </div>
-            </div>
-          )}
-          
-          <button
-            onClick={onVerify}
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
-          >
-            {loading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="w-5 h-5" />
-                Verify & Complete Order
-              </>
-            )}
-          </button>
-        </>
-      )}
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">M-PESA Payments Coming Soon</h3>
+        <p className="text-gray-600 dark:text-gray-400 max-w-md">M-PESA integration will be available shortly. Currently we accept Cash on Delivery.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Total: KSh {countdown.toLocaleString()}</p>
+      </div>
     </div>
   )
 }

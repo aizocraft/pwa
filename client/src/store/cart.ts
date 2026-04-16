@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 import { Product } from '../types/product';
 import { ShippingArea } from '../types/order';
 import toast from 'react-hot-toast';
+import { getTaxRate } from '../lib/company';
 
 interface CartItem {
   id: string;
@@ -36,7 +37,7 @@ interface CartState {
   promoError?: string;
   discount: number;
   shippingCost: number;
-  taxRate: 0.16;
+  taxRate: number;
   totals: CartTotals;
   loading: boolean;
   isHydrated: boolean;
@@ -52,6 +53,7 @@ interface CartState {
   setPromoCode: (code?: string) => Promise<void>;
   recalculateTotals: () => Promise<void>;
   loadInitialData: () => Promise<void>;
+  loadTaxRate: () => Promise<void>;
   syncToStorage: () => void;
   clearPromoError: () => void;
   resetHydration: () => void;
@@ -219,6 +221,17 @@ export const useCartStore = create<CartState>()(
           set({ shippingAreas: [] });
         } finally {
           set({ loading: false });
+        }
+      },
+
+      // Load tax rate from server
+      async loadTaxRate() {
+        try {
+          const taxRate = await getTaxRate();
+          set({ taxRate });
+        } catch (error) {
+          console.warn('Failed to load tax rate, using default:', error);
+          // Keep default tax rate
         }
       },
 
@@ -433,6 +446,9 @@ export const useCartStore = create<CartState>()(
             // Load shipping areas
             await get().loadShippingAreas();
             
+            // Load tax rate
+            await get().loadTaxRate();
+            
             // Re-validate promo if exists
             if (storedData.promoCode && storedData.subtotal > 0) {
               const { validatePromo } = await import('../lib/api');
@@ -466,7 +482,9 @@ export const useCartStore = create<CartState>()(
             get().clearCart();
           }
         } else {
-
+          // No stored data, load fresh data
+          await get().loadShippingAreas();
+          await get().loadTaxRate();
           set({ isHydrated: true });
         }
       }

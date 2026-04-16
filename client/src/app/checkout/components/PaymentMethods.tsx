@@ -7,13 +7,14 @@ interface PaymentMethodsProps {
   paymentMethod: string
   setPaymentMethod: (method: any) => void
   resetMpesa: () => void
+  disabled?: boolean // Add this prop
 }
 
-export default function PaymentMethods({ paymentMethod, setPaymentMethod, resetMpesa }: PaymentMethodsProps) {
+export default function PaymentMethods({ paymentMethod, setPaymentMethod, resetMpesa, disabled = false }: PaymentMethodsProps) {
   const methods = [
     { id: 'cod', label: 'Cash on Delivery', icon: Truck, description: 'Pay when you receive your order', color: 'blue' },
     { id: 'mpesa', label: 'M-PESA', icon: Smartphone, description: 'Pay using M-PESA', color: 'green' },
-    { id: 'card', label: 'Credit/Debit Card', icon: CreditCard, description: 'Visa, Mastercard, etc.', color: 'purple' }
+    { id: 'card', label: 'Credit/Debit Card', icon: CreditCard, description: 'Visa, Mastercard, etc.', color: 'blue' }
   ]
 
   const getColorClasses = (color: string, isSelected: boolean) => {
@@ -45,10 +46,12 @@ export default function PaymentMethods({ paymentMethod, setPaymentMethod, resetM
           <div
             key={method.id}
             onClick={() => {
-              setPaymentMethod(method.id as any)
-              resetMpesa()
+              if (!disabled) {
+                setPaymentMethod(method.id as any)
+                resetMpesa()
+              }
             }}
-            className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${getColorClasses(method.color, isSelected)} hover:shadow-md`}
+            className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${getColorClasses(method.color, isSelected)} ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md'}`}
           >
             <div className="flex items-center gap-4">
               <div className={`w-10 h-10 rounded-lg bg-${method.color}-100 dark:bg-${method.color}-950/50 flex items-center justify-center`}>

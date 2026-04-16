@@ -8,6 +8,12 @@ export async function getCompanySettings(): Promise<CompanySettings> {
   return response.data;
 }
 
+// Get tax rate
+export async function getTaxRate(): Promise<number> {
+  const response = await api.get('/company/tax-rate');
+  return response.data.taxRate;
+}
+
 // Update company settings (all fields)
 export async function updateCompanySettings(data: UpdateCompanyRequest): Promise<CompanySettings> {
   console.log('Sending update to backend:', JSON.stringify(data, null, 2));

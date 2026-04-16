@@ -35,6 +35,7 @@ export interface CompanySettings {
   website: string;
   footerText: string;
   socialLinks: SocialLink[];
+  taxRate: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -49,6 +50,7 @@ export interface UpdateCompanyRequest {
   website?: string;
   footerText?: string;
   socialLinks?: SocialLink[];
+  taxRate?: number;
 }
 
 export interface UploadLogoResponse {
