@@ -57,12 +57,12 @@ export default function ShippingForm({
           // Only update if there's actual data
           if (parsedAddress.fullName || parsedAddress.address1) {
             setShippingAddress(parsedAddress);
-            console.log('ShippingForm loaded address with data:', parsedAddress);
+
           } else {
-            console.log('ShippingForm loaded empty address, ignoring');
+
           }
         } catch (e) {
-          console.error('Error loading saved address:', e);
+
         }
       }
 
@@ -72,7 +72,7 @@ export default function ShippingForm({
         const savedPhone = localStorage.getItem('saved_guest_phone');
         if (savedEmail) setGuestEmail(savedEmail);
         if (savedPhone) setGuestPhone(savedPhone);
-        console.log('ShippingForm loaded guest info:', { savedEmail, savedPhone });
+
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,13 +83,11 @@ export default function ShippingForm({
     if (typeof window !== 'undefined') {
       // Save shipping address
       localStorage.setItem('saved_shipping_address', JSON.stringify(shippingAddress));
-      console.log('Saved shipping address:', shippingAddress);
       
       // Save guest info if guest checkout
       if (isGuest) {
         localStorage.setItem('saved_guest_email', guestEmail);
         localStorage.setItem('saved_guest_phone', guestPhone);
-        console.log('Saved guest info:', { guestEmail, guestPhone });
       }
     }
   };

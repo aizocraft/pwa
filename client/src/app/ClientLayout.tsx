@@ -2,7 +2,7 @@
 'use client'
 
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import Navbar from './Navbar';
 import Footer from './Footer';
@@ -19,38 +19,33 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname();
   const isDashboard = pathname?.startsWith('/dashboard');
   const [mounted, setMounted] = useState(false);
+  const hasInitialized = useRef(false);
 
-  // 🔧 NEW: Rehydrate cart on EVERY route change + mount
-  useEffect(() => {
-    const rehydrateCart = async () => {
-      try {
-        const { useCartStore } = await import('@/store/cart');
-        await useCartStore.getState().rehydrateCart();
-        console.log('🔄 Cart rehydrated on route:', pathname);
-      } catch (error) {
-        console.error('Cart rehydration failed:', error);
-      }
-    };
-
-    if (mounted) {
-      rehydrateCart();
-    }
-  }, [pathname, mounted]);
-
-  // 🔧 NEW: Initial mount + hydration safety
+  // 🔧 ONLY initial mount hydration - once
   useEffect(() => {
     setMounted(true);
-    // Initial sync
-    const initialSync = async () => {
-      try {
-        const { useCartStore } = await import('@/store/cart');
-        await useCartStore.getState().rehydrateCart();
-        console.log('🚀 Initial cart hydration complete');
-      } catch (error) {
-        console.error('Initial cart sync failed:', error);
-      }
-    };
-    initialSync();
+    
+    // Only hydrate once on initial load
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      const initialSync = async () => {
+        try {
+          const { useCartStore } = await import('@/store/cart');
+          const state = useCartStore.getState();
+          
+          // Only load if not already hydrated
+          if (!state.isHydrated) {
+            await state.loadInitialData();
+
+          } else {
+
+          }
+        } catch (error) {
+
+        }
+      };
+      initialSync();
+    }
   }, []);
 
   return (
@@ -98,4 +93,3 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     </QueryProvider>
   );
 }
-

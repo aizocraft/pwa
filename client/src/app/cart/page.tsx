@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import { useCartStore } from '../../store/cart';
 import { formatCurrency } from '../../lib/utils';
-import { validatePromo } from '../../lib/api';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 
@@ -46,6 +45,8 @@ export default function CartPage() {
     setPromoCode: setStorePromoCode,
     promoCode: appliedPromoCode,
     promoValid,
+    promoError,
+    clearPromoError,
     recalculateTotals
   } = useCartStore();
 
@@ -58,15 +59,12 @@ export default function CartPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  // Handle hydration mismatch + auto-rehydrate cart
   useEffect(() => {
     setMounted(true);
-    // Ensure cart fully loaded on mount
     const cart = useCartStore.getState();
     cart.loadInitialData().catch(console.error);
   }, []); 
 
-  // Auto-load shipping areas if empty
   useEffect(() => {
     if (shippingAreas.length === 0 && !cartLoading) {
       useCartStore.getState().loadShippingAreas().catch(console.error);
@@ -78,21 +76,15 @@ export default function CartPage() {
   const total = totals.total || (subtotal + shippingCost + (subtotal * 0.16) - storeDiscount);
   const selectedArea = shippingAreas.find(area => area._id === selectedShippingAreaId);
   
-  // FIXED: Calculate remaining for free shipping only if free shipping is enabled (threshold > 0)
   const remainingForFreeShipping = selectedArea && selectedArea.freeThreshold > 0
     ? Math.max(0, selectedArea.freeThreshold - subtotal)
     : 0;
   
   const freeShippingThreshold = selectedArea?.freeThreshold || 0;
   const isFreeShippingEnabled = freeShippingThreshold > 0;
-  
-  // Check if free shipping applies (threshold > 0 AND subtotal >= threshold)
   const qualifiesForFreeShipping = isFreeShippingEnabled && subtotal >= freeShippingThreshold;
-  
-  // Calculate actual shipping cost to display
   const displayShippingCost = qualifiesForFreeShipping ? 0 : shippingCost;
 
-  // Memoized values
   const progressPercentage = useMemo(() => {
     return isFreeShippingEnabled && freeShippingThreshold > 0 
       ? Math.min(100, (subtotal / freeShippingThreshold) * 100) 
@@ -119,11 +111,15 @@ export default function CartPage() {
     setIsApplyingPromo(true);
     try {
       await setStorePromoCode(promoInput);
-      toast.success('Promo code applied!');
-      setPromoInput('');
+      const state = useCartStore.getState();
+      if (state.promoValid) {
+        toast.success('Promo code applied!');
+        setPromoInput('');
+      } else if (state.promoError) {
+        toast.error(state.promoError);
+      }
     } catch (error) {
       console.error('Error applying promo:', error);
-      toast.error('Failed to apply promo code');
     } finally {
       setIsApplyingPromo(false);
     }
@@ -137,7 +133,6 @@ export default function CartPage() {
   }, [setStorePromoCode, recalculateTotals]);
 
   const handleCheckout = useCallback(async () => {
-    // Validate shipping area is selected
     if (!selectedShippingAreaId) {
       toast.error('Please select a shipping area');
       return;
@@ -165,7 +160,6 @@ export default function CartPage() {
     }
   }, [clearCart]);
 
-  // Helper function to get shipping display text
   const getShippingDisplay = (area: any, subtotal: number) => {
     if (area.freeThreshold > 0 && subtotal >= area.freeThreshold) {
       return { text: 'FREE', isFree: true, cost: 0 };
@@ -275,12 +269,10 @@ export default function CartPage() {
                             </div>
                           </div>
                         )}
-                        {/* Loading shimmer overlay */}
                         {imageErrors[item.id] && (
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer group/image" />
                         )}
                       </div>
-                      {/* Enhanced Quantity Badge */}
                       <div className="absolute -top-3 -right-3 bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-500 dark:to-teal-400 text-white text-xs sm:text-sm font-bold rounded-2xl w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shadow-lg ring-2 ring-white/50 -rotate-6 group-hover:rotate-0 transition-all duration-500 hover:scale-110 hover:shadow-emerald-500/25">
                         {item.qty}
                       </div>
@@ -354,7 +346,7 @@ export default function CartPage() {
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              {/* Shipping Area Selection - FIXED */}
+              {/* Shipping Area Selection */}
               {shippingAreas.length > 0 && (
                 <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-2xl border border-green-200 dark:border-green-800">
                   <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
@@ -371,7 +363,7 @@ export default function CartPage() {
                   >
                     <option value="">Select a shipping area</option>
                     {shippingAreas.map(area => {
-                      const { text, isFree } = getShippingDisplay(area, subtotal);
+                      const { text } = getShippingDisplay(area, subtotal);
                       return (
                         <option key={area._id} value={area._id}>
                           {area.name} - {text}
@@ -383,7 +375,7 @@ export default function CartPage() {
                 </div>
               )}
 
-              {/* Free Shipping Progress - FIXED: Only show if free shipping is enabled AND not already qualified */}
+              {/* Free Shipping Progress */}
               {selectedArea && isFreeShippingEnabled && !qualifiesForFreeShipping && remainingForFreeShipping > 0 && (
                 <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-2xl border border-blue-200 dark:border-blue-800">
                   <div className="flex items-center gap-2 mb-2">
@@ -428,7 +420,6 @@ export default function CartPage() {
                 </div>
               )}
 
-
               <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-lg p-5 sm:p-6 lg:p-8 transition-all duration-300 hover:shadow-xl">
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                   <Package className="w-5 h-5 text-blue-600" />
@@ -444,7 +435,6 @@ export default function CartPage() {
                     </span>
                   </div>
                   
-                  {/* FIXED: Shipping display logic */}
                   <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
                     <div className="flex items-center gap-1">
                       <span>Shipping</span>
@@ -495,10 +485,9 @@ export default function CartPage() {
                       </span>
                     </div>
                   </div>
-
                 </div>
 
-                {/* Promo Code Input */}
+                {/* Promo Code Input with Error Handling */}
                 <div className="mb-6">
                   <div className="flex gap-2">
                     <div className="relative flex-1">
@@ -507,9 +496,14 @@ export default function CartPage() {
                         type="text"
                         placeholder="Enter promo code"
                         value={promoInput}
-                        onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                        onChange={(e) => {
+                          setPromoInput(e.target.value.toUpperCase());
+                          if (promoError) clearPromoError();
+                        }}
                         disabled={promoValid || isApplyingPromo}
-                        className="w-full pl-10 pr-4 py-3 bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className={`w-full pl-10 pr-4 py-3 bg-gray-100 dark:bg-gray-900 border ${
+                          promoError ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700'
+                        } rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all`}
                       />
                     </div>
                     <button
@@ -524,7 +518,17 @@ export default function CartPage() {
                       )}
                     </button>
                   </div>
-                  {appliedPromoCode && (
+                  
+                  {/* Error Message */}
+                  {promoError && (
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {promoError}
+                    </p>
+                  )}
+                  
+                  {/* Success Message */}
+                  {appliedPromoCode && promoValid && !promoError && (
                     <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" />
                       Promo code "{appliedPromoCode}" applied!
