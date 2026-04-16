@@ -1,24 +1,28 @@
-// src/app/categories/page.tsx
-
 'use client'
 
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { getProducts, getCategories } from '@/lib/api'
 import { Product } from '@/types/product'
-import { ArrowRight, Sparkles, Package, AlertCircle, TrendingUp, Shield, Zap, Droplets, Sun, Battery, Cpu } from 'lucide-react'
-import { useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { 
+  ArrowRight, Sparkles, Package, AlertCircle, TrendingUp, Shield, 
+  Zap, Droplets, Sun, Battery, Cpu, Home, Filter, Grid, 
+  ChevronRight, Star, Truck, Clock, Award, CircleDot
+} from 'lucide-react'
+import { useMemo, useState } from 'react'
 import Image from 'next/image'
 
 // Types
 interface CategoryMetadata {
-  icon: string;
   iconComponent: any;
-  color: string;
   gradient: string;
+  bgGradient: string;
   displayName: string;
   description: string;
+  shortDesc: string;
   image: string;
+  color: string;
   features: string[];
 }
 
@@ -26,97 +30,119 @@ interface Category {
   id: string;
   name: string;
   description: string;
-  icon: string;
+  shortDesc: string;
   iconComponent: any;
-  color: string;
   gradient: string;
+  bgGradient: string;
   count: number;
   image: string;
+  color: string;
   features: string[];
 }
 
-interface ApiCategory {
-  slug?: string;
-  name?: string;
-  [key: string]: any;
-}
-
-// Default image for all categories
+// Default image
 const DEFAULT_CATEGORY_IMAGE = "https://res.cloudinary.com/duxnsu61a/image/upload/v1775035077/dc2_rbbsin.jpg"
 
-// Category metadata with images
+// Category metadata with proper icons and gradients
 const categoryMetadata: Record<string, CategoryMetadata> = {
   'water-pumps': {
-    icon: '💧',
     iconComponent: Droplets,
-    color: 'from-blue-500 to-cyan-500',
-    gradient: 'bg-gradient-to-br from-blue-600 to-cyan-600',
+    gradient: 'from-blue-500 to-cyan-500',
+    bgGradient: 'from-blue-600/20 to-cyan-600/20',
     displayName: 'Water Pumps',
     description: 'High-efficiency pumps for residential, commercial, and agricultural use',
+    shortDesc: 'Premium water pumping solutions',
     image: DEFAULT_CATEGORY_IMAGE,
+    color: 'blue',
     features: ['Energy Efficient', 'Durable Build', '5-Year Warranty', 'Low Maintenance']
   },
   'generators': {
-    icon: '⚡',
     iconComponent: Zap,
-    color: 'from-yellow-500 to-orange-500',
-    gradient: 'bg-gradient-to-br from-yellow-600 to-orange-600',
+    gradient: 'from-yellow-500 to-orange-500',
+    bgGradient: 'from-yellow-600/20 to-orange-600/20',
     displayName: 'Generators',
     description: 'Reliable power generators for backup and continuous operation',
+    shortDesc: 'Uninterrupted power supply',
     image: DEFAULT_CATEGORY_IMAGE,
+    color: 'yellow',
     features: ['Quiet Operation', 'Fuel Efficient', 'Auto Start', 'Digital Display']
   },
   'solar-panels': {
-    icon: '☀️',
     iconComponent: Sun,
-    color: 'from-green-500 to-emerald-500',
-    gradient: 'bg-gradient-to-br from-green-600 to-emerald-600',
+    gradient: 'from-green-500 to-emerald-500',
+    bgGradient: 'from-green-600/20 to-emerald-600/20',
     displayName: 'Solar Panels',
     description: 'High-efficiency solar panels for clean, renewable energy',
+    shortDesc: 'Clean energy solutions',
     image: DEFAULT_CATEGORY_IMAGE,
+    color: 'green',
     features: ['25-Year Warranty', 'High Efficiency', 'Weather Resistant', 'Monocrystalline']
   },
   'inverters': {
-    icon: '🔄',
     iconComponent: TrendingUp,
-    color: 'from-purple-500 to-violet-500',
-    gradient: 'bg-gradient-to-br from-purple-600 to-violet-600',
+    gradient: 'from-purple-500 to-violet-500',
+    bgGradient: 'from-purple-600/20 to-violet-600/20',
     displayName: 'Inverters',
     description: 'Advanced inverters for solar systems and backup power',
+    shortDesc: 'Smart power conversion',
     image: DEFAULT_CATEGORY_IMAGE,
+    color: 'purple',
     features: ['Pure Sine Wave', 'Smart Display', 'Remote Monitoring', 'High Efficiency']
   },
   'batteries': {
-    icon: '🔋',
     iconComponent: Battery,
-    color: 'from-indigo-500 to-purple-500',
-    gradient: 'bg-gradient-to-br from-indigo-600 to-purple-600',
+    gradient: 'from-indigo-500 to-purple-500',
+    bgGradient: 'from-indigo-600/20 to-purple-600/20',
     displayName: 'Batteries',
     description: 'Deep-cycle batteries for energy storage solutions',
+    shortDesc: 'Reliable energy storage',
     image: DEFAULT_CATEGORY_IMAGE,
+    color: 'indigo',
     features: ['Long Life Cycle', 'Deep Discharge', 'Maintenance Free', 'Fast Charging']
   },
   'controllers': {
-    icon: '⚙️',
     iconComponent: Cpu,
-    color: 'from-pink-500 to-rose-500',
-    gradient: 'bg-gradient-to-br from-pink-600 to-rose-600',
+    gradient: 'from-pink-500 to-rose-500',
+    bgGradient: 'from-pink-600/20 to-rose-600/20',
     displayName: 'Controllers',
     description: 'Smart charge controllers and system management devices',
+    shortDesc: 'Intelligent system control',
     image: DEFAULT_CATEGORY_IMAGE,
+    color: 'pink',
     features: ['MPPT Technology', 'LCD Display', 'Overload Protection', 'Temperature Comp']
   }
 }
 
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+}
+
+const statVariants = {
+  hidden: { opacity: 0, scale: 0.9 },
+  visible: { opacity: 1, scale: 1 }
+}
+
 export default function CategoriesPage() {
-  // Fetch products to get category counts
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
+
   const { data: allProductsData, isLoading: productsLoading, error: productsError } = useQuery({
     queryKey: ['categories-products'],
     queryFn: () => getProducts({ limit: 1000 }),
     staleTime: 30 * 60 * 1000
   })
 
-  // Fetch categories separately if your API has a categories endpoint
   const { data: categoriesData, isLoading: categoriesLoading } = useQuery({
     queryKey: ['categories-list'],
     queryFn: () => getCategories().catch(() => null),
@@ -127,74 +153,77 @@ export default function CategoriesPage() {
   const categories: Category[] = useMemo(() => {
     if (!allProductsData?.products) return []
 
-    // Count products per category
     const catMap = new Map<string, number>()
     allProductsData.products.forEach((product: Product) => {
       const category = product.category
-      catMap.set(category, (catMap.get(category) || 0) + 1)
+      if (category) {
+        catMap.set(category, (catMap.get(category) || 0) + 1)
+      }
     })
 
-    // Use categories from API if available, otherwise use mapped categories
     if (categoriesData && Array.isArray(categoriesData) && categoriesData.length > 0) {
       return categoriesData
-        .filter((cat: ApiCategory) => {
+        .filter((cat: any) => {
           const slug = cat.slug || cat.name?.toLowerCase().replace(/\s+/g, '-') || ''
           return catMap.has(slug)
         })
-        .map((cat: ApiCategory) => {
+        .map((cat: any) => {
           const slug = cat.slug || cat.name?.toLowerCase().replace(/\s+/g, '-') || ''
           const metadata = categoryMetadata[slug] || {
-            icon: '📦',
             iconComponent: Package,
-            color: 'from-gray-500 to-gray-700',
-            gradient: 'bg-gradient-to-br from-gray-600 to-gray-700',
+            gradient: 'from-gray-500 to-gray-600',
+            bgGradient: 'from-gray-600/20 to-gray-700/20',
             displayName: cat.name || slug,
-            description: `Premium ${cat.name || slug} products for your needs`,
+            description: `Premium ${cat.name || slug} products`,
+            shortDesc: `Quality ${cat.name || slug} products`,
             image: DEFAULT_CATEGORY_IMAGE,
-            features: ['Premium Quality', 'Best Price', 'Fast Shipping', 'Warranty Included']
+            color: 'gray',
+            features: ['Premium Quality', 'Best Price', 'Fast Shipping', 'Warranty']
           }
           
           return {
             id: slug,
             name: metadata.displayName,
             description: metadata.description,
-            icon: metadata.icon,
+            shortDesc: metadata.shortDesc,
             iconComponent: metadata.iconComponent,
-            color: metadata.color,
             gradient: metadata.gradient,
+            bgGradient: metadata.bgGradient,
             count: catMap.get(slug) || 0,
             image: metadata.image,
+            color: metadata.color,
             features: metadata.features
           }
         })
-        .sort((a: Category, b: Category) => b.count - a.count)
+        .sort((a, b) => b.count - a.count)
     }
 
-    // Fallback: use mapped categories with counts
     return Array.from(catMap.entries())
-      .sort((a: [string, number], b: [string, number]) => b[1] - a[1])
-      .map(([slug, count]: [string, number]) => {
+      .sort((a, b) => b[1] - a[1])
+      .map(([slug, count]) => {
         const metadata = categoryMetadata[slug] || {
-          icon: '📦',
           iconComponent: Package,
-          color: 'from-gray-500 to-gray-700',
-          gradient: 'bg-gradient-to-br from-gray-600 to-gray-700',
-          displayName: slug.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-          description: `Premium ${slug.replace(/-/g, ' ')} products for your needs`,
+          gradient: 'from-gray-500 to-gray-600',
+          bgGradient: 'from-gray-600/20 to-gray-700/20',
+          displayName: slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          description: `Premium ${slug.replace(/-/g, ' ')} products`,
+          shortDesc: `Quality ${slug.replace(/-/g, ' ')} products`,
           image: DEFAULT_CATEGORY_IMAGE,
-          features: ['Premium Quality', 'Best Price', 'Fast Shipping', 'Warranty Included']
+          color: 'gray',
+          features: ['Premium Quality', 'Best Price', 'Fast Shipping', 'Warranty']
         }
         
         return {
           id: slug,
           name: metadata.displayName,
           description: metadata.description,
-          icon: metadata.icon,
+          shortDesc: metadata.shortDesc,
           iconComponent: metadata.iconComponent,
-          color: metadata.color,
           gradient: metadata.gradient,
+          bgGradient: metadata.bgGradient,
           count,
           image: metadata.image,
+          color: metadata.color,
           features: metadata.features
         }
       })
@@ -203,7 +232,6 @@ export default function CategoriesPage() {
   const isLoading = productsLoading || categoriesLoading
   const error = productsError
 
-  // Calculate stats
   const stats = useMemo(() => {
     const products = allProductsData?.products || []
     const totalProducts = allProductsData?.pagination?.total || products.length
@@ -213,53 +241,53 @@ export default function CategoriesPage() {
       totalProducts,
       totalCategories,
       avgRating: products.length > 0 
-        ? (products.reduce((sum: number, p: Product) => sum + p.rating, 0) / products.length).toFixed(1)
+        ? (products.reduce((sum: number, p: Product) => sum + (p.rating || 0), 0) / products.length).toFixed(1)
         : "4.8"
     }
   }, [allProductsData, categories])
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 flex items-center justify-center">
-        <div className="max-w-md mx-auto px-4 py-16 text-center">
-          <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-            <AlertCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center px-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-md"
+        >
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Failed to load categories</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
-            There was an error loading the categories. Please try again later.
-          </p>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Failed to load categories</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Please try again later</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 hover:scale-105"
+            className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-all"
           >
             Refresh Page
           </button>
-        </div>
+        </motion.div>
       </div>
     )
   }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800">
-        <div className="max-w-7xl mx-auto px-4 py-24">
-          <div className="text-center mb-12">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
+        <div className="max-w-7xl mx-auto px-4 py-12">
+          <div className="text-center mb-8">
             <div className="inline-block">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto mb-4" />
+              <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Loading categories...</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="animate-pulse">
-                <div className="bg-white/70 dark:bg-gray-800/70 rounded-3xl overflow-hidden">
-                  <div className="h-48 bg-gray-200 dark:bg-gray-700" />
-                  <div className="p-6">
-                    <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-2xl mx-auto mb-4" />
-                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mx-auto mb-3" />
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mb-2" />
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mx-auto" />
+                <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
+                  <div className="h-40 bg-gray-200 dark:bg-gray-700" />
+                  <div className="p-4">
+                    <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full mb-1" />
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
                   </div>
                 </div>
               </div>
@@ -272,183 +300,179 @@ export default function CategoriesPage() {
 
   if (categories.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 flex items-center justify-center">
-        <div className="max-w-md mx-auto px-4 py-16 text-center">
-          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Package className="w-10 h-10 text-gray-400" />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center px-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-md"
+        >
+          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Package className="w-8 h-8 text-gray-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">No categories found</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
-            There are no products available at the moment. Check back later!
-          </p>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No categories found</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">No products available at the moment</p>
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 hover:scale-105"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-all"
           >
-            Browse All Products
+            Browse Products
             <ArrowRight className="w-4 h-4" />
           </Link>
-        </div>
+        </motion.div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800">
-    
-      <section className="relative pt-24 pb-10 lg:pt-28 lg:pb-12 px-4 sm:px-6 lg:px-8 overflow-hidden">
-  
-  {/* Animated Background */}
-  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/15 to-indigo-500/20 animate-pulse" />
-  <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/30 rounded-full blur-3xl animate-pulse" />
-  <div className="absolute bottom-20 right-10 w-72 h-72 bg-purple-500/30 rounded-full blur-3xl animate-pulse delay-1000" />
-  
-  <div className="relative z-10 max-w-5xl mx-auto text-center">
-    
-    <h1 className="text-2xl md:text-4xl lg:text-6xl font-black bg-gradient-to-r from-gray-900 via-blue-800 to-purple-900 dark:from-white dark:via-blue-400 dark:to-purple-400 bg-clip-text text-transparent mb-2 drop-shadow-2xl animate-gradient">
-      Shop by Category
-    </h1>
-
-  </div>
-</section>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
+      {/* Hero Section - Compact */}
+      <section className="relative pt-12 pb-8 px-4">
+        <div className="max-w-7xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-full mb-4"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Shop by Category</span>
+          </motion.div>
+          
+          <motion.h1 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-2"
+          >
+            Browse Categories
+          </motion.h1>
+          
+          <motion.p 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mx-auto"
+          >
+            Find exactly what you need from our curated collection
+          </motion.p>
+        </div>
+      </section>
 
       {/* Categories Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-4 pb-12">
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+        >
           {categories.map((category, index) => {
             const IconComponent = category.iconComponent
+            const isHovered = hoveredCategory === category.id
+            
             return (
-              <Link 
+              <motion.div
                 key={category.id}
-                href={`/products?category=${category.id}`}
-                className="group relative block animate-fade-in-up"
-                style={{ animationDelay: `${index * 100}ms` }}
+                variants={itemVariants}
+                whileHover={{ y: -4 }}
+                onMouseEnter={() => setHoveredCategory(category.id)}
+                onMouseLeave={() => setHoveredCategory(null)}
               >
-                <div className="relative overflow-hidden bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl shadow-xl hover:shadow-3xl transition-all duration-700 hover:-translate-y-4 hover:scale-[1.02] border border-white/50 dark:border-gray-700/50 hover:border-blue-500/50 dark:hover:border-blue-500/50">
-                  
-                  {/* Category Image */}
-                  <div className="relative h-56 overflow-hidden">
-                    <Image
-                      src={category.image}
-                      alt={category.name}
-                      fill
-                      className="object-cover transition-transform duration-700 group-hover:scale-110"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    />
-                    <div className={`absolute inset-0 ${category.gradient} opacity-60 group-hover:opacity-50 transition-opacity duration-500`} />
+                <Link href={`/products?category=${category.id}`} className="block h-full">
+                  <div className="relative h-full bg-white dark:bg-gray-900/80 backdrop-blur-sm rounded-xl overflow-hidden border border-gray-200/50 dark:border-gray-800/50 shadow-sm hover:shadow-lg transition-all duration-300">
                     
-                    {/* Icon Overlay */}
-                    <div className={`absolute -bottom-8 right-4 w-24 h-24 ${category.gradient} rounded-2xl flex items-center justify-center shadow-2xl transform rotate-6 group-hover:rotate-12 group-hover:scale-110 transition-all duration-500`}>
-                      {IconComponent && <IconComponent className="w-10 h-10 text-white drop-shadow-lg" />}
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-6 pt-10">
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
-                      {category.name}
-                    </h3>
-                    
-                    <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed line-clamp-2">
-                      {category.description}
-                    </p>
-
-                    {/* Features Tags */}
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {category.features.slice(0, 3).map((feature, idx) => (
-                        <span key={idx} className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700/50 rounded-lg text-gray-600 dark:text-gray-400">
-                          {feature}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Stats */}
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4 text-blue-500" />
-                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                          {category.count} Products
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform duration-300">
-                        <span className="text-sm font-medium">Browse</span>
-                        <ArrowRight className="w-4 h-4" />
+                    {/* Image Section */}
+                    <div className="relative h-36 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
+                      <Image
+                        src={category.image}
+                        alt={category.name}
+                        fill
+                        className={`object-cover transition-transform duration-500 ${isHovered ? 'scale-110' : 'scale-100'}`}
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      />
+                      <div className={`absolute inset-0 bg-gradient-to-t ${category.bgGradient} opacity-60`} />
+                      
+                      {/* Icon Badge */}
+                      <div className={`absolute -bottom-5 right-4 w-12 h-12 rounded-xl bg-gradient-to-r ${category.gradient} flex items-center justify-center shadow-lg transition-all duration-300 ${isHovered ? 'scale-110 rotate-6' : ''}`}>
+                        <IconComponent className="w-6 h-6 text-white" />
                       </div>
                     </div>
-                  </div>
 
-                  {/* Hover Effect Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-                </div>
-              </Link>
+                    {/* Content */}
+                    <div className="p-4 pt-7">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="font-bold text-gray-900 dark:text-white text-base line-clamp-1">
+                          {category.name}
+                        </h3>
+                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                          <Package className="w-3 h-3" />
+                          <span>{category.count}</span>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                        {category.shortDesc}
+                      </p>
+
+                      {/* Features Tags */}
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {category.features.slice(0, 2).map((feature, idx) => (
+                          <span key={idx} className="text-[10px] px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-400">
+                            {feature}
+                          </span>
+                        ))}
+                        {category.features.length > 2 && (
+                          <span className="text-[10px] px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-500">
+                            +{category.features.length - 2}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Browse Button */}
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
+                        <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          <span>Browse</span>
+                          <ArrowRight className={`w-3.5 h-3.5 transition-transform duration-300 ${isHovered ? 'translate-x-1' : ''}`} />
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] text-gray-400">
+                          <Star className="w-3 h-3 fill-current text-yellow-400" />
+                          <span>4.8</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
             )
           })}
-        </div>
+        </motion.div>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-24 p-8 lg:p-12 bg-white/50 dark:bg-gray-800/30 backdrop-blur-xl rounded-3xl shadow-xl border border-white/40 dark:border-gray-700/40">
-          <div className="text-center group cursor-pointer">
-            <div className="text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 mb-2 group-hover:scale-110 transition-transform">
-              {stats.totalProducts}+
-            </div>
-            <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Products Available
-            </div>
-          </div>
-          <div className="text-center group cursor-pointer">
-            <div className="text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 mb-2 group-hover:scale-110 transition-transform">
-              {stats.totalCategories}
-            </div>
-            <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Categories
-            </div>
-          </div>
-          <div className="text-center group cursor-pointer">
-            <div className="text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 mb-2 group-hover:scale-110 transition-transform">
-              {stats.avgRating}
-            </div>
-            <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Average Rating
-            </div>
-          </div>
-          <div className="text-center group cursor-pointer">
-            <div className="text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500 mb-2 group-hover:scale-110 transition-transform">
-              24/7
-            </div>
-            <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Support
-            </div>
-          </div>
-        </div>
+        {/* Stats Row - Compact */}
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-10 p-5 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-gray-800/50"
+        >
+          {[
+            { label: 'Products', value: `${stats.totalProducts}+`, color: 'emerald' },
+            { label: 'Categories', value: stats.totalCategories, color: 'blue' },
+            { label: 'Avg Rating', value: stats.avgRating, color: 'purple' },
+            { label: 'Support', value: '24/7', color: 'amber' },
+          ].map((stat, idx) => (
+            <motion.div
+              key={idx}
+              variants={statVariants}
+              whileHover={{ scale: 1.02 }}
+              className="text-center"
+            >
+              <div className={`text-2xl font-bold text-${stat.color}-600 dark:text-${stat.color}-400`}>
+                {stat.value}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{stat.label}</div>
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
-
-      <style jsx global>{`
-        @keyframes gradient {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        .animate-gradient {
-          background-size: 200% 200%;
-          animation: gradient 3s ease infinite;
-        }
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fade-in-up {
-          animation: fadeInUp 0.6s ease-out forwards;
-          opacity: 0;
-        }
-        .delay-1000 {
-          animation-delay: 1s;
-        }
-      `}</style>
     </div>
   )
 }

@@ -20,7 +20,7 @@ interface GuestOrder extends Order {
 const getStatusConfig = (status: Order['status']) => {
   switch (status) {
     case 'pending': 
-      return { icon: Clock, color: 'bg-amber-500/10 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30', label: 'Pending Payment', gradient: 'from-amber-500 to-orange-500' };
+      return { icon: Clock, color: 'bg-amber-500/10 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30', label: 'Pending', gradient: 'from-amber-500 to-orange-500' };
     case 'processing': 
       return { icon: Package, color: 'bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30', label: 'Processing', gradient: 'from-blue-500 to-cyan-500' };
     case 'paid': 
@@ -40,7 +40,7 @@ const getStatusConfig = (status: Order['status']) => {
 
 const StatusIcon = ({ status }: { status: Order['status'] }) => {
   const { icon: Icon } = getStatusConfig(status);
-  return <Icon className="w-4 h-4" />;
+  return <Icon className="w-3.5 h-3.5" />;
 };
 
 export default function OrdersPage() {
@@ -60,12 +60,10 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
-  // Fix hydration by setting mounted state
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Load guest orders from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedEmail = localStorage.getItem('last_guest_email');
@@ -194,15 +192,14 @@ export default function OrdersPage() {
     totalSpent: orders.reduce((sum, o) => sum + (o.total || 0), 0)
   };
 
-  // Don't render until mounted to prevent hydration errors
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <div className="relative inline-block">
-              <div className="w-24 h-24 border-4 border-emerald-200 dark:border-emerald-900 rounded-full"></div>
-              <div className="absolute top-0 left-0 w-24 h-24 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-16 h-16 border-4 border-emerald-200 dark:border-emerald-900 rounded-full"></div>
+              <div className="absolute top-0 left-0 w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
           </div>
         </div>
@@ -214,27 +211,23 @@ export default function OrdersPage() {
   if (!isLoggedIn && !isGuestMode) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
-        <div className="max-w-md mx-auto px-4 py-24">
+        <div className="max-w-md mx-auto px-4 py-16">
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition duration-1000"></div>
             <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl p-8 border border-white/50 shadow-xl">
-              <div className="text-center mb-8">
-                <div className="relative inline-block">
-                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full blur-2xl opacity-20"></div>
-                  <Package className="relative w-20 h-20 text-emerald-500 mx-auto mb-4" strokeWidth={1.5} />
-                </div>
-                <h1 className="text-3xl font-black bg-gradient-to-r from-gray-900 via-emerald-800 to-blue-900 dark:from-white dark:via-emerald-400 dark:to-blue-400 bg-clip-text text-transparent mb-2">
-                  My Orders
+              <div className="text-center mb-6">
+                <Package className="w-16 h-16 text-emerald-500 mx-auto mb-3" strokeWidth={1.5} />
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-emerald-800 dark:from-white dark:to-emerald-400 bg-clip-text text-transparent">
+                  Order History
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400">View your order history and track deliveries</p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <button
                   onClick={() => router.push('/auth/login')}
-                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                  className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
                 >
-                  Sign In to View Orders
+                  Sign In
                 </button>
                 
                 <div className="relative">
@@ -242,16 +235,16 @@ export default function OrdersPage() {
                     <div className="w-full border-t border-gray-300 dark:border-gray-700"></div>
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white/90 dark:bg-gray-900/90 text-gray-500">or continue as guest</span>
+                    <span className="px-2 bg-white/90 dark:bg-gray-900/90 text-gray-500">or</span>
                   </div>
                 </div>
 
                 <button
                   onClick={() => setIsGuestMode(true)}
-                  className="w-full py-3 bg-white/50 dark:bg-gray-800/50 hover:bg-white/70 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-semibold rounded-xl border border-gray-200 dark:border-gray-700 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-white/50 dark:bg-gray-800/50 hover:bg-white/70 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-semibold rounded-xl border border-gray-200 dark:border-gray-700 transition-all flex items-center justify-center gap-2"
                 >
-                  <Eye className="w-5 h-5" />
-                  View Orders as Guest
+                  <Eye className="w-4 h-4" />
+                  Continue as Guest
                 </button>
               </div>
             </div>
@@ -265,92 +258,69 @@ export default function OrdersPage() {
   if (!isLoggedIn && isGuestMode && (!guestEmail || !guestPhone) && rawOrders.length === 0 && !loadingOrders) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
-        <div className="max-w-md mx-auto px-4 py-24">
+        <div className="max-w-md mx-auto px-4 py-16">
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition duration-1000"></div>
             <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl p-8 border border-white/50 shadow-xl">
-              <div className="text-center mb-8">
-                <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-emerald-100 to-blue-100 dark:from-emerald-950/50 dark:to-blue-950/50 rounded-full flex items-center justify-center">
-                  <Eye className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-emerald-100 to-blue-100 dark:from-emerald-950/50 dark:to-blue-950/50 rounded-full flex items-center justify-center">
+                  <Eye className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-2">Find Your Orders</h1>
-                <p className="text-gray-600 dark:text-gray-400">Enter your email and phone number to view orders</p>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Find Orders</h1>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Enter your details to view orders</p>
               </div>
 
               <form onSubmit={handleGuestSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Email Address
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Email
                   </label>
-                  <div className="relative group">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="email"
                       value={guestEmail}
                       onChange={(e) => setGuestEmail(e.target.value)}
                       required
-                      className="w-full pl-10 pr-4 py-3 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-sm"
                       placeholder="your@email.com"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Phone Number
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Phone
                   </label>
-                  <div className="relative group">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="tel"
                       value={guestPhone}
                       onChange={(e) => setGuestPhone(e.target.value)}
                       required
-                      className="w-full pl-10 pr-4 py-3 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-sm"
                       placeholder="0712345678"
                     />
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-4">
+                <div className="flex gap-3 pt-2">
                   <button
                     type="button"
                     onClick={() => setIsGuestMode(false)}
-                    className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl transition-all"
+                    className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl transition-all text-sm"
                   >
                     Back
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                    className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg text-sm"
                   >
                     View Orders
                   </button>
                 </div>
               </form>
-
-              {(() => {
-                const recentEmail = typeof window !== 'undefined' ? localStorage.getItem('last_guest_email') : null;
-                const recentPhone = typeof window !== 'undefined' ? localStorage.getItem('last_guest_phone') : null;
-                if (recentEmail && recentPhone && (recentEmail !== guestEmail || recentPhone !== guestPhone)) {
-                  return (
-                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-2">Recently used</p>
-                      <button
-                        onClick={() => {
-                          setGuestEmail(recentEmail);
-                          setGuestPhone(recentPhone);
-                          fetchOrders();
-                        }}
-                        className="w-full py-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-                      >
-                        {recentEmail} • {recentPhone}
-                      </button>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
             </div>
           </div>
         </div>
@@ -361,14 +331,12 @@ export default function OrdersPage() {
   if (loadingOrders) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <div className="relative inline-block">
-              <div className="w-24 h-24 border-4 border-emerald-200 dark:border-emerald-900 rounded-full"></div>
-              <div className="absolute top-0 left-0 w-24 h-24 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-16 h-16 border-4 border-emerald-200 dark:border-emerald-900 rounded-full"></div>
+              <div className="absolute top-0 left-0 w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
-            <h2 className="mt-8 text-2xl font-bold text-gray-900 dark:text-white">Loading orders...</h2>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">Fetching your order history</p>
           </div>
         </div>
       </div>
@@ -378,15 +346,13 @@ export default function OrdersPage() {
   if (error && rawOrders.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
-        <div className="max-w-md mx-auto px-4 py-24">
+        <div className="max-w-md mx-auto px-4 py-16">
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-3xl blur-xl opacity-30"></div>
             <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl p-8 border border-white/50 shadow-xl text-center">
-              <div className="w-20 h-20 mx-auto mb-4 bg-red-100 dark:bg-red-950/50 rounded-full flex items-center justify-center">
-                <Package className="w-10 h-10 text-red-600 dark:text-red-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Error Loading Orders</h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
+              <Package className="w-16 h-16 text-red-500 mx-auto mb-3" />
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Error</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{error}</p>
               <button
                 onClick={() => {
                   if (isLoggedIn) {
@@ -397,7 +363,7 @@ export default function OrdersPage() {
                     setGuestPhone('');
                   }
                 }}
-                className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
+                className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-semibold text-sm hover:shadow-lg transition-all"
               >
                 Try Again
               </button>
@@ -411,38 +377,23 @@ export default function OrdersPage() {
   if (filteredOrders.length === 0 && !searchQuery && filterStatus === 'all') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
-            <div className="relative inline-block mb-8">
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full blur-2xl opacity-20"></div>
-              <ShoppingCart className="relative mx-auto h-32 w-32 text-gray-400 dark:text-gray-600" strokeWidth={1.5} />
-            </div>
-            <h1 className="text-5xl sm:text-6xl font-black bg-gradient-to-r from-gray-900 via-emerald-800 to-blue-900 dark:from-white dark:via-emerald-400 dark:to-blue-400 bg-clip-text text-transparent mb-6">
-              No orders yet
+            <ShoppingCart className="mx-auto h-24 w-24 text-gray-400 dark:text-gray-600 mb-4" strokeWidth={1.5} />
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-emerald-800 dark:from-white dark:to-emerald-400 bg-clip-text text-transparent mb-3">
+              No Orders Yet
             </h1>
-            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-md mx-auto">
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
               {isLoggedIn 
-                ? "You haven't placed any orders. Start shopping to see your order history here."
-                : "No orders found for this email and phone number."}
+                ? "Start shopping to see your order history"
+                : "No orders found for these details"}
             </p>
-            {!isLoggedIn && (
-              <button
-                onClick={() => {
-                  setIsGuestMode(false);
-                  setGuestEmail('');
-                  setGuestPhone('');
-                }}
-                className="inline-flex items-center px-8 py-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-lg rounded-2xl shadow-xl transition-all mb-4 mr-4"
-              >
-                Try Different Details
-              </button>
-            )}
             <Link
               href="/products"
-              className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-bold text-lg rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
             >
               Start Shopping
-              <ShoppingCart className="ml-2 w-5 h-5" />
+              <ShoppingCart className="ml-2 w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -452,90 +403,98 @@ export default function OrdersPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
-      {/* Hero Section with Stats */}
-      <div className="relative overflow-hidden border-b border-gray-200/50 dark:border-gray-800/50">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-blue-500/5 to-purple-500/10"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
-          <div className="text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-sm font-medium mb-4">
-              <Star className="w-4 h-4 fill-current" />
+      {/* Compact Header */}
+      <div className="relative border-b border-gray-200/50 dark:border-gray-800/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs font-medium mb-3">
+              <Star className="w-3 h-3 fill-current" />
               <span>Order History</span>
             </div>
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black bg-gradient-to-r from-gray-900 via-emerald-800 to-blue-900 dark:from-white dark:via-emerald-400 dark:to-blue-400 bg-clip-text text-transparent mb-6">
-              {isLoggedIn ? 'Your Orders' : 'Guest Orders'}
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-900 to-emerald-800 dark:from-white dark:to-emerald-400 bg-clip-text text-transparent">
+              My Orders
             </h1>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
-              {isLoggedIn 
-                ? "Track and manage all your orders. View details, track delivery, and reorder with ease."
-                : `Viewing orders for ${guestEmail}`}
-            </p>
-            {!isLoggedIn && (
-              <button
-                onClick={() => {
-                  setIsGuestMode(false);
-                  setGuestEmail('');
-                  setGuestPhone('');
-                }}
-                className="mt-4 inline-flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
-              >
-                ← Switch to different account
-              </button>
-            )}
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mt-12">
-            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl p-4 border border-white/50 shadow-lg hover:shadow-xl transition-all group">
-              <div className="text-2xl font-black text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">{stats.total}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Total Orders</div>
+          {/* Compact Stats Cards - Auto width */}
+          <div className="flex flex-wrap gap-3 justify-center mt-6">
+            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl px-4 py-2 border border-white/50 shadow-sm hover:shadow-md transition-all">
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-black text-gray-900 dark:text-white">{stats.total}</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400">Total</span>
+              </div>
             </div>
-            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl p-4 border border-white/50 shadow-lg hover:shadow-xl transition-all group">
-              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">Ksh.{stats.totalSpent.toFixed(0)}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Total Spent</div>
-            </div>
-            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl p-4 border border-white/50 shadow-lg hover:shadow-xl transition-all group">
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{stats.pending}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Pending</div>
-            </div>
-            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl p-4 border border-white/50 shadow-lg hover:shadow-xl transition-all group">
-              <div className="text-2xl font-black text-blue-600 dark:text-blue-400">{stats.processing}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Processing</div>
-            </div>
-            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl p-4 border border-white/50 shadow-lg hover:shadow-xl transition-all group">
-              <div className="text-2xl font-black text-purple-600 dark:text-purple-400">{stats.shipped}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Shipped</div>
-            </div>
-            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl p-4 border border-white/50 shadow-lg hover:shadow-xl transition-all group">
-              <div className="text-2xl font-black text-green-600 dark:text-green-400">{stats.delivered}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Delivered</div>
-            </div>
-            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl p-4 border border-white/50 shadow-lg hover:shadow-xl transition-all group">
-              <div className="text-2xl font-black text-red-600 dark:text-red-400">{stats.cancelled}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Cancelled</div>
+            {stats.pending > 0 && (
+              <div className="bg-amber-50 dark:bg-amber-950/30 rounded-xl px-4 py-2 border border-amber-200 dark:border-amber-800/50 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">{stats.pending}</span>
+                </div>
+              </div>
+            )}
+            {stats.processing > 0 && (
+              <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl px-4 py-2 border border-blue-200 dark:border-blue-800/50 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Package className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">{stats.processing}</span>
+                </div>
+              </div>
+            )}
+            {stats.shipped > 0 && (
+              <div className="bg-purple-50 dark:bg-purple-950/30 rounded-xl px-4 py-2 border border-purple-200 dark:border-purple-800/50 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-3.5 h-3.5 text-purple-600" />
+                  <span className="text-sm font-semibold text-purple-700 dark:text-purple-400">{stats.shipped}</span>
+                </div>
+              </div>
+            )}
+            {stats.delivered > 0 && (
+              <div className="bg-green-50 dark:bg-green-950/30 rounded-xl px-4 py-2 border border-green-200 dark:border-green-800/50 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                  <span className="text-sm font-semibold text-green-700 dark:text-green-400">{stats.delivered}</span>
+                </div>
+              </div>
+            )}
+            {stats.cancelled > 0 && (
+              <div className="bg-red-50 dark:bg-red-950/30 rounded-xl px-4 py-2 border border-red-200 dark:border-red-800/50 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-red-600" />
+                  <span className="text-sm font-semibold text-red-700 dark:text-red-400">{stats.cancelled}</span>
+                </div>
+              </div>
+            )}
+            <div className="bg-gradient-to-r from-emerald-500/10 to-blue-500/10 rounded-xl px-4 py-2 border border-emerald-200/50 dark:border-emerald-800/30 shadow-sm">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                  Ksh.{stats.totalSpent.toLocaleString()}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Search and Filters */}
-        <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl p-4 sm:p-6 border border-white/50 shadow-xl mb-8">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative group">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+        <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 border border-white/50 shadow-lg mb-6">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search by order number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-10 py-3 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                className="w-full pl-10 pr-8 py-2 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-sm"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 hover:scale-110 transition-transform"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
                 >
-                  <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                  <X className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
                 </button>
               )}
             </div>
@@ -543,38 +502,39 @@ export default function OrdersPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
-                className="px-4 py-2 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-white/70 transition-all"
+                className="px-3 py-2 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm hover:bg-white/70 transition-all"
               >
-                {viewMode === 'table' ? 'Grid View' : 'Table View'}
+                {viewMode === 'table' ? 'Grid' : 'Table'}
               </button>
               
               <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="sm:hidden flex items-center justify-center gap-2 px-6 py-3 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700"
+                className="sm:hidden flex items-center gap-2 px-4 py-2 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 text-sm"
               >
-                <Filter className="w-5 h-5" />
-                <span>Filters</span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
+                <Filter className="w-4 h-4" />
+                Filter
+                <ChevronDown className={`w-3 h-3 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
               </button>
             </div>
           </div>
 
-          <div className={`${isFilterOpen ? 'flex' : 'hidden'} sm:flex flex-wrap gap-2 mt-4`}>
+          <div className={`${isFilterOpen ? 'flex' : 'hidden'} sm:flex flex-wrap gap-2 mt-3`}>
             {(['all', 'pending', 'processing', 'paid', 'shipped', 'delivered', 'cancelled'] as const).map((status) => {
               const count = status === 'all' ? stats.total : stats[status as keyof typeof stats] || 0;
               const isActive = filterStatus === status;
+              if (count === 0 && status !== 'all') return null;
               return (
                 <button
                   key={status}
                   onClick={() => setFilterStatus(status === 'all' ? 'all' : status)}
-                  className={`px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+                  className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-all duration-200 flex items-center gap-1.5 ${
                     isActive
-                      ? 'bg-gradient-to-r from-emerald-500 to-blue-500 text-white shadow-lg shadow-emerald-500/25'
-                      : 'bg-white/50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-gray-700/50 border border-gray-200/50 dark:border-gray-700'
+                      ? 'bg-gradient-to-r from-emerald-500 to-blue-500 text-white shadow-md'
+                      : 'bg-white/50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-white/70 border border-gray-200/50 dark:border-gray-700'
                   }`}
                 >
                   {status !== 'all' && <StatusIcon status={status as Order['status']} />}
-                  <span className="capitalize">{status}</span>
+                  <span className="capitalize">{status === 'all' ? 'All' : status}</span>
                   <span className={`text-xs ${isActive ? 'text-white/80' : 'text-gray-500'}`}>({count})</span>
                 </button>
               );
@@ -584,135 +544,108 @@ export default function OrdersPage() {
 
         {/* Orders Display */}
         {viewMode === 'table' ? (
-          <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-white/50 shadow-xl overflow-hidden">
+          <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl border border-white/50 shadow-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                      Order
-                    </th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">
-                      <button
-                        className="flex items-center gap-1 hover:text-emerald-600 transition-colors"
-                        onClick={() => {
-                          setSortBy('date');
-                          setSortDir(sortDir === 'desc' ? 'asc' : 'desc');
-                        }}
-                      >
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Order</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 hidden md:table-cell">
+                      <button className="flex items-center gap-1 hover:text-emerald-600" onClick={() => { setSortBy('date'); setSortDir(sortDir === 'desc' ? 'asc' : 'desc'); }}>
                         Date
                         {sortBy === 'date' && (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
                       </button>
                     </th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
-                      Items
-                    </th>
-                    <th className="px-4 sm:px-6 py-4 text-right text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                      <button
-                        className="flex items-center gap-1 justify-end hover:text-emerald-600 transition-colors"
-                        onClick={() => {
-                          setSortBy('total');
-                          setSortDir(sortDir === 'desc' ? 'asc' : 'desc');
-                        }}
-                      >
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 hidden lg:table-cell">Items</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400">
+                      <button className="flex items-center gap-1 justify-end hover:text-emerald-600" onClick={() => { setSortBy('total'); setSortDir(sortDir === 'desc' ? 'asc' : 'desc'); }}>
                         Total
                         {sortBy === 'total' && (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
                       </button>
                     </th>
-                    <th className="px-4 sm:px-6 py-4 text-right text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200/50 dark:divide-gray-700/50">
                   {filteredOrders.map((order) => {
-                    const { icon: StatusIcon, color, label } = getStatusConfig(order.status);
+                    const { color, label } = getStatusConfig(order.status);
                     return (
-                      <tr key={order._id || order.orderNumber} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors group">
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                          <div className="font-mono font-bold text-sm text-gray-900 dark:text-white">{order.orderNumber}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden mt-1">
+                      <tr key={order._id || order.orderNumber} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="font-mono font-semibold text-sm text-gray-900 dark:text-white">{order.orderNumber}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden mt-0.5">
                             {new Date(order.createdAt || order.savedAt || order.date).toLocaleDateString()}
                           </div>
                         </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap hidden md:table-cell">
-                          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                            <Calendar className="w-4 h-4" />
+                        <td className="px-4 py-3 whitespace-nowrap hidden md:table-cell">
+                          <div className="text-sm text-gray-600 dark:text-gray-300">
                             {new Date(order.createdAt || order.savedAt || order.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </div>
                         </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${color}`}>
-                            <StatusIcon />
-                            <span className="ml-1.5">{label}</span>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${color}`}>
+                            <StatusIcon status={order.status} />
+                            <span className="ml-1">{label}</span>
                           </span>
                         </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap hidden lg:table-cell">
+                        <td className="px-4 py-3 whitespace-nowrap hidden lg:table-cell">
                           <span className="text-sm text-gray-700 dark:text-gray-300">{order.itemsCount} items</span>
                         </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
-                          <div className="text-lg font-black text-gray-900 dark:text-white">Ksh.{order.total?.toFixed(2) || '0.00'}</div>
+                        <td className="px-4 py-3 whitespace-nowrap text-right">
+                          <div className="text-base font-bold text-gray-900 dark:text-white">Ksh.{order.total?.toFixed(2) || '0'}</div>
                         </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
-                          <Link
-                            href={`/orders/${order._id}`}
-                            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white text-sm font-medium rounded-xl transition-all shadow-md hover:shadow-lg"
-                          >
-                            View Details
-                            <ChevronRight className="ml-1 w-4 h-4" />
+                        <td className="px-4 py-3 whitespace-nowrap text-right">
+                          <Link href={`/orders/${order._id}`} className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white text-xs font-medium rounded-lg transition-all shadow-md hover:shadow-lg">
+                            View
+                            <ChevronRight className="ml-1 w-3 h-3" />
                           </Link>
                         </td>
                       </tr>
                     );
                   })}
-                                </tbody>
+                </tbody>
               </table>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredOrders.map((order) => {
-              const { icon: StatusIcon, color, label, gradient } = getStatusConfig(order.status);
+              const { color, label, gradient } = getStatusConfig(order.status);
               return (
-                <div key={order._id || order.orderNumber} className="group relative bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-white/50 shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                <div key={order._id || order.orderNumber} className="group relative bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl border border-white/50 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden">
                   <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${gradient}`}></div>
-                  <div className="p-6">
-                    <div className="flex justify-between items-start mb-4">
+                  <div className="p-4">
+                    <div className="flex justify-between items-start mb-3">
                       <div>
-                        <div className="font-mono font-bold text-sm text-gray-900 dark:text-white">{order.orderNumber}</div>
-                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <div className="font-mono font-semibold text-xs text-gray-900 dark:text-white">{order.orderNumber}</div>
+                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                           <Calendar className="w-3 h-3" />
                           {new Date(order.createdAt || order.savedAt || order.date).toLocaleDateString()}
                         </div>
                       </div>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${color}`}>
-                        <StatusIcon />
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${color}`}>
+                        <StatusIcon status={order.status} />
                         <span className="ml-1">{label}</span>
                       </span>
                     </div>
 
-                    <div className="space-y-3 mb-6">
+                    <div className="space-y-2 mb-3">
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Items:</span>
                         <span className="font-medium text-gray-900 dark:text-white">{order.itemsCount}</span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Total:</span>
-                        <span className="text-xl font-black bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
-                          Ksh.{order.total?.toFixed(2) || '0.00'}
+                      <div className="flex justify-between items-end">
+                        <span className="text-gray-600 dark:text-gray-400 text-sm">Total:</span>
+                        <span className="text-lg font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+                          Ksh.{order.total?.toFixed(2) || '0'}
                         </span>
                       </div>
                     </div>
 
-                    <Link
-                      href={`/orders/${order._id}`}
-                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white text-sm font-medium rounded-xl transition-all shadow-md hover:shadow-lg group"
-                    >
+                    <Link href={`/orders/${order._id}`} className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white text-xs font-medium rounded-lg transition-all shadow-md hover:shadow-lg">
                       View Details
-                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                     </Link>
                   </div>
                 </div>
@@ -722,21 +655,13 @@ export default function OrdersPage() {
         )}
 
         {filteredOrders.length === 0 && searchQuery && (
-          <div className="text-center py-16">
-            <div className="text-gray-400 mb-4">
-              <Search className="w-16 h-16 mx-auto" strokeWidth={1.5} />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No orders found</h3>
-            <p className="text-gray-600 dark:text-gray-400">Try adjusting your search or filter</p>
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setFilterStatus('all');
-              }}
-              className="mt-4 text-emerald-600 hover:text-emerald-700 font-medium inline-flex items-center gap-1"
-            >
-              Clear all filters
-              <X className="w-4 h-4" />
+          <div className="text-center py-12">
+            <Search className="w-12 h-12 text-gray-400 mx-auto mb-3" strokeWidth={1.5} />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">No orders found</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Try adjusting your search</p>
+            <button onClick={() => { setSearchQuery(''); setFilterStatus('all'); }} className="mt-3 text-emerald-600 hover:text-emerald-700 text-sm font-medium inline-flex items-center gap-1">
+              Clear filters
+              <X className="w-3 h-3" />
             </button>
           </div>
         )}
