@@ -178,12 +178,12 @@ const ReviewCard = ({ review, onEdit, onDelete, isCurrentUser }: {
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white font-semibold">
-            {(typeof review.userId === 'string' ? review.userId.charAt(0).toUpperCase() : review.userId.name.charAt(0).toUpperCase())}
+            {(typeof review.userId === 'string' ? review.userId.charAt(0).toUpperCase() : (review.userId?.name || 'U').charAt(0).toUpperCase())} 
 
           </div>
           <div>
             <p className="font-semibold text-gray-900 dark:text-white">
-              {typeof review.userId === 'string' ? 'Anonymous' : review.userId.name}
+            {typeof review.userId === 'string' ? 'Anonymous' : review.userId?.name || 'Anonymous'} 
 
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
@@ -453,7 +453,7 @@ export default function ReviewComponent({ productId, productName }: ReviewCompon
               review={review}
               onEdit={() => handleEditClick(review)}
               onDelete={handleDeleteReview}
-  isCurrentUser={isLoggedIn && typeof review.userId === 'object' && review.userId?._id === user?.id}
+  isCurrentUser={isLoggedIn && typeof review.userId === 'object' && review.userId?._id === user?.id} 
 
             />
           ))}

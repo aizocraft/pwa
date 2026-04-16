@@ -36,6 +36,7 @@ import { getProduct, getProducts } from '../../../lib/api';
 import { useCartStore } from '../../../store/cart';
 import { cn, formatCurrency } from '../../../lib/utils';
 import ReviewComponent from '../../../components/Review';
+import OrderToWhatsApp from '../../../components/OrderToWhatsApp';
 
 // Animation variants
 const fadeInUp = {
@@ -362,7 +363,7 @@ export default function ProductDetail() {
                       </motion.button>
                     </div>
                     
-                    <motion.button
+                      <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={handleAddToCart}
@@ -371,6 +372,7 @@ export default function ProductDetail() {
                       <ShoppingCart className="w-5 h-5" />
                       {itemQty > 0 ? `Add More (${itemQty} in cart)` : 'Add to Cart'}
                     </motion.button>
+                    <OrderToWhatsApp product={product} quantity={qty} />
                   </div>
 
                   {/* Added to Cart Toast */}

@@ -333,13 +333,6 @@ export default function ProductsPage() {
           </div>
         </div>
         
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 px-1">
-          <span>KSh 0</span>
-          <span>KSh 250K</span>
-          <span>KSh 500K</span>
-          <span>KSh 750K</span>
-          <span>KSh 1M</span>
-        </div>
       </div>
     )
   }
