@@ -21,7 +21,13 @@ const authMiddleware = async (req: Request, res: Response, next: NextFunction) =
       return res.status(401).json({ error: 'Token is not valid' });
     }
 
-    req.user = decoded;
+    // Populate complete user object matching global Express types
+    req.user = {
+      userId: user._id.toString(),
+      role: user.role,
+      id: user._id.toString(),
+      email: user.email
+    };
     next();
   } catch (error) {
     res.status(401).json({ error: 'Token is not valid' });

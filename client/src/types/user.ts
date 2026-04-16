@@ -1,4 +1,4 @@
-// src/types/user.ts
+// src/types/user.ts - Extended with password functions
 export interface User {
   id: string;
   _id?: string;
@@ -7,14 +7,18 @@ export interface User {
   role: 'user' | 'sales' | 'admin';
   phone?: string;
   avatar?: string;
-  isActive: boolean;  // Make required (not optional)
+  isActive: boolean;
   lastLogin?: string;
   createdAt?: string;
   updatedAt?: string;
   
-  // Google Auth fields
   provider: 'local' | 'google';
   googleId?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
 }
 
 export interface UserListResponse {
@@ -27,13 +31,32 @@ export interface UserListResponse {
   };
 }
 
+export interface UserResponse {
+  success: boolean;
+  data: User;
+  stats?: {
+    orderCount: number;
+    totalSpent: number;
+  };
+  message?: string;
+}
+
+export interface BulkStatusResponse {
+  success: boolean;
+  message: string;
+  data: {
+    matched: number;
+    modified: number;
+  };
+}
+
 export interface CreateUserRequest {
   name: string;
   email: string;
-  password?: string;  // Make optional for Google users
-  role?: 'user' | 'sales';
+  password?: string;
+  role?: 'user' | 'sales' | 'admin';
   phone?: string;
-  provider?: 'local' | 'google';  // Allow specifying provider
+  provider?: 'local' | 'google';
 }
 
 export interface UpdateUserRequest {

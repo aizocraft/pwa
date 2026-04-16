@@ -1,7 +1,7 @@
 // src/lib/api.ts
 import axios from 'axios';
 import { Product, ProductListResponse } from '@/types/product';
-import { User, UserListResponse, CreateUserRequest, UpdateUserRequest } from '@/types/user';
+import { User, UserListResponse, UserResponse, BulkStatusResponse, CreateUserRequest, UpdateUserRequest } from '@/types/user';
 import type { Order, OrderListResponse, CreateOrderRequest } from '@/types/order';
 import toast from 'react-hot-toast';
 import { getToken } from './auth';
@@ -132,6 +132,28 @@ export async function updateProfile(data: {
   }
 }
 
+export async function forgotPassword(email: string) {
+  try {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to send reset email');
+    throw error;
+  }
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  try {
+    const response = await api.post('/auth/reset-password', { token, newPassword });
+    toast.success('Password reset successful');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to reset password');
+    throw error;
+  }
+}
+
+
 export async function logout() {
   try {
     await api.post('/auth/logout');
@@ -219,48 +241,172 @@ export const getCurrentUser = (): {
   }
 };
 // ========== USER MANAGEMENT API ==========
+
+
+
+/**
+ * Get all users with pagination and filtering
+ * Access: Admin or Sales
+ */
 export async function getUsers(params?: {
   role?: string;
   search?: string;
   isActive?: boolean;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }): Promise<UserListResponse> {
   const query = new URLSearchParams();
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      query.append(key, String(value));
-    }
-  });
+  
+  if (params?.role && params.role !== 'all') {
+    query.append('role', params.role);
+  }
+  if (params?.search) {
+    query.append('search', params.search);
+  }
+  if (params?.isActive !== undefined && params?.isActive !== null) {
+    query.append('isActive', String(params.isActive));
+  }
+  if (params?.page) {
+    query.append('page', String(params.page));
+  }
+  if (params?.limit) {
+    query.append('limit', String(params.limit));
+  }
+  if (params?.sortBy) {
+    query.append('sortBy', params.sortBy);
+  }
+  if (params?.sortOrder) {
+    query.append('sortOrder', params.sortOrder);
+  }
 
   const response = await api.get(`/users?${query.toString()}`);
-  return response.data;
+  
+  // Align with user.ts UserListResponse shape (users instead of data)
+  return {
+    ...response.data,
+    users: response.data.users || response.data.data || [],
+  };
 }
 
-export async function getUser(id: string): Promise<{ user: User }> {
+/**
+ * Get single user by ID
+ * Access: Admin or Sales (Admin gets additional stats)
+ */
+export async function getUser(id: string): Promise<UserResponse> {
   const response = await api.get(`/users/${id}`);
   return response.data;
 }
 
-export async function createUser(data: CreateUserRequest): Promise<{ user: User }> {
+/**
+ * Create new user
+ * Access: Admin only
+ */
+export async function createUser(data: CreateUserRequest): Promise<UserResponse> {
   const response = await api.post('/users', data);
   return response.data;
 }
 
-export async function updateUser(id: string, data: UpdateUserRequest): Promise<{ user: User }> {
+/**
+ * Update user information
+ * Access: Admin (full) or Sales (limited)
+ */
+export async function updateUser(id: string, data: UpdateUserRequest): Promise<UserResponse> {
   const response = await api.put(`/users/${id}`, data);
   return response.data;
 }
 
-export async function deleteUser(id: string): Promise<void> {
-  await api.delete(`/users/${id}`);
+/**
+ * Delete user (or deactivate if has orders)
+ * Access: Admin only
+ */
+export async function deleteUser(id: string): Promise<{ 
+  success: boolean; 
+  message: string; 
+  data?: { action: string; userId: string } 
+}> {
+  const response = await api.delete(`/users/${id}`);
+  return response.data;
 }
 
-export async function toggleUserStatus(id: string): Promise<{ isActive: boolean }> {
+/**
+ * Reset user password
+ * Access: Admin only
+ */
+export async function resetUserPassword(id: string, newPassword: string): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  const response = await api.post(`/users/${id}/reset-password`, { newPassword });
+  return response.data;
+}
+
+/**
+ * Toggle user active status
+ * Access: Admin only
+ */
+export async function toggleUserStatus(id: string): Promise<{
+  success: boolean;
+  message: string;
+  data: { isActive: boolean };
+}> {
   const response = await api.post(`/users/${id}/toggle-status`);
   return response.data;
 }
 
+/**
+ * Bulk update user status
+ * Access: Admin only
+ */
+export async function bulkUpdateUserStatus(userIds: string[], isActive: boolean): Promise<BulkStatusResponse> {
+  const response = await api.post('/users/bulk/status', { userIds, isActive });
+  return response.data;
+}
+
+/**
+ * Export users to CSV
+ * Access: Admin only
+ */
+export async function exportUsersToCSV(params?: {
+  role?: string;
+  isActive?: boolean;
+}): Promise<Blob> {
+  const query = new URLSearchParams();
+  
+  if (params?.role) {
+    query.append('role', params.role);
+  }
+  if (params?.isActive !== undefined) {
+    query.append('isActive', String(params.isActive));
+  }
+  
+  const response = await api.get(`/users/export/csv?${query.toString()}`, {
+    responseType: 'blob'
+  });
+  
+  return response.data;
+}
+
+// Legacy function aliases for backward compatibility
+export async function getUsersLegacy(params?: {
+  role?: string;
+  search?: string;
+  isActive?: boolean;
+  page?: number;
+  limit?: number;
+}): Promise<{ users: User[]; pagination: any }> {
+  const response = await getUsers(params);
+  return {
+    users: response.users,
+    pagination: response.pagination
+  };
+}
+
+export async function getUserLegacy(id: string): Promise<{ user: User }> {
+  const response = await getUser(id);
+  return { user: response.data };
+}
 // ========== PRODUCT API ==========
 export async function getProducts(params?: {
   category?: string;

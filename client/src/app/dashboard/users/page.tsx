@@ -2,9 +2,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useUsers } from '@/lib/users'
+import { useUsersPage } from '@/lib/useUsers'
 import { useAuth } from '@/lib/auth'
 import { User, CreateUserRequest, UpdateUserRequest } from '@/types/user'
+import { useExportUsers } from '@/lib/useUsers'
 import toast from 'react-hot-toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -28,23 +29,24 @@ export default function UsersPage() {
     name: '',
     email: '',
     password: '',
-    role: 'user' as 'user' | 'sales',
+    role: 'user' as 'user' | 'sales' | 'admin',
     phone: ''
   })
 
-  const { 
-    users, 
-    pagination, 
-    isLoading, 
+  const {
+    users,
+    pagination,
+    isLoading,
+    error,
     refetch,
     createUser,
-    updateUser,
+    updateUser, 
     deleteUser,
     toggleUserStatus
-  } = useUsers({
+  } = useUsersPage({
     search: search || undefined,
     role: roleFilter || undefined,
-    isActive: statusFilter ? statusFilter === 'active' : undefined,
+    isActive: statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined,
     page,
     limit: 10
   })
@@ -400,7 +402,7 @@ export default function UsersPage() {
                           </button>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
-                          {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
+                          {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Never'}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -413,7 +415,7 @@ export default function UsersPage() {
                                       name: user.name,
                                       email: user.email,
                                       password: '',
-                                      role: user.role as 'user' | 'sales',
+                                      role: user.role,
                                       phone: user.phone || ''
                                     })
                                     setShowModal(true)
@@ -566,11 +568,11 @@ export default function UsersPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                     Role *
                   </label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as 'user' | 'sales' })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  >
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'user' | 'sales' | 'admin' })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                >
                     <option value="user">Customer</option>
                     <option value="sales">Sales Representative</option>
                   </select>

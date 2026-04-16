@@ -11,6 +11,8 @@ export interface IUser extends Document {
   avatar?: string;
   isActive: boolean;
   lastLogin?: Date;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
   
@@ -65,13 +67,25 @@ const userSchema = new Schema<IUser>({
     type: String, 
     enum: ['local', 'google'], 
     default: 'local' 
+  },
+  resetPasswordToken: { 
+    type: String 
+  },
+  resetPasswordExpires: { 
+    type: Date 
   }
 }, {
   timestamps: true
 });
 
-// Hash password pre-save (only for local provider)
+// Hash password pre-save (only for local provider) - also clear reset fields on password change
 userSchema.pre('save', async function(next) {
+  // Clear reset fields when password is changed
+  if (this.isModified('password')) {
+    this.resetPasswordToken = undefined;
+    this.resetPasswordExpires = undefined;
+  }
+  
   // Only hash password if provider is local and password is modified
   if (this.provider === 'local' && this.isModified('password') && this.password) {
     try {

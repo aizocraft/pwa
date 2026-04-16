@@ -194,6 +194,145 @@ router.put('/profile', authMiddleware, async (req: Request & { user?: any }, res
   }
 });
 
+// POST /api/auth/change-password
+router.post('/change-password', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+    
+    const user = await UserModel.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Check if user is using Google auth
+    if (user.provider === 'google') {
+      return res.status(400).json({ 
+        error: 'Google-authenticated accounts cannot change password. Use Google Sign-In instead.'
+      });
+    }
+    
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+    
+    // Update password
+    user.password = newPassword;
+    await user.save();
+    
+    res.json({ message: 'Password changed successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to change password' });
+  }
+});
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.json({ message: 'If your email is registered, you will receive a password reset link' });
+    }
+    
+    if (user.provider === 'google') {
+      return res.status(400).json({ 
+        error: 'Google-authenticated accounts use Google Sign-In. No password reset needed.'
+      });
+    }
+    
+    const crypto = await import('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date();
+    resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 1);
+    
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetTokenExpiry;
+    await user.save();
+    
+    const { sendPasswordResetEmail } = await import('../services/email.service');
+    await sendPasswordResetEmail(email, resetToken);
+    
+    res.json({ message: 'Password reset link sent to your email' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to send reset email' });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+    
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required' });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    
+    const user = await UserModel.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() }
+    });
+    
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+    
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+    
+    res.json({ message: 'Password reset successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to reset password' });
+  }
+});
+
+// DELETE /api/auth/profile - Delete own account
+router.delete('/profile', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const user = await UserModel.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const OrderModel = (await import('../models/Order')).default;
+    const hasOrders = await OrderModel.exists({ user: user._id });
+    
+    if (hasOrders) {
+      user.isActive = false;
+      await user.save();
+      return res.json({ 
+        message: 'Account deactivated due to existing orders. Contact support for full deletion.',
+        deactivated: true 
+      });
+    }
+    
+    await user.deleteOne();
+    res.json({ message: 'Account deleted successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to delete account' });
+  }
+});
+
 // GET /api/auth/google/status - Check if Google auth is configured
 router.get('/google/status', (req: Request, res: Response) => {
   const isConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
