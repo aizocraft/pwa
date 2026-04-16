@@ -8,7 +8,8 @@ import {
   Activity, Calendar, DollarSign, Edit2, Save, X, Check, 
   ShoppingBag, Heart, Star, Clock, CreditCard, Shield, 
   Bell, Globe, Smartphone, LogOut, AlertTriangle, Home,
-  ChevronRight, ChevronDown, Copy, ExternalLink
+  ChevronRight, ChevronDown, Copy, ExternalLink, Sparkles,
+  Award, TrendingUp, Clock as ClockIcon, Eye
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
@@ -16,16 +17,16 @@ import { OrderStatusBadge } from '@/components/OrderStatusBadge'
 import { Order } from '@/types/order'
 import { format } from 'date-fns'
 
-// Enhanced UI Components with Dark Mode Support
+// Enhanced UI Components with Dark/Light Mode Support
 const Button = ({ children, className = '', variant = 'default', size = 'default', disabled, onClick, type = 'button' }: any) => {
   const baseClasses = 'inline-flex items-center justify-center rounded-xl font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 shadow-lg hover:shadow-xl gap-2';
   
   const variants = {
-    default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-    destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-    outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-    ghost: 'hover:bg-accent hover:text-accent-foreground',
-    success: 'bg-success text-success-foreground hover:bg-success/90',
+    default: 'bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80',
+    destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:bg-red-600 dark:hover:bg-red-700',
+    outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground dark:border-gray-700 dark:hover:bg-gray-800',
+    ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-800',
+    success: 'bg-success text-success-foreground hover:bg-success/90 dark:bg-green-600 dark:hover:bg-green-700',
   }
   
   const sizes = {
@@ -47,18 +48,18 @@ const Button = ({ children, className = '', variant = 'default', size = 'default
 }
 
 const Card = ({ children, className = '', hover = false }: any) => (
-  <div className={`bg-card text-card-foreground rounded-2xl border border-border shadow-lg ${hover ? 'hover:shadow-xl hover:border-primary/50 dark:hover:border-primary/30 transition-all duration-300' : 'shadow-md'} backdrop-blur-sm ${className}`}>
+  <div className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm dark:shadow-lg ${hover ? 'hover:shadow-md dark:hover:shadow-xl hover:border-primary/30 dark:hover:border-primary/30 transition-all duration-300' : ''} ${className}`}>
     {children}
   </div>
 )
 
-const CardHeader = ({ children, className = '' }: any) => <div className={`p-6 pb-3 ${className}`}>{children}</div>
-const CardContent = ({ children, className = '' }: any) => <div className={`p-6 pt-0 ${className}`}>{children}</div>
+const CardHeader = ({ children, className = '' }: any) => <div className={`p-6 pb-3 border-b border-gray-100 dark:border-gray-800 ${className}`}>{children}</div>
+const CardContent = ({ children, className = '' }: any) => <div className={`p-6 ${className}`}>{children}</div>
 const CardTitle = ({ children, className = '' }: any) => (
-  <h3 className={`text-xl font-bold bg-gradient-to-r from-foreground via-primary to-secondary bg-clip-text text-transparent ${className}`}>{children}</h3>
+  <h3 className={`text-xl font-bold text-gray-900 dark:text-white ${className}`}>{children}</h3>
 )
 const CardDescription = ({ children, className = '' }: any) => (
-  <p className={`text-sm text-muted-foreground ${className}`}>{children}</p>
+  <p className={`text-sm text-gray-500 dark:text-gray-400 ${className}`}>{children}</p>
 )
 
 const Input = ({ 
@@ -67,11 +68,11 @@ const Input = ({
 }: any) => (
   <div className="relative">
     {Icon && (
-      <Icon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <Icon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
     )}
     <input
       id={id}
-      className={`w-full rounded-xl border ${error ? 'border-destructive' : 'border-input'} bg-background/80 backdrop-blur-sm px-4 py-2.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-input transition-all duration-200 ${Icon ? 'pl-10' : ''} ${className}`}
+      className={`w-full rounded-xl border ${error ? 'border-red-500 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'} bg-white dark:bg-gray-800 px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all duration-200 ${Icon ? 'pl-10' : ''} ${className}`}
       value={value}
       onChange={onChange}
       type={type}
@@ -79,14 +80,14 @@ const Input = ({
       required={required}
       minLength={minLength}
     />
-    {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    {error && <p className="text-xs text-red-500 dark:text-red-400 mt-1">{error}</p>}
   </div>
 )
 
 const Label = ({ htmlFor, children, required }: any) => (
-  <label htmlFor={htmlFor} className="text-sm font-medium text-foreground mb-2 block">
+  <label htmlFor={htmlFor} className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
     {children}
-    {required && <span className="text-destructive ml-1">*</span>}
+    {required && <span className="text-red-500 dark:text-red-400 ml-1">*</span>}
   </label>
 )
 
@@ -94,8 +95,8 @@ const Tabs = ({ defaultValue, className, children }: any) => {
   const [value, setValue] = useState(defaultValue)
   return (
     <div className={`space-y-6 ${className}`}>
-      <div className="border-b border-gray-800">
-        <div className="flex flex-wrap gap-1">
+      <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 rounded-t-xl">
+        <div className="flex flex-wrap gap-1 px-2">
           {React.Children.map(children, child => 
             React.isValidElement(child) && child.type === TabsTrigger 
               ? React.cloneElement(child as React.ReactElement<any>, { 
@@ -118,16 +119,13 @@ const Tabs = ({ defaultValue, className, children }: any) => {
 const TabsTrigger = ({ value, children, active, onClick }: any) => (
   <button
     onClick={onClick}
-    className={`px-4 py-2 text-sm font-medium transition-all duration-200 relative ${
+    className={`px-5 py-3 text-sm font-medium transition-all duration-200 relative rounded-t-lg ${
       active 
-        ? 'text-primary border-b-2 border-primary' 
-        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+        ? 'text-primary dark:text-primary-400 border-b-2 border-primary dark:border-primary-400 bg-gray-50 dark:bg-gray-800/50' 
+        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/30'
     }`}
   >
     {children}
-    {active && (
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-primary/80 rounded-full" />
-    )}
   </button>
 )
 
@@ -138,36 +136,36 @@ const TabsContent = ({ value, className, children }: any) => (
 )
 
 const Table = ({ children }: any) => (
-  <div className="w-full overflow-auto rounded-xl border border-border">
+  <div className="w-full overflow-auto rounded-xl border border-gray-200 dark:border-gray-800">
     <table className="w-full caption-bottom text-sm">
       {children}
     </table>
   </div>
 )
 
-const TableHeader = ({ children }: any) => <thead className="bg-gray-900/50 border-b border-gray-800">{children}</thead>
-const TableBody = ({ children }: any) => <tbody>{children}</tbody>
+const TableHeader = ({ children }: any) => <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">{children}</thead>
+const TableBody = ({ children }: any) => <tbody className="divide-y divide-gray-100 dark:divide-gray-800">{children}</tbody>
 
 const TableHead = ({ children, className }: any) => (
-  <th className={`h-12 px-4 text-left align-middle font-semibold text-gray-300 ${className}`}>
+  <th className={`h-12 px-4 text-left align-middle font-semibold text-gray-600 dark:text-gray-400 ${className}`}>
     {children}
   </th>
 )
 
 const TableRow = ({ children, className = '' }: any) => (
-  <tr className={`border-b border-gray-800 transition-colors hover:bg-gray-800/30 ${className}`}>
+  <tr className={`transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50 ${className}`}>
     {children}
   </tr>
 )
 
 const TableCell = ({ children, className }: any) => (
-  <td className={`p-4 align-middle text-gray-300 ${className}`}>
+  <td className={`p-4 align-middle text-gray-700 dark:text-gray-300 ${className}`}>
     {children}
   </td>
 )
 
 const Avatar = ({ className, children }: any) => (
-  <div className={`relative inline-flex overflow-hidden rounded-full ring-4 ring-gray-800 shadow-2xl ${className}`}>
+  <div className={`relative inline-flex overflow-hidden rounded-full ring-4 ring-white dark:ring-gray-800 shadow-xl ${className}`}>
     {children}
   </div>
 )
@@ -175,40 +173,40 @@ const Avatar = ({ className, children }: any) => (
 const AvatarImage = ({ src, alt }: any) => src ? <img src={src} alt={alt} className="h-full w-full object-cover" /> : null
 
 const AvatarFallback = ({ className, children }: any) => (
-  <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600 to-purple-600 text-white font-bold ${className}`}>
+  <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br from-primary to-secondary text-white font-bold ${className}`}>
     {children}
   </div>
 )
 
 const Badge = ({ children, variant = 'default', className = '' }: any) => {
   const variants = {
-    default: 'bg-gradient-to-r from-blue-600 to-purple-600 text-white',
-    success: 'bg-gradient-to-r from-green-600 to-emerald-600 text-white',
-    warning: 'bg-gradient-to-r from-yellow-600 to-orange-600 text-white',
-    danger: 'bg-gradient-to-r from-red-600 to-pink-600 text-white',
-    info: 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white',
+    default: 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-400 border border-primary/20',
+    success: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800',
+    warning: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800',
+    danger: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800',
+    info: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
   }
   return (
-<span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variants[variant as keyof typeof variants]} ${className}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variants[variant as keyof typeof variants]} ${className}`}>
       {children}
     </span>
   )
 }
 
 const StatCard = ({ icon: Icon, label, value, trend }: any) => (
-  <div className="bg-gradient-to-br from-gray-900/50 to-gray-900/30 rounded-xl border border-gray-800 p-4 hover:border-gray-700 transition-all duration-300">
-    <div className="flex items-center justify-between mb-2">
-      <div className="p-2 bg-blue-600/20 rounded-lg">
-        <Icon className="h-5 w-5 text-blue-500" />
+  <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 hover:shadow-lg transition-all duration-300 group">
+    <div className="flex items-center justify-between mb-3">
+      <div className="p-2.5 bg-primary/10 dark:bg-primary/20 rounded-xl group-hover:scale-110 transition-transform duration-300">
+        <Icon className="h-5 w-5 text-primary dark:text-primary-400" />
       </div>
       {trend && (
         <Badge variant={trend > 0 ? 'success' : 'danger'} className="text-xs">
-          {trend > 0 ? '+' : ''}{trend}%
+          {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
         </Badge>
       )}
     </div>
-    <p className="text-2xl font-bold text-white mb-1">{value}</p>
-    <p className="text-xs text-gray-400">{label}</p>
+    <p className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{value}</p>
+    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{label}</p>
   </div>
 )
 
@@ -362,13 +360,13 @@ export default function ProfilePage() {
 
   if (profileLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 flex items-center justify-center">
         <div className="text-center">
           <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-            <Loader2 className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-blue-500 animate-pulse" />
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary mx-auto"></div>
+            <Loader2 className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-primary animate-pulse" />
           </div>
-          <p className="mt-4 text-gray-400 font-medium">Loading your profile...</p>
+          <p className="mt-4 text-gray-500 dark:text-gray-400 font-medium">Loading your profile...</p>
         </div>
       </div>
     )
@@ -376,13 +374,13 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 flex items-center justify-center">
         <div className="text-center">
-          <div className="bg-red-500/10 rounded-full p-6 inline-block mb-4">
-            <AlertTriangle className="h-12 w-12 text-red-500" />
+          <div className="bg-red-100 dark:bg-red-900/30 rounded-full p-6 inline-block mb-4">
+            <AlertTriangle className="h-12 w-12 text-red-500 dark:text-red-400" />
           </div>
-          <p className="text-xl font-semibold text-white mb-2">Profile not found</p>
-          <p className="text-gray-400 mb-6">Please login to access your profile</p>
+          <p className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Profile not found</p>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">Please login to access your profile</p>
           <Link href="/auth/login">
             <Button variant="default">
               Go to Login
@@ -395,18 +393,18 @@ export default function ProfilePage() {
   }
 
   const stats = [
-    { icon: ShoppingBag, label: 'Total Orders', value: ordersData?.total || 0 },
-    { icon: DollarSign, label: 'Total Spent', value: `KSh ${(ordersData?.orders?.reduce((sum: number, order: Order) => sum + order.total, 0) || 0).toLocaleString()}` },
-    { icon: Star, label: 'Reviews', value: '0' },
-    { icon: Heart, label: 'Wishlist', value: '0' },
+    { icon: ShoppingBag, label: 'Total Orders', value: ordersData?.total || 0, trend: 12 },
+    { icon: DollarSign, label: 'Total Spent', value: `KSh ${(ordersData?.orders?.reduce((sum: number, order: Order) => sum + order.total, 0) || 0).toLocaleString()}`, trend: 8 },
+    { icon: Star, label: 'Reviews', value: '12', trend: 5 },
+    { icon: Heart, label: 'Wishlist', value: '8', trend: -2 },
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
-      {/* Animated Background */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+      {/* Subtle Background Pattern */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary/5 rounded-full blur-3xl"></div>
       </div>
 
       <div className="container mx-auto px-4 py-8 lg:py-12 relative z-10">
@@ -420,23 +418,29 @@ export default function ProfilePage() {
                   {profile.name.slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute bottom-4 right-0 bg-green-500 rounded-full p-1 border-4 border-gray-900">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <div className="absolute bottom-4 right-0 bg-green-500 rounded-full p-1.5 border-2 border-white dark:border-gray-900">
+                <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></div>
               </div>
             </div>
             
-<h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-foreground via-primary to-secondary dark:from-white dark:via-blue-400 dark:to-purple-500 bg-clip-text text-transparent mb-3">
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-gray-900 via-primary to-secondary dark:from-white dark:via-primary-400 dark:to-secondary-400 bg-clip-text text-transparent mb-3">
               {profile.name}
             </h1>
             
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Badge variant="info">{profile.role.toUpperCase()}</Badge>
-              <Badge variant="default">{profile.provider.toUpperCase()} Account</Badge>
-            </div>
+            <div className="flex items-center justify-center gap-2 mb-3 flex-wrap">
+  <Badge variant="info">{profile.role?.toUpperCase() || 'USER'}</Badge>
+  <Badge variant="default">{profile.provider?.toUpperCase() || 'EMAIL'} Account</Badge>
+  {(profile as any).emailVerified && (
+    <Badge variant="success">
+      <Check className="h-3 w-3 mr-1" />
+      Verified
+    </Badge>
+  )}
+</div>
             
-            <p className="text-gray-400 flex items-center justify-center gap-2">
+            <p className="text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
               <Calendar className="h-4 w-4" />
-              Joined {format(new Date(profile.createdAt || 0), 'MMMM yyyy')}
+              Joined {format(new Date(profile.createdAt || Date.now()), 'MMMM yyyy')}
             </p>
           </div>
 
@@ -449,36 +453,37 @@ export default function ProfilePage() {
 
           {/* Tabs Section */}
           <Tabs defaultValue="profile" className="w-full">
-            <TabsTrigger value="profile">
-              <User className="mr-2 h-4 w-4" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="orders">
-              <Package className="mr-2 h-4 w-4" />
-              Orders
-            </TabsTrigger>
-            <TabsTrigger value="addresses">
-              <MapPin className="mr-2 h-4 w-4" />
-              Addresses
-            </TabsTrigger>
-            <TabsTrigger value="password">
-              <Lock className="mr-2 h-4 w-4" />
-              Security
-            </TabsTrigger>
-            <TabsTrigger value="activity">
-              <Activity className="mr-2 h-4 w-4" />
-              Activity
-            </TabsTrigger>
+            <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 dark:border-gray-800 pb-0">
+              <TabsTrigger value="profile">
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </TabsTrigger>
+              <TabsTrigger value="orders">
+                <Package className="mr-2 h-4 w-4" />
+                Orders
+              </TabsTrigger>
+              <TabsTrigger value="addresses">
+                <MapPin className="mr-2 h-4 w-4" />
+                Addresses
+              </TabsTrigger>
+              <TabsTrigger value="password">
+                <Lock className="mr-2 h-4 w-4" />
+                Security
+              </TabsTrigger>
+              <TabsTrigger value="activity">
+                <Activity className="mr-2 h-4 w-4" />
+                Activity
+              </TabsTrigger>
+            </div>
 
             {/* Profile Tab */}
             <TabsContent value="profile">
               <Card hover className="overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-600/10 to-purple-600/10 rounded-full blur-3xl"></div>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
                       <CardTitle>Profile Information</CardTitle>
-                      <CardDescription>Manage your personal details</CardDescription>
+                      <CardDescription>Manage your personal details and preferences</CardDescription>
                     </div>
                     {!isEditing && (
                       <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
@@ -543,7 +548,7 @@ export default function ProfilePage() {
                     </div>
                     
                     {isEditing && (
-                      <div className="flex gap-3 pt-4">
+                      <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                         <Button type="button" variant="outline" onClick={() => {
                           setIsEditing(false)
                           if (profile) {
@@ -591,47 +596,49 @@ export default function ProfilePage() {
                   {ordersLoading ? (
                     <div className="space-y-3">
                       {[1,2,3].map((i) => (
-                        <div key={i} className="flex items-center p-4 rounded-xl border border-gray-800 animate-pulse">
-                          <div className="w-12 h-12 bg-gray-800 rounded-lg" />
+                        <div key={i} className="flex items-center p-4 rounded-xl border border-gray-200 dark:border-gray-800 animate-pulse">
+                          <div className="w-12 h-12 bg-gray-200 dark:bg-gray-800 rounded-lg" />
                           <div className="flex-1 space-y-2 ml-4">
-                            <div className="h-4 bg-gray-800 rounded w-3/4" />
-                            <div className="h-3 bg-gray-800 rounded w-1/2" />
+                            <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4" />
+                            <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-1/2" />
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : ordersData?.orders?.length ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Order ID</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Items</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {ordersData.orders.map((order: Order) => (
-                          <TableRow key={order._id}>
-                            <TableCell className="font-mono text-sm">#{order.orderNumber}</TableCell>
-                            <TableCell>{format(new Date(order.createdAt), 'MMM dd, yyyy')}</TableCell>
-                            <TableCell><OrderStatusBadge status={order.status} /></TableCell>
-                            <TableCell>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</TableCell>
-                            <TableCell className="text-right font-semibold text-white">
-                              KSh {order.total.toLocaleString()}
-                            </TableCell>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Order ID</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Items</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {ordersData.orders.map((order: Order) => (
+                            <TableRow key={order._id}>
+                              <TableCell className="font-mono text-sm">#{order.orderNumber}</TableCell>
+                              <TableCell>{format(new Date(order.createdAt), 'MMM dd, yyyy')}</TableCell>
+                              <TableCell><OrderStatusBadge status={order.status} /></TableCell>
+                              <TableCell>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</TableCell>
+                              <TableCell className="text-right font-semibold text-gray-900 dark:text-white">
+                                KSh {order.total.toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   ) : (
                     <div className="text-center py-16">
-                      <div className="bg-gray-800/30 rounded-full p-6 inline-block mb-4">
-                        <Package className="h-12 w-12 text-gray-500" />
+                      <div className="bg-gray-100 dark:bg-gray-800/50 rounded-full p-6 inline-block mb-4">
+                        <Package className="h-12 w-12 text-gray-400 dark:text-gray-500" />
                       </div>
-                      <h3 className="text-xl font-semibold text-white mb-2">No orders yet</h3>
-                      <p className="text-gray-400 mb-6">Start shopping to see your orders here</p>
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No orders yet</h3>
+                      <p className="text-gray-500 dark:text-gray-400 mb-6">Start shopping to see your orders here</p>
                       <Link href="/products">
                         <Button variant="default">
                           Start Shopping
@@ -648,7 +655,7 @@ export default function ProfilePage() {
             <TabsContent value="addresses">
               <Card hover>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
                       <CardTitle>Saved Addresses</CardTitle>
                       <CardDescription>Manage your delivery locations</CardDescription>
@@ -661,8 +668,11 @@ export default function ProfilePage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {showAddressForm && (
-                    <div className="bg-gradient-to-br from-gray-800/30 to-gray-900/30 rounded-xl border border-gray-800 p-6 animate-fadeIn">
-                      <h3 className="text-lg font-semibold text-white mb-4">New Address</h3>
+                    <div className="bg-gray-50 dark:bg-gray-800/30 rounded-xl border border-gray-200 dark:border-gray-700 p-6 animate-fadeIn">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-primary" />
+                        New Address
+                      </h3>
                       <form onSubmit={addAddress} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="fullName" required>Full Name</Label>
@@ -719,23 +729,26 @@ export default function ProfilePage() {
                   {addresses.length ? (
                     <div className="space-y-4">
                       {addresses.map((address) => (
-                        <div key={address.id} className="bg-gradient-to-r from-gray-800/20 to-gray-900/20 rounded-xl border border-gray-800 p-6 hover:border-gray-700 transition-all duration-300">
-                          <div className="flex items-start justify-between">
+                        <div key={address.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 hover:shadow-md transition-all duration-300">
+                          <div className="flex items-start justify-between flex-wrap gap-4">
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-3">
-                                <span className="font-semibold text-white text-lg">{address.fullName}</span>
+                              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                                <span className="font-semibold text-gray-900 dark:text-white text-lg">{address.fullName}</span>
                                 {address.isDefault && (
-                                  <Badge variant="success">Default Address</Badge>
+                                  <Badge variant="success">
+                                    <Star className="h-3 w-3 mr-1 fill-current" />
+                                    Default
+                                  </Badge>
                                 )}
                               </div>
-                              <p className="text-gray-300 mb-1">{address.address1}</p>
-                              <p className="text-gray-300 mb-3">{address.city}</p>
-                              <p className="text-gray-400 text-sm flex items-center gap-2">
+                              <p className="text-gray-600 dark:text-gray-400 mb-1">{address.address1}</p>
+                              <p className="text-gray-600 dark:text-gray-400 mb-3">{address.city}</p>
+                              <p className="text-gray-500 dark:text-gray-500 text-sm flex items-center gap-2">
                                 <Phone className="h-3 w-3" />
                                 {address.phone}
                               </p>
                             </div>
-                            <div className="flex items-center gap-2 ml-4">
+                            <div className="flex items-center gap-2">
                               {!address.isDefault && (
                                 <Button
                                   variant="outline"
@@ -749,7 +762,7 @@ export default function ProfilePage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => deleteAddress(address.id)}
-                                className="text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -760,10 +773,11 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <div className="text-center py-16">
-                      <div className="bg-gray-800/30 rounded-full p-6 inline-block mb-4">
-                        <MapPin className="h-12 w-12 text-gray-500" />
+                      <div className="bg-gray-100 dark:bg-gray-800/50 rounded-full p-6 inline-block mb-4">
+                        <MapPin className="h-12 w-12 text-gray-400 dark:text-gray-500" />
                       </div>
-                      <p className="text-gray-400">No addresses saved yet</p>
+                      <p className="text-gray-500 dark:text-gray-400">No addresses saved yet</p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Add your first address for faster checkout</p>
                     </div>
                   )}
                 </CardContent>
@@ -778,7 +792,7 @@ export default function ProfilePage() {
                   <CardDescription>Update your password and security preferences</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handlePasswordChange} className="space-y-6">
+                  <form onSubmit={handlePasswordChange} className="space-y-6 max-w-md">
                     <div className="space-y-2">
                       <Label htmlFor="currentPassword" required>Current Password</Label>
                       <Input 
@@ -804,7 +818,7 @@ export default function ProfilePage() {
                         icon={Shield}
                         error={passwordErrors.new}
                       />
-                      <p className="text-xs text-gray-500">Must be at least 6 characters long</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Must be at least 6 characters long</p>
                     </div>
                     
                     <div className="space-y-2">
@@ -830,24 +844,24 @@ export default function ProfilePage() {
               </Card>
 
               {/* Danger Zone */}
-              <Card className="border-red-500/20 bg-gradient-to-br from-red-950/20 to-red-900/10 mt-6">
+              <Card className="border-red-200 dark:border-red-800/50 bg-red-50/30 dark:bg-red-950/20 mt-6">
                 <CardHeader>
                   <div className="flex items-start gap-3">
-                    <div className="p-2 bg-red-500/20 rounded-lg">
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
+                    <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                      <AlertTriangle className="h-5 w-5 text-red-500 dark:text-red-400" />
                     </div>
                     <div>
-                      <CardTitle className="text-red-500">Danger Zone</CardTitle>
-                      <CardDescription className="text-red-400/80">
+                      <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
+                      <CardDescription className="text-red-500 dark:text-red-400/80">
                         Permanently delete your account and all associated data
                       </CardDescription>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6">
-                    <p className="text-sm text-red-400 mb-2">This action will permanently delete:</p>
-                    <ul className="text-sm text-red-400/80 space-y-1 list-disc list-inside">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">
+                    <p className="text-sm text-red-600 dark:text-red-400 mb-2 font-medium">This action will permanently delete:</p>
+                    <ul className="text-sm text-red-500 dark:text-red-400/80 space-y-1 list-disc list-inside">
                       <li>Your profile and personal information</li>
                       <li>All order history and records</li>
                       <li>Saved addresses and payment methods</li>
@@ -876,6 +890,34 @@ export default function ProfilePage() {
                   </Button>
                 </CardContent>
               </Card>
+
+              {/* Security Tips */}
+              <Card className="mt-6">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <Shield className="h-5 w-5 text-primary" />
+                    <CardTitle>Security Tips</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/30">
+                      <Check className="h-5 w-5 text-green-500 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">Use a strong password</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Mix letters, numbers, and symbols</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/30">
+                      <Check className="h-5 w-5 text-green-500 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">Enable 2FA</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Add an extra layer of security</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Activity Tab */}
@@ -883,41 +925,52 @@ export default function ProfilePage() {
               <Card hover>
                 <CardHeader>
                   <CardTitle>Recent Activity</CardTitle>
-                  <CardDescription>Your latest account activities</CardDescription>
+                  <CardDescription>Your latest account activities and updates</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-gray-800/20 to-gray-900/20 border border-gray-800">
-                      <div className="p-2 bg-blue-500/20 rounded-lg">
-                        <User className="h-5 w-5 text-blue-500" />
+                    <div className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-800">
+                      <div className="p-2.5 bg-primary/10 rounded-lg">
+                        <User className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-white">Profile Updated</p>
-                        <p className="text-sm text-gray-400">You updated your profile information</p>
+                        <p className="font-medium text-gray-900 dark:text-white">Profile Updated</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">You updated your profile information</p>
                       </div>
                       <Badge variant="info">2 hours ago</Badge>
                     </div>
                     
-                    <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-gray-800/20 to-gray-900/20 border border-gray-800">
-                      <div className="p-2 bg-green-500/20 rounded-lg">
+                    <div className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-800">
+                      <div className="p-2.5 bg-green-500/10 rounded-lg">
                         <Package className="h-5 w-5 text-green-500" />
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-white">Order Delivered</p>
-                        <p className="text-sm text-gray-400">Order #ORD123 was delivered successfully</p>
+                        <p className="font-medium text-gray-900 dark:text-white">Order Delivered</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Order #ORD123 was delivered successfully</p>
                       </div>
                       <Badge variant="success">Yesterday</Badge>
                     </div>
                     
-                    <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-gray-800/20 to-gray-900/20 border border-gray-800">
-                      <div className="p-2 bg-purple-500/20 rounded-lg">
+                    <div className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-800">
+                      <div className="p-2.5 bg-purple-500/10 rounded-lg">
                         <Lock className="h-5 w-5 text-purple-500" />
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-white">Login from new device</p>
-                        <p className="text-sm text-gray-400">Chrome on Windows - IP: 192.168.1.1</p>
+                        <p className="font-medium text-gray-900 dark:text-white">Login from new device</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Chrome on Windows - IP: 192.168.1.1</p>
                       </div>
                       <Badge variant="warning">3 days ago</Badge>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-800">
+                      <div className="p-2.5 bg-blue-500/10 rounded-lg">
+                        <ShoppingBag className="h-5 w-5 text-blue-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900 dark:text-white">New Order Placed</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Order #ORD456 - KSh 2,500.00</p>
+                      </div>
+                      <Badge variant="info">5 days ago</Badge>
                     </div>
                     
                     <div className="text-center pt-6">

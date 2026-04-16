@@ -426,7 +426,7 @@ export const sendWelcomeEmail = async (email: string, name: string) => {
  * Send password reset email
  */
 export const sendPasswordResetEmail = async (email: string, resetToken: string) => {
-  const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+  const resetUrl = `${process.env.CLIENT_URL}/auth/reset-password?token=${resetToken}`;
   
   return await sendEmail({
     to: email,

@@ -361,6 +361,14 @@ export default function DashboardLayout({
 
               <div className="flex items-center gap-2 sm:gap-3">
 <button 
+    onClick={() => router.push('/profile')}
+    title="Profile"
+    className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+  >
+    <User className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+    <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
+  </button>
+  <button 
     onClick={() => router.push('/dashboard/notifications')}
     title="Notifications"
     className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"

@@ -1,7 +1,6 @@
-// src/app/dashboard/users/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useUsersPage } from '@/lib/useUsers'
 import { useAuth } from '@/lib/auth'
 import { User, CreateUserRequest, UpdateUserRequest } from '@/types/user'
@@ -13,7 +12,8 @@ import {
   Shield, ShieldCheck, User as UserIcon, Mail, Phone,
   X, RefreshCw, Filter, ChevronLeft, ChevronRight,
   Crown, Briefcase, Calendar, MoreVertical, Loader2,
-  CheckCircle, AlertCircle, Eye, EyeOff, Key
+  CheckCircle, AlertCircle, Eye, EyeOff, Key, AlertTriangle,
+  Download, Upload, ShieldAlert, Copy, Check, Clock
 } from 'lucide-react'
 
 export default function UsersPage() {
@@ -25,6 +25,16 @@ export default function UsersPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [showRoleWarning, setShowRoleWarning] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<string>('')
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false)
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [showBulkAction, setShowBulkAction] = useState(false)
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [showUserDetails, setShowUserDetails] = useState<User | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -51,11 +61,23 @@ export default function UsersPage() {
     limit: 10
   })
 
+  const exportUsersMutation = useExportUsers()
+
+  // Check if current user is admin
+  const isAdmin = currentUser?.role === 'admin'
+
   const handleCloseModal = () => {
     setShowModal(false)
     setEditingUser(null)
     setFormData({ name: '', email: '', password: '', role: 'user', phone: '' })
     setShowPassword(false)
+    setShowRoleWarning(false)
+  }
+
+  const handleCloseResetModal = () => {
+    setShowResetPasswordModal(false)
+    setResetPasswordUser(null)
+    setNewPassword('')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,6 +93,13 @@ export default function UsersPage() {
       return
     }
 
+    // Warn if creating/updating to admin role
+    if (formData.role === 'admin' && (!editingUser || editingUser.role !== 'admin')) {
+      if (!window.confirm('⚠️ Warning: You are about to grant ADMIN privileges. This user will have full system access. Are you sure?')) {
+        return
+      }
+    }
+
     try {
       if (editingUser) {
         const updateData: UpdateUserRequest = {
@@ -80,6 +109,7 @@ export default function UsersPage() {
           phone: formData.phone
         }
         await updateUser.mutateAsync({ id: editingUser._id!, data: updateData })
+        toast.success('User updated successfully')
       } else {
         const createData: CreateUserRequest = {
           name: formData.name,
@@ -89,10 +119,29 @@ export default function UsersPage() {
           phone: formData.phone
         }
         await createUser.mutateAsync(createData)
+        toast.success('User created successfully')
       }
       handleCloseModal()
     } catch (error) {
       // Error handled in mutation
+    }
+  }
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordUser || !newPassword) return
+    
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters')
+      return
+    }
+
+    try {
+      const { resetUserPassword } = await import('@/lib/api')
+      await resetUserPassword(resetPasswordUser._id!, newPassword)
+      toast.success(`Password reset for ${resetPasswordUser.name}`)
+      handleCloseResetModal()
+    } catch (error) {
+      // Error handled in API
     }
   }
 
@@ -101,8 +150,9 @@ export default function UsersPage() {
       toast.error('Cannot delete your own account')
       return
     }
-    if (confirm(`Are you sure you want to delete ${user.name}?`)) {
+    if (confirm(`⚠️ Are you sure you want to delete ${user.name}? This action cannot be undone.`)) {
       await deleteUser.mutateAsync(user._id!)
+      toast.success('User deleted successfully')
     }
   }
 
@@ -112,6 +162,62 @@ export default function UsersPage() {
       return
     }
     await toggleUserStatus.mutateAsync(user._id!)
+    toast.success(`User ${user.isActive ? 'deactivated' : 'activated'} successfully`)
+  }
+
+  const handleExportCSV = async () => {
+    try {
+      const blob = await exportUsersMutation.mutateAsync({
+        role: roleFilter || undefined,
+        isActive: statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined
+      })
+      
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `users-export-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      toast.success('Users exported successfully')
+    } catch (error) {
+      // Error handled in mutation
+    }
+  }
+
+  const handleBulkStatusUpdate = async (isActive: boolean) => {
+    if (selectedUsers.length === 0) {
+      toast.error('No users selected')
+      return
+    }
+
+    // Filter out current user
+    const filteredUsers = selectedUsers.filter(id => id !== currentUser?._id)
+    
+    if (filteredUsers.length === 0) {
+      toast.error('Cannot change your own status')
+      return
+    }
+
+    if (confirm(`Are you sure you want to ${isActive ? 'activate' : 'deactivate'} ${filteredUsers.length} user(s)?`)) {
+      try {
+        const { bulkUpdateUserStatus } = await import('@/lib/api')
+        await bulkUpdateUserStatus(filteredUsers, isActive)
+        toast.success(`${filteredUsers.length} user(s) updated`)
+        setSelectedUsers([])
+        refetch()
+      } catch (error) {
+        // Error handled in API
+      }
+    }
+  }
+
+  const copyUserId = (userId: string) => {
+    navigator.clipboard.writeText(userId)
+    setCopiedId(userId)
+    setTimeout(() => setCopiedId(null), 2000)
+    toast.success('User ID copied')
   }
 
   const getRoleIcon = (role: string) => {
@@ -138,6 +244,20 @@ export default function UsersPage() {
     setPage(1)
   }
 
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    )
+  }
+
+  const selectAllUsers = () => {
+    if (selectedUsers.length === users.length) {
+      setSelectedUsers([])
+    } else {
+      setSelectedUsers(users.map(u => u._id!).filter(id => id !== currentUser?._id))
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -157,16 +277,32 @@ export default function UsersPage() {
                 Manage customers, sales representatives, and administrators
               </p>
             </div>
-            {currentUser?.role === 'admin' && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowModal(true)}
-                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
-              >
-                <Plus className="w-5 h-5" />
-                Add User
-              </motion.button>
+            {isAdmin && (
+              <div className="flex gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleExportCSV}
+                  disabled={exportUsersMutation.isPending}
+                  className="flex items-center gap-2 px-5 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
+                >
+                  {exportUsersMutation.isPending ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Download className="w-5 h-5" />
+                  )}
+                  Export CSV
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowModal(true)}
+                  className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add User
+                </motion.button>
+              </div>
             )}
           </div>
         </motion.div>
@@ -176,7 +312,7 @@ export default function UsersPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"
         >
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
             <div className="flex items-center justify-between">
@@ -230,7 +366,58 @@ export default function UsersPage() {
               </div>
             </div>
           </div>
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Inactive</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
+                  {users.filter(u => !u.isActive).length}
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center">
+                <UserX className="w-5 h-5 text-red-600" />
+              </div>
+            </div>
+          </div>
         </motion.div>
+
+        {/* Bulk Actions Bar */}
+        {selectedUsers.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                {selectedUsers.length} user(s) selected
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleBulkStatusUpdate(true)}
+                className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+              >
+                <UserCheck className="w-4 h-4 inline mr-1" />
+                Activate
+              </button>
+              <button
+                onClick={() => handleBulkStatusUpdate(false)}
+                className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                <UserX className="w-4 h-4 inline mr-1" />
+                Deactivate
+              </button>
+              <button
+                onClick={() => setSelectedUsers([])}
+                className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Filters */}
         <motion.div
@@ -338,11 +525,22 @@ export default function UsersPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+                      {isAdmin && (
+                        <th className="px-4 py-4 w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.length === users.filter(u => u._id !== currentUser?._id).length && users.length > 0}
+                            onChange={selectAllUsers}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </th>
+                      )}
                       <th className="px-6 py-4 text-left font-semibold text-gray-600 dark:text-gray-400">User</th>
                       <th className="px-6 py-4 text-left font-semibold text-gray-600 dark:text-gray-400">Contact</th>
                       <th className="px-6 py-4 text-left font-semibold text-gray-600 dark:text-gray-400">Role</th>
                       <th className="px-6 py-4 text-left font-semibold text-gray-600 dark:text-gray-400">Status</th>
-                      <th className="px-6 py-4 text-left font-semibold text-gray-600 dark:text-gray-400">Last Login</th>
+                      <th className="px-6 py-4 text-left font-semibold text-gray-600 dark:text-gray-400">Provider</th>
+                      <th className="px-6 py-4 text-left font-semibold text-gray-600 dark:text-gray-400">Created</th>
                       <th className="px-6 py-4 text-right font-semibold text-gray-600 dark:text-gray-400">Actions</th>
                     </tr>
                   </thead>
@@ -356,6 +554,17 @@ export default function UsersPage() {
                         whileHover={{ backgroundColor: 'rgba(59, 130, 246, 0.02)' }}
                         className="transition-colors"
                       >
+                        {isAdmin && (
+                          <td className="px-4 py-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedUsers.includes(user._id!)}
+                              onChange={() => toggleUserSelection(user._id!)}
+                              disabled={user._id === currentUser?._id}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                            />
+                          </td>
+                        )}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
@@ -363,7 +572,17 @@ export default function UsersPage() {
                             </div>
                             <div>
                               <div className="font-semibold text-gray-900 dark:text-white">{user.name}</div>
-                              <div className="text-xs text-gray-500 font-mono">ID: {user._id?.slice(-8)}</div>
+                              <button
+                                onClick={() => copyUserId(user._id!)}
+                                className="text-xs text-gray-400 font-mono hover:text-blue-600 transition-colors flex items-center gap-1"
+                              >
+                                ID: {user._id?.slice(-8)}
+                                {copiedId === user._id ? (
+                                  <Check className="w-3 h-3 text-green-500" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
                             </div>
                           </div>
                         </td>
@@ -390,24 +609,56 @@ export default function UsersPage() {
                         <td className="px-6 py-4">
                           <button
                             onClick={() => handleToggleStatus(user)}
-                            disabled={currentUser?.role !== 'admin' || user._id === currentUser?._id}
+                            disabled={!isAdmin || user._id === currentUser?._id}
                             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
                               user.isActive
                                 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200'
                                 : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200'
-                            } ${currentUser?.role === 'admin' && user._id !== currentUser?._id ? 'cursor-pointer' : 'cursor-default'}`}
+                            } ${isAdmin && user._id !== currentUser?._id ? 'cursor-pointer' : 'cursor-default'}`}
                           >
                             {user.isActive ? <UserCheck className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
                             {user.isActive ? 'Active' : 'Inactive'}
                           </button>
                         </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+                            user.provider === 'google' 
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                              : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                          }`}>
+                            {user.provider === 'google' ? 'Google' : 'Local'}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
-                          {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Never'}
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {currentUser?.role === 'admin' && (
+                            {isAdmin && (
                               <>
+                                <button
+                                  onClick={() => {
+                                    setShowUserDetails(user)
+                                  }}
+                                  className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-all"
+                                  title="View details"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setResetPasswordUser(user)
+                                    setShowResetPasswordModal(true)
+                                  }}
+                                  disabled={user.provider === 'google'}
+                                  className="p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Reset password"
+                                >
+                                  <Key className="w-4 h-4" />
+                                </button>
                                 <button
                                   onClick={() => {
                                     setEditingUser(user)
@@ -499,6 +750,130 @@ export default function UsersPage() {
         </motion.div>
       </div>
 
+      {/* User Details Modal */}
+      <AnimatePresence>
+        {showUserDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUserDetails(null)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full"
+            >
+              <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">User Details</h2>
+                  <button onClick={() => setShowUserDetails(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">
+                    {showUserDetails.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{showUserDetails.name}</h3>
+                    <p className="text-sm text-gray-500">{showUserDetails.email}</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-gray-500">User ID</span>
+                    <span className="font-mono text-sm">{showUserDetails._id}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-gray-500">Role</span>
+                    <span className="capitalize">{showUserDetails.role}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-gray-500">Status</span>
+                    <span className={showUserDetails.isActive ? 'text-green-600' : 'text-red-600'}>
+                      {showUserDetails.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-gray-500">Provider</span>
+                    <span>{showUserDetails.provider || 'local'}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-gray-500">Phone</span>
+                    <span>{showUserDetails.phone || 'Not provided'}</span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-gray-500">Created</span>
+                    <span>{new Date(showUserDetails.createdAt!).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Reset Password Modal */}
+      <AnimatePresence>
+        {showResetPasswordModal && resetPasswordUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseResetModal} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full"
+            >
+              <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Reset Password</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-gray-600 dark:text-gray-400">
+                  Reset password for <strong>{resetPasswordUser.name}</strong> ({resetPasswordUser.email})
+                </p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      placeholder="Minimum 6 characters"
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={handleResetPassword}
+                    disabled={!newPassword || newPassword.length < 6}
+                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all disabled:opacity-50"
+                  >
+                    Reset Password
+                  </button>
+                  <button
+                    onClick={handleCloseResetModal}
+                    className="px-4 py-2.5 border border-gray-300 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Add/Edit User Modal */}
       <AnimatePresence>
         {showModal && (
@@ -514,10 +889,7 @@ export default function UsersPage() {
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   {editingUser ? 'Edit User' : 'Add New User'}
                 </h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                >
+                <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -532,7 +904,7 @@ export default function UsersPage() {
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     placeholder="John Doe"
                   />
                 </div>
@@ -546,7 +918,7 @@ export default function UsersPage() {
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     placeholder="john@example.com"
                   />
                 </div>
@@ -559,7 +931,7 @@ export default function UsersPage() {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     placeholder="+254 700 000 000"
                   />
                 </div>
@@ -568,14 +940,27 @@ export default function UsersPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                     Role *
                   </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'user' | 'sales' | 'admin' })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                >
+                  <select
+                    value={formData.role}
+                    onChange={(e) => {
+                      const newRole = e.target.value as 'user' | 'sales' | 'admin'
+                      setFormData({ ...formData, role: newRole })
+                      if (newRole === 'admin' && (!editingUser || editingUser.role !== 'admin')) {
+                        setShowRoleWarning(true)
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  >
                     <option value="user">Customer</option>
                     <option value="sales">Sales Representative</option>
+                    <option value="admin">Administrator</option>
                   </select>
+                  {showRoleWarning && formData.role === 'admin' && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      Admin users have full system access
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -589,13 +974,13 @@ export default function UsersPage() {
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       required={!editingUser}
                       minLength={6}
-                      className="w-full px-4 py-2.5 pr-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full px-4 py-2.5 pr-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       placeholder={editingUser ? 'Leave blank to keep current' : 'Minimum 6 characters'}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -609,7 +994,7 @@ export default function UsersPage() {
                   <button
                     type="submit"
                     disabled={createUser.isPending || updateUser.isPending}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all disabled:opacity-50"
                   >
                     {createUser.isPending || updateUser.isPending ? (
                       <Loader2 className="w-5 h-5 animate-spin mx-auto" />

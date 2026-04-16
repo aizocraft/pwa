@@ -182,31 +182,43 @@ export const useCartStore = create<CartState>()(
         return state.items.find(item => item.id === id)?.qty || 0;
       },
 
-      async loadShippingAreas() {
-        const { getShippingAreas, getPublicShippingAreas } = await import('../lib/api');
-        const { getToken } = await import('../lib/auth');
-        try {
-          set({ loading: true });
-          
-          let result;
-          if (getToken()) {
-            // Logged-in user: full admin areas
-            result = await getShippingAreas();
-          } else {
-            // Guest user: public areas only
-            const areas = await getPublicShippingAreas();
-            result = { areas }; // Normalize shape
-          }
-          
-          const areas = result.areas || [];
-          set({ shippingAreas: areas.filter((a: ShippingArea) => a.isActive) });
-          console.log('✅ Shipping areas loaded:', areas.length, getToken() ? '(logged-in)' : '(guest)');
-        } catch (error) {
-          console.error('Failed to load shipping areas:', error);
-        } finally {
-          set({ loading: false });
-        }
-      },
+    async loadShippingAreas() {
+  const { getShippingAreas, getPublicShippingAreas } = await import('../lib/api');
+  const { getToken, getUser } = await import('../lib/auth');
+  
+  try {
+    set({ loading: true });
+    
+    const token = getToken();
+    const user = getUser();
+    
+    // ✅ Only admin or sales can use admin endpoint
+    const isAdminOrSales = user?.role === 'admin' || user?.role === 'sales';
+    
+    let result;
+    
+    if (token && isAdminOrSales) {
+      // ✅ Admin/Sales: use admin endpoint (has full access)
+      result = await getShippingAreas();
+      console.log('📦 Loading shipping areas (admin mode)');
+    } else {
+      // ✅ Customers (logged in) & Guests: use public endpoint
+      const areas = await getPublicShippingAreas();
+      result = { areas }; // Normalize shape
+      console.log('📦 Loading shipping areas (public mode)', token ? '(logged-in customer)' : '(guest)');
+    }
+    
+    const areas = result.areas || [];
+    set({ shippingAreas: areas.filter((a: ShippingArea) => a.isActive) });
+    
+    console.log('✅ Shipping areas loaded:', areas.length);
+  } catch (error: any) {
+    console.error('Failed to load shipping areas:', error);
+    set({ shippingAreas: [] });
+  } finally {
+    set({ loading: false });
+  }
+},
 
       setShippingArea: async (id?: string) => {
         set({ selectedShippingAreaId: id });
