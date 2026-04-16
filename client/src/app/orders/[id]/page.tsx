@@ -575,9 +575,9 @@ export default function UserOrderDetails() {
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-blue-500/5 to-purple-500/10"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-            <Link 
+<Link 
               href="/orders"
-              className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all duration-300 mb-6 group"
+              className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-300 mb-6 group"
             >
               <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-300" />
               <span className="font-medium">Back to Orders</span>
@@ -794,11 +794,11 @@ export default function UserOrderDetails() {
          {/* Action Buttons */}
 <div className="no-print grid grid-cols-2 gap-3 sm:gap-4">
   {/* Back to Orders Button */}
-  <Link href="/orders" className="w-full">
+              <Link href="/orders" className="w-full">
     <motion.button
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className="w-full flex items-center justify-center gap-2 px-4 py-3 sm:p-4 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-semibold rounded-xl shadow-lg transition-all duration-300 text-sm sm:text-base"
+      className="w-full flex items-center justify-center gap-2 px-4 py-3 sm:p-4 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:shadow-blue-500/25 transition-all duration-300 text-sm sm:text-base"
     >
       <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
       Back to Orders

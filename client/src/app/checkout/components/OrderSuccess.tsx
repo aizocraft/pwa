@@ -40,9 +40,9 @@ export default function OrderSuccess({ orderId }: OrderSuccessProps) {
           </div>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
+              <button
               onClick={() => router.push(`/orders/${orderId}`)}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 group"
+              className="px-6 py-3 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl hover:shadow-blue-500/25 hover:scale-[1.02] flex items-center justify-center gap-2 group"
             >
               <Package className="w-5 h-5" />
               View Order Details

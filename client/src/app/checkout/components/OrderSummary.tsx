@@ -158,7 +158,7 @@ const promoValid = cart.promoValid
             )}
 
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600 dark:text-gray-400">Tax (16% VAT)</span>
+            <span className="text-gray-600 dark:text-gray-400">Tax (VAT)</span>
             <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(tax)}</span>
           </div>
 
