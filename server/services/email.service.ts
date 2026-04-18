@@ -543,3 +543,29 @@ export const sendPasswordResetEmail = async (email: string, resetToken: string) 
     `
   });
 };
+
+// Payment confirmation email
+export const sendPaymentConfirmation = async (data: {
+  email: string;
+  customerName: string;
+  orderNumber: string;
+  amount: number;
+  transactionId?: string;
+  paymentMethod: string;
+  items: Array<{ name: string; quantity: number; price: number }>;
+}) => {
+  // Implement your email sending logic
+  console.log(`Payment confirmation sent to ${data.email} for order ${data.orderNumber}`);
+};
+
+// Payment failed notification
+export const sendPaymentFailedNotification = async (data: {
+  email: string;
+  customerName: string;
+  orderNumber: string;
+  amount: number;
+  reason?: string;
+}) => {
+  // Implement your email sending logic
+  console.log(`Payment failure notification sent to ${data.email} for order ${data.orderNumber}`);
+};

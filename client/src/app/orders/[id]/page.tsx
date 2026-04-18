@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getOrder, cancelOrder } from '@/lib/api'
@@ -708,21 +709,19 @@ export default function UserOrderDetails() {
                     className="p-4 sm:p-6 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-all duration-300"
                   >
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                      <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-50/80 via-white to-gray-50/80 dark:from-slate-800/60 dark:via-gray-900/30 dark:to-slate-800/60 shadow-lg ring-1 ring-gray-200/50 dark:ring-gray-700/50 hover:shadow-xl hover:ring-emerald-200/50 dark:hover:ring-emerald-400/30 mx-auto sm:mx-0 group/image transition-all duration-500 hover:scale-105">
-                        <img 
-                          src={item.image || '/logo.png'}
-                          alt={item.name}
-                          className="w-full h-full object-cover group-hover/image:scale-110 transition-transform duration-500"
-                          onError={(e) => {
-                            ;(e.target as HTMLImageElement).src = '/logo.png'
-                          }}
-                          loading="lazy"
-                          draggable={false}
-                        />
-                        {item.image && !item.image.startsWith('http') && (
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                        )}
-                      </div>
+<div className="relative flex-shrink-0 w-40 h-40 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-50/70 via-white to-gray-50/70 dark:from-slate-800/50 dark:via-gray-900/20 dark:to-slate-800/50 shadow-lg ring-1 ring-gray-200/50 dark:ring-gray-700/50 hover:shadow-2xl hover:ring-emerald-200/50 dark:hover:ring-emerald-400/30 group/image transition-all duration-500 hover:scale-105 hover:rotate-1 hover:shadow-emerald-500/10 mx-auto sm:mx-0">
+                          <Image
+                            src={item.image || '/logo.png'}
+                            alt={item.name}
+                            fill
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 224px, 224px"
+                            className="object-cover transition-transform duration-500 group-hover/image:scale-110"
+                            priority={index === 0}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/logo.png'
+                            }}
+                          />
+                        </div>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">

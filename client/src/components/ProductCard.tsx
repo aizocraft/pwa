@@ -8,6 +8,7 @@ import { Product } from '../types/product';
 import { useCartStore } from '../store/cart';
 import { cn, formatCurrency } from '../lib/utils';
 import { useState } from 'react';
+import { getImageUrl } from '../lib/api';
 
 interface ProductCardProps {
   product: Product;
@@ -90,7 +91,7 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
             <div className="absolute inset-0 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 animate-shimmer" />
           )}
           <Image
-            src={product.images[0] || '/placeholder-solar.jpg'}
+            src={getImageUrl(product.images[0] || { type: 'url', url: '/placeholder-solar.jpg' })}
             alt={product.name}
             fill
             className={cn(

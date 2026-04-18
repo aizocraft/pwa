@@ -26,8 +26,9 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { getProduct, updateProduct } from '@/lib/api'
-import { Product } from '@/types/product'
+import { getImageUrl, getProduct, updateProduct, uploadProductImages } from '@/lib/api'
+import { useDropzone } from 'react-dropzone'
+import type { Product } from '@/types/product'
 
 export default function EditProductPage() {
   const router = useRouter()
@@ -47,7 +48,7 @@ export default function EditProductPage() {
     category: '',
     stock: '',
     featured: false,
-    images: [''] as string[],
+        images: [] as string[],
     tags: [] as string[],
     specifications: {} as Record<string, string>,
     brand: '',
@@ -59,6 +60,9 @@ export default function EditProductPage() {
   const [specKey, setSpecKey] = useState('')
   const [specValue, setSpecValue] = useState('')
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({})
+  const [images, setImages] = useState<File[]>([])
+  const [previewImages, setPreviewImages] = useState<string[]>([])
+  const [showImageUpload, setShowImageUpload] = useState(false)
 
   // Fetch product data using slug
   const { data: product, isLoading, error } = useQuery({
@@ -79,7 +83,7 @@ export default function EditProductPage() {
         category: product.category || '',
         stock: product.stock?.toString() || '',
         featured: product.featured || false,
-        images: product.images?.length ? product.images : [''],
+        images: product.images?.map(img => getImageUrl(img)) || [],
         tags: product.tags || [],
         specifications: product.specs || {},
         brand: product.brand || '',
@@ -161,6 +165,41 @@ export default function EditProductPage() {
     }
   }, [formData.images, imageErrors])
 
+  // Drag drop handlers
+  const onDropEdit = useCallback((acceptedFiles: File[]) => {
+    setImages(prev => [...prev, ...acceptedFiles]);
+    const newPreviews = acceptedFiles.map(file => URL.createObjectURL(file));
+    setPreviewImages(prev => [...prev, ...newPreviews]);
+  }, []);
+
+  const { getRootProps: getRootPropsEdit, getInputProps: getInputPropsEdit, isDragActive: isDragActiveEdit } = useDropzone({
+    onDrop: onDropEdit,
+    accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.gif'] },
+    maxFiles: 6,
+  });
+
+  const handleImageUploadRemove = (index: number) => {
+    const file = images[index];
+    if (file) URL.revokeObjectURL(previewImages[index]);
+    setImages(prev => prev.filter((_, i) => i !== index));
+    setPreviewImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadAndAddImages = async () => {
+    if (images.length > 0) {
+      try {
+        const uploaded = await uploadProductImages(product?._id!, images);
+        const newImageUrls = uploaded.map(img => getImageUrl(img));
+        setFormData(prev => ({ ...prev, images: [...prev.images, ...newImageUrls] }));
+        setImages([]);
+        setPreviewImages([]);
+        toast.success('Images uploaded');
+      } catch (error) {
+        toast.error('Upload failed');
+      }
+    }
+  };
+
   const addImage = useCallback(() => {
     setFormData(prev => ({ ...prev, images: [...prev.images, ''] }))
   }, [])
@@ -229,7 +268,7 @@ export default function EditProductPage() {
       rating: formData.rating || 0,
     }
 
-    updateMutation.mutate({ id: product._id, data: productData })
+    updateMutation.mutate({ id: productSlug, data: productData })
   }, [formData, product, updateMutation])
 
   const sections = [
@@ -562,51 +601,95 @@ export default function EditProductPage() {
                 </div>
               </div>
               <div className="p-5 sm:p-6">
-                <div className="space-y-3">
-                  {formData.images.map((image, index) => (
-                    <div key={index} className="flex gap-3 items-start group animate-in fade-in slide-in-from-left duration-300">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Upload className="w-4 h-4 text-gray-400" />
-                          <input
-                            type="url"
-                            value={image}
-                            onChange={(e) => updateImage(index, e.target.value)}
-                            className={`flex-1 px-4 py-2.5 border rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 transition-all ${
-                              imageErrors[index] 
-                                ? 'border-red-300 focus:ring-red-500' 
-                                : 'border-gray-300 dark:border-gray-600'
-                            }`}
-                            placeholder="https://example.com/image.jpg"
-                          />
-                        </div>
-                        {imageErrors[index] && (
-                          <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            Invalid image URL
-                          </p>
-                        )}
+                {/* Toggle between URL and Upload */}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Image Management</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowImageUpload(!showImageUpload)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+                  >
+                    {showImageUpload ? 'Switch to URLs' : 'Upload Images'}
+                  </button>
+                </div>
+
+                {showImageUpload ? (
+                  <>
+                    <div {...getRootPropsEdit()} className={`p-6 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all mb-4 ${
+                      isDragActiveEdit 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-300 hover:border-blue-400'
+                    }`}>
+                      <input {...getInputPropsEdit()} />
+                      <Upload className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                      <p>{isDragActiveEdit ? 'Drop files here' : 'Drag & drop or click to upload images'}</p>
+                    </div>
+                    {previewImages.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        {previewImages.map((preview, index) => (
+                          <div key={index} className="relative">
+                            <img src={preview} alt="Preview" className="w-full h-20 object-cover rounded-lg" />
+                            <button
+                              onClick={() => handleImageUploadRemove(index)}
+                              className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full text-xs"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                      {index > 0 && (
+                    )}
+                    <button
+                      onClick={uploadAndAddImages}
+                      disabled={images.length === 0}
+                      className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    >
+                      Upload {images.length} image{images.length !== 1 ? 's' : ''}
+                    </button>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    {formData.images.map((image, index) => (
+                      <div key={index} className="flex gap-3 items-start group">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Upload className="w-4 h-4 text-gray-400" />
+                            <input
+                              type="url"
+                              value={image}
+                              onChange={(e) => updateImage(index, e.target.value)}
+                              className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                                imageErrors[index] 
+                                  ? 'border-red-300 focus:ring-red-500 bg-red-50' 
+                                  : 'border-gray-300'
+                              }`}
+                              placeholder="https://example.com/image.jpg"
+                              onError={() => handleImageError(index)}
+                            />
+                          </div>
+                          {imageErrors[index] && (
+                            <p className="text-xs text-red-500 mt-1">Invalid image URL</p>
+                          )}
+                        </div>
                         <button
                           type="button"
                           onClick={() => removeImage(index)}
-                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg transition-all duration-200 hover:scale-110"
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={addImage}
-                    className="group flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium transition-all duration-200 hover:translate-x-1"
-                  >
-                    <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    Add another image
-                  </button>
-                </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addImage}
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add URL image
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </section>

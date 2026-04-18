@@ -7,7 +7,7 @@ import Link from "next/link"
 import { useSearchParams } from 'next/navigation'
 import { Product } from "../../types/product"
 import ProductCard from "../../components/ProductCard"
-import { getProducts, getBrands } from "../../lib/api"
+import { getProducts, getBrands, getImageUrl } from "../../lib/api"
 import { useCartStore } from "../../store/cart"
 
 export default function ProductsPage() {
@@ -692,7 +692,7 @@ export default function ProductsPage() {
                 {viewMode === "grid" ? (
                   <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
                     {products.map((product: Product, index: number) => (
-                      <div key={product._id} className="group">
+                    <div key={product._id} className="group">
                         <ProductCard product={product} />
                       </div>
                     ))}

@@ -2,137 +2,43 @@
 'use client'
 
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { 
   CreditCard, Search, Filter, Download, RefreshCw,
   DollarSign, Calendar, Clock, User, Mail, Phone,
   CheckCircle, XCircle, AlertCircle, Loader2,
   ChevronLeft, ChevronRight, Eye, Smartphone,
   Truck, Building2, Receipt, FileText, Copy,
-  ChevronDown, TrendingUp, TrendingDown, Wallet
+  ChevronDown, TrendingUp, TrendingDown, Wallet, X
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { getTransactions, getTransactionStats } from '@/lib/api'
 
 // Types
 interface Transaction {
-  id: string
-  orderId: string
-  orderNumber: string
+  _id: string
+  orderId: string | { orderNumber: string }
+  transactionId: string
   customerName: string
-  customerEmail: string
-  customerPhone: string
+  guestEmail?: string
+  guestPhone?: string
   amount: number
   currency: string
   paymentMethod: 'mpesa' | 'card' | 'cod'
-  status: 'completed' | 'pending' | 'failed' | 'refunded'
-  transactionId: string
+  status: 'pending' | 'completed' | 'failed' | 'refunded'
   mpesaReceipt?: string
   cardLast4?: string
   cardBrand?: string
   createdAt: string
   updatedAt: string
-  metadata?: Record<string, any>
-}
-
-// Mock data
-const mockTransactions: Transaction[] = [
-  {
-    id: '1',
-    orderId: 'order_1',
-    orderNumber: 'ORD-12345',
-    customerName: 'John Doe',
-    customerEmail: 'john@example.com',
-    customerPhone: '+254 712 345 678',
-    amount: 299.99,
-    currency: 'USD',
-    paymentMethod: 'mpesa',
-    status: 'completed',
-    transactionId: 'MPESA_TX_001',
-    mpesaReceipt: 'QK4L9X2M7P',
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 5).toISOString()
-  },
-  {
-    id: '2',
-    orderId: 'order_2',
-    orderNumber: 'ORD-12346',
-    customerName: 'Jane Smith',
-    customerEmail: 'jane@example.com',
-    customerPhone: '+254 723 456 789',
-    amount: 149.99,
-    currency: 'USD',
-    paymentMethod: 'card',
-    status: 'completed',
-    transactionId: 'CARD_TX_002',
-    cardLast4: '4242',
-    cardBrand: 'Visa',
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString()
-  },
-  {
-    id: '3',
-    orderId: 'order_3',
-    orderNumber: 'ORD-12347',
-    customerName: 'Michael Otieno',
-    customerEmail: 'michael@example.com',
-    customerPhone: '+254 734 567 890',
-    amount: 599.99,
-    currency: 'USD',
-    paymentMethod: 'mpesa',
-    status: 'pending',
-    transactionId: 'MPESA_TX_003',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60).toISOString()
-  },
-  {
-    id: '4',
-    orderId: 'order_4',
-    orderNumber: 'ORD-12348',
-    customerName: 'Sarah Wanjiku',
-    customerEmail: 'sarah@example.com',
-    customerPhone: '+254 745 678 901',
-    amount: 89.99,
-    currency: 'USD',
-    paymentMethod: 'cod',
-    status: 'completed',
-    transactionId: 'COD_TX_004',
-    createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 120).toISOString()
-  },
-  {
-    id: '5',
-    orderId: 'order_5',
-    orderNumber: 'ORD-12349',
-    customerName: 'David Kimani',
-    customerEmail: 'david@example.com',
-    customerPhone: '+254 756 789 012',
-    amount: 449.99,
-    currency: 'USD',
-    paymentMethod: 'card',
-    status: 'failed',
-    transactionId: 'CARD_TX_005',
-    cardLast4: '1111',
-    cardBrand: 'Mastercard',
-    createdAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 180).toISOString()
-  },
-  {
-    id: '6',
-    orderId: 'order_6',
-    orderNumber: 'ORD-12350',
-    customerName: 'Grace Muthoni',
-    customerEmail: 'grace@example.com',
-    customerPhone: '+254 767 890 123',
-    amount: 199.99,
-    currency: 'USD',
-    paymentMethod: 'mpesa',
-    status: 'refunded',
-    transactionId: 'MPESA_TX_006',
-    mpesaReceipt: 'RFND9L2X8Q',
-    createdAt: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60).toISOString()
+  orderNumber?: string
+  customerInfo?: {
+    name: string
+    email: string
+    phone: string
   }
-]
+}
 
 export default function TransactionsPage() {
   const [search, setSearch] = useState('')
@@ -140,39 +46,100 @@ export default function TransactionsPage() {
   const [methodFilter, setMethodFilter] = useState('')
   const [dateRange, setDateRange] = useState({ start: '', end: '' })
   const [page, setPage] = useState(1)
-  const [isLoading, setIsLoading] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
-  const itemsPerPage = 10
 
-  // Filter transactions
-  const filteredTransactions = mockTransactions.filter(tx => {
-    const matchesSearch = search === '' || 
-      tx.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
-      tx.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      tx.customerEmail.toLowerCase().includes(search.toLowerCase()) ||
-      tx.transactionId.toLowerCase().includes(search.toLowerCase())
-    
-    const matchesStatus = statusFilter === '' || tx.status === statusFilter
-    const matchesMethod = methodFilter === '' || tx.paymentMethod === methodFilter
-    
-    const matchesDate = (!dateRange.start || new Date(tx.createdAt) >= new Date(dateRange.start)) &&
-      (!dateRange.end || new Date(tx.createdAt) <= new Date(dateRange.end))
-    
-    return matchesSearch && matchesStatus && matchesMethod && matchesDate
+  // Real API queries
+  const transactionsQuery = useQuery({
+    queryKey: ['transactions', { 
+      page, 
+      search, 
+      status: statusFilter, 
+      paymentMethod: methodFilter,
+      startDate: dateRange.start,
+      endDate: dateRange.end
+    }],
+    queryFn: () => getTransactions({
+      page,
+      limit: 20,
+      search: search || undefined,
+      status: statusFilter || undefined,
+      paymentMethod: methodFilter || undefined,
+    }),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
-  // Pagination
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage)
-  const paginatedTransactions = filteredTransactions.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+  const statsQuery = useQuery({
+    queryKey: ['transactionStats'],
+    queryFn: getTransactionStats,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  })
 
-  // Statistics
-  const stats = {
-    total: mockTransactions.reduce((sum, tx) => sum + tx.amount, 0),
-    completed: mockTransactions.filter(tx => tx.status === 'completed').reduce((sum, tx) => sum + tx.amount, 0),
-    pending: mockTransactions.filter(tx => tx.status === 'pending').reduce((sum, tx) => sum + tx.amount, 0),
-    failed: mockTransactions.filter(tx => tx.status === 'failed').reduce((sum, tx) => sum + tx.amount, 0),
-    refunded: mockTransactions.filter(tx => tx.status === 'refunded').reduce((sum, tx) => sum + tx.amount, 0),
-    count: mockTransactions.length
+  const transactions = transactionsQuery.data?.transactions || []
+const stats = statsQuery.data?.summary || {
+  totalVolume: 0,
+  totalTransactions: 0,
+  completed: 0,
+  pending: 0,
+  failed: 0,
+  refunded: 0,
+  mpesaCount: 0,
+  cardCount: 0,
+  codCount: 0,
+  completedVolume: 0,
+  successRate: 0  
+}
+  const pagination = transactionsQuery.data?.pagination || { 
+    current: 1, 
+    pages: 1, 
+    total: 0, 
+    limit: 20
+  } as any
+  
+  const isLoading = transactionsQuery.isLoading || statsQuery.isLoading
+
+  const handleRefresh = () => {
+    transactionsQuery.refetch()
+    statsQuery.refetch()
+    toast.success('Transactions refreshed')
+  }
+
+  const handleExport = async () => {
+    try {
+      const { exportTransactionsToCSV } = await import('@/lib/api')
+      const blob = await exportTransactionsToCSV({
+        status: statusFilter || undefined,
+        paymentMethod: methodFilter || undefined,
+        startDate: dateRange.start || undefined,
+        endDate: dateRange.end || undefined
+      })
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `transactions-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      
+      toast.success('Export completed')
+    } catch (error) {
+      toast.error('Failed to export transactions')
+    }
+  }
+
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id)
+    toast.success('Transaction ID copied')
+  }
+
+  const clearFilters = () => {
+    setSearch('')
+    setStatusFilter('')
+    setMethodFilter('')
+    setDateRange({ start: '', end: '' })
+    setPage(1)
   }
 
   const getStatusConfig = (status: string) => {
@@ -209,28 +176,23 @@ export default function TransactionsPage() {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   }
 
-  const handleRefresh = async () => {
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsLoading(false)
-    toast.success('Transactions refreshed')
-  }
-
-  const handleExport = () => {
-    toast.success('Export started. You will be notified when ready.')
-  }
-
-  const handleCopyId = (id: string) => {
-    navigator.clipboard.writeText(id)
-    toast.success('Transaction ID copied')
-  }
-
-  const clearFilters = () => {
-    setSearch('')
-    setStatusFilter('')
-    setMethodFilter('')
-    setDateRange({ start: '', end: '' })
-    setPage(1)
+  const getTransactionDisplay = (tx: Transaction) => {
+    return {
+      id: tx._id,
+      transactionId: tx.transactionId,
+      orderNumber: tx.orderNumber || (typeof tx.orderId === 'object' ? tx.orderId?.orderNumber : 'N/A'),
+      customerName: tx.customerInfo?.name || tx.customerName,
+      customerEmail: tx.customerInfo?.email || tx.guestEmail || 'N/A',
+      customerPhone: tx.customerInfo?.phone || tx.guestPhone || 'N/A',
+      amount: tx.amount,
+      currency: tx.currency,
+      paymentMethod: tx.paymentMethod,
+      status: tx.status,
+      mpesaReceipt: tx.mpesaReceipt,
+      cardLast4: tx.cardLast4,
+      cardBrand: tx.cardBrand,
+      createdAt: tx.createdAt
+    }
   }
 
   return (
@@ -284,7 +246,7 @@ export default function TransactionsPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Total Volume</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  ${stats.total.toLocaleString()}
+                  KES {stats.totalVolume?.toLocaleString() || 0}
                 </p>
               </div>
               <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
@@ -296,9 +258,9 @@ export default function TransactionsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Completed</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-                  ${stats.completed.toLocaleString()}
-                </p>
+                 <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+          KES {stats.completed?.toLocaleString() || 0}
+        </p>
               </div>
               <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-green-600" />
@@ -310,7 +272,7 @@ export default function TransactionsPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Pending</p>
                 <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">
-                  ${stats.pending.toLocaleString()}
+                  {stats.pending || 0}
                 </p>
               </div>
               <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl flex items-center justify-center">
@@ -323,7 +285,7 @@ export default function TransactionsPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Failed</p>
                 <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-                  ${stats.failed.toLocaleString()}
+                  {stats.failed || 0}
                 </p>
               </div>
               <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center">
@@ -334,10 +296,10 @@ export default function TransactionsPage() {
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Transactions</p>
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
-                  {stats.count}
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Success Rate</p>
+                      <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+          {(stats as any).successRate || '0'}%
+        </p>
               </div>
               <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
                 <Receipt className="w-5 h-5 text-purple-600" />
@@ -416,7 +378,7 @@ export default function TransactionsPage() {
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
             </div>
-          ) : paginatedTransactions.length === 0 ? (
+          ) : transactions.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CreditCard className="w-8 h-8 text-gray-400" />
@@ -443,15 +405,16 @@ export default function TransactionsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {paginatedTransactions.map((tx, index) => {
-                      const StatusIcon = getStatusConfig(tx.status).icon
-                      const statusConfig = getStatusConfig(tx.status)
-                      const MethodIcon = getMethodConfig(tx.paymentMethod).icon
-                      const methodConfig = getMethodConfig(tx.paymentMethod)
+                    {transactions.map((tx: Transaction, index: number) => {
+                      const display = getTransactionDisplay(tx)
+                      const StatusIcon = getStatusConfig(display.status).icon
+                      const statusConfig = getStatusConfig(display.status)
+                      const MethodIcon = getMethodConfig(display.paymentMethod).icon
+                      const methodConfig = getMethodConfig(display.paymentMethod)
                       
                       return (
                         <motion.tr
-                          key={tx.id}
+                          key={display.id}
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: index * 0.05 }}
@@ -462,25 +425,25 @@ export default function TransactionsPage() {
                           <td className="px-6 py-4">
                             <div>
                               <div className="font-mono font-medium text-gray-900 dark:text-white">
-                                {tx.transactionId.slice(0, 12)}...
+                                {display.transactionId.slice(0, 12)}...
                               </div>
                               <div className="text-xs text-gray-500 mt-0.5">
-                                Order: {tx.orderNumber}
+                                Order: {display.orderNumber}
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4">
                             <div>
-                              <div className="font-medium text-gray-900 dark:text-white">{tx.customerName}</div>
-                              <div className="text-xs text-gray-500">{tx.customerEmail}</div>
-                              <div className="text-xs text-gray-500">{tx.customerPhone}</div>
+                              <div className="font-medium text-gray-900 dark:text-white">{display.customerName}</div>
+                              <div className="text-xs text-gray-500">{display.customerEmail}</div>
+                              <div className="text-xs text-gray-500">{display.customerPhone}</div>
                             </div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="font-bold text-gray-900 dark:text-white">
-                              ${tx.amount.toLocaleString()}
+                              KES {display.amount.toLocaleString()}
                             </div>
-                            <div className="text-xs text-gray-500">{tx.currency}</div>
+                            <div className="text-xs text-gray-500">{display.currency}</div>
                           </td>
                           <td className="px-6 py-4">
                             <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${methodConfig.bg}`}>
@@ -489,31 +452,31 @@ export default function TransactionsPage() {
                                 {methodConfig.label}
                               </span>
                             </div>
-                            {tx.cardLast4 && (
+                            {display.cardLast4 && (
                               <div className="text-xs text-gray-500 mt-1">
-                                •••• {tx.cardLast4}
+                                •••• {display.cardLast4}
                               </div>
                             )}
-                            {tx.mpesaReceipt && (
+                            {display.mpesaReceipt && (
                               <div className="text-xs text-gray-500 mt-1">
-                                Receipt: {tx.mpesaReceipt}
+                                Receipt: {display.mpesaReceipt}
                               </div>
                             )}
-                           </td>
+                          </td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
                               <StatusIcon className="w-3 h-3" />
                               {statusConfig.label}
                             </span>
-                           </td>
+                          </td>
                           <td className="px-6 py-4 text-gray-500">
-                            {formatDate(tx.createdAt)}
-                           </td>
+                            {formatDate(display.createdAt)}
+                          </td>
                           <td className="px-6 py-4 text-right">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handleCopyId(tx.transactionId)
+                                handleCopyId(display.transactionId)
                               }}
                               className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
                             >
@@ -528,37 +491,37 @@ export default function TransactionsPage() {
               </div>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {pagination.pages > 1 && (
                 <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50/30 dark:bg-gray-900/30">
                   <div className="text-sm text-gray-500">
-                    Showing {((page - 1) * itemsPerPage) + 1} to {Math.min(page * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+                    Showing {((pagination.current - 1) * pagination.limit) + 1} to {Math.min(pagination.current * pagination.limit, pagination.total)} of {pagination.total} transactions
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      disabled={page === 1}
+                      disabled={!pagination.hasPrev}
                       onClick={() => setPage(p => p - 1)}
                       className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
                         let pageNum: number
-                        if (totalPages <= 5) {
+                        if (pagination.pages <= 5) {
                           pageNum = i + 1
-                        } else if (page <= 3) {
+                        } else if (pagination.current <= 3) {
                           pageNum = i + 1
-                        } else if (page >= totalPages - 2) {
-                          pageNum = totalPages - 4 + i
+                        } else if (pagination.current >= pagination.pages - 2) {
+                          pageNum = pagination.pages - 4 + i
                         } else {
-                          pageNum = page - 2 + i
+                          pageNum = pagination.current - 2 + i
                         }
                         return (
                           <button
                             key={pageNum}
                             onClick={() => setPage(pageNum)}
                             className={`w-8 h-8 rounded-lg text-sm font-medium transition-all ${
-                              page === pageNum
+                              pagination.current === pageNum
                                 ? 'bg-blue-600 text-white shadow-sm'
                                 : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
                             }`}
@@ -569,7 +532,7 @@ export default function TransactionsPage() {
                       })}
                     </div>
                     <button
-                      disabled={page === totalPages}
+                      disabled={!pagination.hasNext}
                       onClick={() => setPage(p => p + 1)}
                       className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
@@ -610,12 +573,14 @@ export default function TransactionsPage() {
                 </div>
                 <div>
                   <label className="text-xs text-gray-500">Order Number</label>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedTransaction.orderNumber}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {selectedTransaction.orderNumber || (typeof selectedTransaction.orderId === 'object' ? selectedTransaction.orderId?.orderNumber : 'N/A')}
+                  </p>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500">Amount</label>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    ${selectedTransaction.amount.toLocaleString()} {selectedTransaction.currency}
+                    KES {selectedTransaction.amount.toLocaleString()} {selectedTransaction.currency}
                   </p>
                 </div>
                 <div>
@@ -662,6 +627,3 @@ export default function TransactionsPage() {
     </div>
   )
 }
-
-// Missing import
-import { X } from 'lucide-react'

@@ -1,5 +1,13 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
+export interface Image {
+  type: 'url' | 'gridfs';
+  url?: string;
+  fileId?: mongoose.Types.ObjectId;
+  filename?: string;
+  mimeType?: string;
+}
+
 export interface IProduct extends Document {
   name: string;
   slug: string;
@@ -10,13 +18,29 @@ export interface IProduct extends Document {
   description?: string;
   specs: any;
   stock: number;
-  images: string[];
+  images: Image[];
   featured: boolean;
   rating: number;
   tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const ImageSchema = new Schema({
+  type: { 
+    type: String, 
+    enum: ['url', 'gridfs'],
+    default: 'url',
+    required: true
+  },
+  url: { type: String },
+  fileId: { 
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'fs.files'
+  },
+  filename: String,
+  mimeType: String
+});
 
 const productSchema = new Schema<IProduct>({
   name: { type: String, required: true },
@@ -28,12 +52,23 @@ const productSchema = new Schema<IProduct>({
   description: { type: String },
   specs: { type: Schema.Types.Mixed, default: {} },
   stock: { type: Number, default: 0 },
-  images: { type: [String], default: [] },
+  images: [ImageSchema],
   featured: { type: Boolean, default: false },
   rating: { type: Number, default: 0, min: 0, max: 5 },
   tags: { type: [String], default: [] },
 }, {
   timestamps: true
+});
+
+// Virtual getter for image URLs
+productSchema.virtual('imageUrls').get(function() {
+  return this.images.map(img => {
+    if (img.type === 'url') return img.url;
+    if (img.type === 'gridfs' && img.fileId) {
+      return `/api/products/image/${img.fileId}`;
+    }
+    return '';
+  }).filter(Boolean);
 });
 
 // Export both the model and the model type

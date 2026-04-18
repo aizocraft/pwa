@@ -7,6 +7,8 @@ export interface IUser extends Document {
   email: string;
   password?: string; // Made optional for Google auth
   role: 'user' | 'sales' | 'admin';
+    stripeCustomerId?: string; 
+
   phone?: string;
   avatar?: string;
   isActive: boolean;

@@ -798,14 +798,18 @@ export default function AdminOrderDetails() {
                   >
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                       <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-md mx-auto sm:mx-0">
-                        <img 
+                        <Image
                           src={item.image || '/logo.png'}
                           alt={item.name}
+                          fill
+                          sizes="(max-width: 640px) 100vw, 224px"
                           className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
+                          priority={index === 0}
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = '/logo.png'
                           }}
                         />
+
                       </div>
                       
                       <div className="flex-1 min-w-0">

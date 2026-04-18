@@ -25,11 +25,13 @@ export interface IOrder extends Document {
   status: 'pending' | 'processing' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   paymentMethod: 'cod' | 'mpesa' | 'card';
   paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded';
-  paymentDetails?: {
+    paymentDetails?: {
     transactionId?: string;
     mpesaReceipt?: string;
     cardLast4?: string;
     cardBrand?: string;
+    paidAt?: Date;
+    phoneNumber?: string;
   };
   stripeId?: string;
   selectedShippingArea?: mongoose.Types.ObjectId;
@@ -96,12 +98,14 @@ const orderSchema = new Schema<IOrder, IOrderModel>({
     enum: ['pending', 'completed', 'failed', 'refunded'],
     default: 'pending'
   },
-  paymentDetails: {
-    transactionId: String,
-    mpesaReceipt: String,
-    cardLast4: String,
-    cardBrand: String
-  },
+paymentDetails: {
+  transactionId: { type: String },
+  mpesaReceipt: { type: String },
+  cardLast4: { type: String },
+  cardBrand: { type: String },
+  paidAt: { type: Date },
+  phoneNumber: { type: String }
+},
   stripeId: String,
   selectedShippingArea: { type: SchemaTypes.ObjectId, ref: 'ShippingArea' },
   appliedPromoCode: { type: SchemaTypes.ObjectId, ref: 'PromoCode' },

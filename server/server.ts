@@ -26,6 +26,7 @@ import healthzRoutes from './routes/healthz.routes';
 import shippingRoutes from './routes/shipping.routes';
 import promoRoutes from './routes/promo.routes';
 import orderCalcRoutes from './routes/orderCalc.routes';
+import transactionRoutes from './routes/transaction.routes';
 
 dotenv.config();
 
@@ -94,6 +95,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/promo', promoRoutes);
 app.use('/api/order/calculate', orderCalcRoutes);
+app.use('/api/transactions', transactionRoutes);
 app.use('/', healthzRoutes);
 
 // Health check (excluded from audit)

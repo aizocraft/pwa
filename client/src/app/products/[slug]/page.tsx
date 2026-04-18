@@ -32,7 +32,7 @@ import {
   Zap
 } from 'lucide-react';
 import { Product } from '../../../types/product';
-import { getProduct, getProducts } from '../../../lib/api';
+import { getProduct, getProducts, getImageUrl, getProductImageUrl } from '../../../lib/api';
 import { useCartStore } from '../../../store/cart';
 import { cn, formatCurrency } from '../../../lib/utils';
 import ReviewComponent from '../../../components/Review';
@@ -179,14 +179,14 @@ export default function ProductDetail() {
               {/* Main Image */}
               <div className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-lg group cursor-zoom-in">
                 <Image
-                  src={product.images?.[selectedImage] || '/placeholder-product.jpg'}
+                  src={getProductImageUrl(product, selectedImage)}
                   alt={product.name}
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   priority
                   onClick={() => {
-                    setLightboxImg(product.images?.[selectedImage] || '');
+                    setLightboxImg(getProductImageUrl(product, selectedImage));
                     setIsLightbox(true);
                   }}
                 />
@@ -194,7 +194,7 @@ export default function ProductDetail() {
                 {/* Zoom Button */}
                 <button
                   onClick={() => {
-                    setLightboxImg(product.images?.[selectedImage] || '');
+                    setLightboxImg(getProductImageUrl(product, selectedImage));
                     setIsLightbox(true);
                   }}
                   className="absolute bottom-4 right-4 p-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full shadow-lg hover:scale-110 transition-transform"
@@ -227,7 +227,7 @@ export default function ProductDetail() {
                       )}
                     >
                       <Image
-                        src={img}
+                        src={getProductImageUrl(product, index)}
                         alt={`${product.name} view ${index + 1}`}
                         fill
                         className="object-cover"
@@ -552,7 +552,7 @@ export default function ProductDetail() {
                         <div className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 hover:shadow-lg transition-all">
                           <div className="relative aspect-square bg-gray-100 dark:bg-gray-800">
                             <Image
-                              src={relatedProduct.images?.[0] || '/placeholder-product.jpg'}
+                              src={getProductImageUrl(relatedProduct, 0)}
                               alt={relatedProduct.name}
                               fill
                               className="object-cover group-hover:scale-105 transition-transform duration-300"

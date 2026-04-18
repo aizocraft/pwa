@@ -1,9 +1,30 @@
 // src/server/routes/productRoutes.ts
-import { Router, Request, Response } from 'express';
-import ProductModel, { IProduct } from '../models/Product';
+import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
+import ProductModel, { IProduct, Image } from '../models/Product';
+import { getGridFSBucket } from '../config/gridfs';
+import mongoose from 'mongoose';
+import authMiddleware from '../middleware/auth';
 
 function productRoutes(productModel: typeof ProductModel) {
   const router = Router();
+
+  // Helper: Check if user is admin
+  const isAdmin = (req: Request): boolean => (req as any).user?.role === 'admin';
+
+  // Multer config for product images
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Allowed: JPEG, PNG, WebP, GIF, SVG'));
+      }
+    }
+  });
 
   // Get all products with filters, search, pagination, sorting
   router.get('/', async (req: Request, res: Response) => {
@@ -48,7 +69,7 @@ function productRoutes(productModel: typeof ProductModel) {
         ];
       }
 
-      const pageNum = Math.max(1, parseInt(page as string));
+const pageNum = Math.max(1, parseInt(page as string));
       const limitNum = Math.max(1, Math.min(100, parseInt(limit as string)));
       const skip = (pageNum - 1) * limitNum;
 
@@ -60,18 +81,18 @@ function productRoutes(productModel: typeof ProductModel) {
         ProductModel.find(query)
           .sort(sortObj)
           .limit(limitNum)
-          .skip(skip)
-          .lean(),
+          .skip(skip),
         ProductModel.countDocuments(query)
       ]);
 
-      // No conversion needed - price is already a number
+      const productsWithUrls = products.map(p => p.toObject());
+
       res.json({
-        products,
+        products: productsWithUrls,
         pagination: {
           page: pageNum,
           limit: limitNum,
-          total,
+          total: total,
           pages: Math.ceil(total / limitNum),
           hasNext: pageNum * limitNum < total,
           hasPrev: pageNum > 1
@@ -158,6 +179,34 @@ router.get('/brands', async (req: Request, res: Response) => {
     }
   });
 
+  // Update product by slug
+  router.put('/slug/:slug', async (req: Request, res: Response) => {
+    try {
+      const { slug } = req.params;
+      const updateData = { ...req.body };
+      
+      // Ensure price is a number if it exists in the update
+      if (updateData.price !== undefined) {
+        updateData.price = typeof updateData.price === 'string' 
+          ? parseFloat(updateData.price) 
+          : Number(updateData.price);
+      }
+      
+      const product = await ProductModel.findOneAndUpdate(
+        { slug }, 
+        updateData, 
+        { new: true, runValidators: true }
+      );
+      
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      res.json(product);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || 'Error updating product' });
+    }
+  });
+
   // Delete product
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
@@ -169,6 +218,161 @@ router.get('/brands', async (req: Request, res: Response) => {
       res.json({ message: 'Product deleted successfully' });
     } catch (error) {
       res.status(500).json({ error: 'Error deleting product' });
+    }
+  });
+
+  // POST /api/products/upload-images - Upload images for new product
+  router.post('/upload-images', authMiddleware, upload.array('images', 6), async (req: Request, res: Response) => {
+    try {
+      if (!isAdmin(req)) return res.status(403).json({ error: 'Admin access required' });
+      if (!req.files || (req.files as any[]).length === 0) {
+        return res.status(400).json({ error: 'No files uploaded' });
+      }
+
+      const bucket = getGridFSBucket();
+      const uploadedImages: Image[] = [];
+
+      for (const file of req.files as any[]) {
+        const filename = `product-${req.body.productSlug || 'unknown'}-${Date.now()}-${file.originalname}`;
+        const uploadStream = bucket.openUploadStream(filename, {
+          contentType: file.mimetype,
+          metadata: { 
+            type: 'product-image', 
+            originalName: file.originalname, 
+            uploadedAt: new Date(), 
+            fileSize: file.size 
+          }
+        });
+
+        uploadStream.write(file.buffer);
+        uploadStream.end();
+
+        await new Promise((resolve, reject) => {
+          uploadStream.on('finish', () => resolve(uploadStream.id));
+          uploadStream.on('error', reject);
+        });
+
+        uploadedImages.push({
+          type: 'gridfs',
+          fileId: uploadStream.id,
+          filename,
+          mimeType: file.mimetype
+        });
+      }
+
+      res.json({ success: true, images: uploadedImages });
+    } catch (error: any) {
+      console.error('Upload images error:', error);
+      res.status(500).json({ error: 'Failed to upload images' });
+    }
+  });
+
+  // POST /api/products/:id/upload-images - Add images to existing product
+  router.post('/:id/upload-images', authMiddleware, upload.array('images', 6), async (req: Request, res: Response) => {
+    try {
+      if (!isAdmin(req)) return res.status(403).json({ error: 'Admin access required' });
+      if (!req.files || (req.files as any[]).length === 0) {
+        return res.status(400).json({ error: 'No files uploaded' });
+      }
+
+      const product = await ProductModel.findById(req.params.id);
+      if (!product) return res.status(404).json({ error: 'Product not found' });
+
+      const bucket = getGridFSBucket();
+      const newImages: Image[] = [];
+
+      for (const file of req.files as any[]) {
+        const filename = `product-${product.slug}-${Date.now()}-${file.originalname}`;
+        const uploadStream = bucket.openUploadStream(filename, {
+          contentType: file.mimetype,
+          metadata: { 
+            type: 'product-image', 
+            productId: product._id,
+            originalName: file.originalname, 
+            uploadedAt: new Date(), 
+            fileSize: file.size 
+          }
+        });
+
+        uploadStream.write(file.buffer);
+        uploadStream.end();
+
+        const fileId = await new Promise<mongoose.Types.ObjectId>((resolve, reject) => {
+          uploadStream.on('finish', () => resolve(uploadStream.id));
+          uploadStream.on('error', reject);
+        });
+
+        newImages.push({
+          type: 'gridfs',
+          fileId,
+          filename,
+          mimeType: file.mimetype
+        });
+      }
+
+      product.images.push(...newImages);
+      await product.save();
+
+      res.json({ 
+        success: true, 
+        message: 'Images added successfully', 
+        newImages,
+        totalImages: product.images.length 
+      });
+    } catch (error: any) {
+      console.error('Add images error:', error);
+      res.status(500).json({ error: 'Failed to add images' });
+    }
+  });
+
+  // DELETE /api/products/:id/images/:index - Delete specific image
+  router.delete('/:id/images/:index', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      if (!isAdmin(req)) return res.status(403).json({ error: 'Admin access required' });
+
+      const product = await ProductModel.findById(req.params.id);
+      if (!product) return res.status(404).json({ error: 'Product not found' });
+
+      const index = parseInt(req.params.index);
+      if (isNaN(index) || index < 0 || index >= product.images.length) {
+        return res.status(400).json({ error: 'Invalid image index' });
+      }
+
+      const image = product.images[index];
+      if (image.type === 'gridfs' && image.fileId) {
+        const bucket = getGridFSBucket();
+        await bucket.delete(image.fileId);
+      }
+
+      product.images.splice(index, 1);
+      await product.save();
+
+      res.json({ success: true, message: 'Image deleted successfully', remaining: product.images.length });
+    } catch (error: any) {
+      console.error('Delete image error:', error);
+      res.status(500).json({ error: 'Failed to delete image' });
+    }
+  });
+
+  // GET /api/products/image/:fileId - Serve GridFS image
+  router.get('/image/:fileId', async (req: Request, res: Response) => {
+    try {
+      const { fileId } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(fileId)) {
+        return res.status(400).json({ error: 'Invalid file ID' });
+      }
+
+      const bucket = getGridFSBucket();
+      const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(fileId));
+
+      downloadStream.on('error', () => {
+        res.status(404).json({ error: 'Image not found' });
+      });
+
+      downloadStream.pipe(res);
+    } catch (error) {
+      console.error('Serve image error:', error);
+      res.status(500).json({ error: 'Failed to serve image' });
     }
   });
 

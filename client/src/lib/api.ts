@@ -407,7 +407,59 @@ export async function getUserLegacy(id: string): Promise<{ user: User }> {
   const response = await getUser(id);
   return { user: response.data };
 }
+// Image utility
+export const getImageUrl = (image: import('@/types/product').ProductImage): string => {
+  if ((image as any).type === 'url' && image.url) {
+    return image.url;
+  }
+  if (image.type === 'gridfs' && image.fileId) {
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/products/image/${image.fileId}`;
+  }
+  return '/placeholder.svg';
+};
+
+// Get first image URL from product (safe fallback)
+export const getProductImageUrl = (product: import('@/types/product').Product, index: number = 0): string => {
+  if (!product?.images?.[index]) return '/placeholder-product.jpg';
+  return getImageUrl(product.images[index]);
+};
+
 // ========== PRODUCT API ==========
+export async function uploadProductImages(
+  productId: string | null, 
+  files: File[]
+): Promise<any[]> {
+  try {
+    const formData = new FormData();
+    files.forEach(file => formData.append('images', file));
+    
+    if (productId) {
+      const response = await api.post(`/products/${productId}/upload-images`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return response.data.newImages;
+    } else {
+      const response = await api.post('/products/upload-images', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return response.data.images;
+    }
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to upload images');
+    throw error;
+  }
+}
+
+export async function deleteProductImage(productId: string, index: number): Promise<void> {
+  try {
+    await api.delete(`/products/${productId}/images/${index}`);
+    toast.success('Image deleted');
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to delete image');
+    throw error;
+  }
+}
+
 export async function getProducts(params?: {
   category?: string;
   q?: string;
@@ -470,7 +522,7 @@ export async function createProduct(productData: Omit<Product, '_id' | 'createdA
   }
 }
 
-export async function updateProduct(id: string, productData: Partial<Omit<Product, '_id' | 'createdAt' | 'updatedAt'>>): Promise<Product> {
+export async function updateProduct(slug: string, productData: Partial<Omit<Product, '_id' | 'createdAt' | 'updatedAt'>>): Promise<Product> {
   try {
     const dataToSend = { ...productData };
     if (dataToSend.price !== undefined) {
@@ -479,7 +531,7 @@ export async function updateProduct(id: string, productData: Partial<Omit<Produc
         : dataToSend.price;
     }
     
-    const response = await api.put(`/products/${id}`, dataToSend);
+    const response = await api.put(`/products/slug/${slug}`, dataToSend);
     toast.success('Product updated successfully');
     return response.data;
   } catch (error: any) {
@@ -1240,6 +1292,106 @@ export async function deleteAdminReview(reviewId: string): Promise<void> {
   } catch (error: any) {
     const errorMessage = error.response?.data?.error || 'Failed to delete review';
     toast.error(errorMessage);
+    throw error;
+  }
+}
+// ========== TRANSACTION API ==========
+// Get admin transactions (paginated)
+export async function getTransactions(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  paymentMethod?: string;
+  search?: string;
+}): Promise<{
+  transactions: any[];
+  pagination: {
+    current: number;
+    pages: number;
+    total: number;
+    limit: number;
+  };
+}> {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  });
+
+  try {
+    const response = await api.get(`/transactions/admin?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch transactions:', error);
+    throw error;
+  }
+}
+
+// Get transaction statistics
+export async function getTransactionStats(): Promise<{
+  summary: {
+    totalVolume: number;
+    totalTransactions: number;
+    completed: number;
+    pending: number;
+    failed: number;
+    refunded: number;
+    mpesaCount: number;
+    cardCount: number;
+    codCount: number;
+  };
+  statusBreakdown: Array<{
+    _id: string;
+    count: number;
+    volume: number;
+  }>;
+}> {
+  try {
+    const response = await api.get('/transactions/admin/stats');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch transaction stats:', error);
+    throw error;
+  }
+}
+
+// Update transaction status
+export async function updateTransactionStatus(id: string, status: string): Promise<any> {
+  try {
+    const response = await api.patch(`/transactions/${id}/status`, { status });
+    toast.success('Transaction status updated');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to update status');
+    throw error;
+  }
+}
+
+// In api.ts - Add this function to your transaction API section
+
+// Export transactions to CSV
+export async function exportTransactionsToCSV(params?: {
+  status?: string;
+  paymentMethod?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<Blob> {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  });
+
+  try {
+    const response = await api.get(`/admin/transactions/export/csv?${query.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to export transactions:', error);
+    toast.error('Failed to export transactions');
     throw error;
   }
 }

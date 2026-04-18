@@ -1,4 +1,11 @@
-// src/types/product.ts
+export interface ProductImage {
+  type: 'url' | 'gridfs';
+  url?: string;
+  fileId?: string;
+  filename?: string;
+  mimeType?: string;
+}
+
 export interface Product {
   _id?: string;
   name: string;
@@ -11,12 +18,13 @@ export interface Product {
   description?: string;
   specs: Record<string, any>;
   stock: number;
-  images: string[];
+  images: ProductImage[];
   featured: boolean;
   rating: number;
   tags: string[];
   createdAt?: string;
   updatedAt?: string;
+  imageUrls?: string[]; // Computed virtual from backend
 }
 
 export interface ProductListResponse {
@@ -45,3 +53,4 @@ export interface ProductFilters {
   minRating?: number;
   tags?: string;
 }
+

@@ -1,6 +1,7 @@
 // src/app/cart/page.tsx
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -255,12 +256,14 @@ export default function CartPage() {
                     <div className="relative flex-shrink-0">
                       <div className="relative w-40 h-40 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-50/70 via-white to-gray-50/70 dark:from-slate-800/50 dark:via-gray-900/20 dark:to-slate-800/50 shadow-lg ring-1 ring-gray-200/50 dark:ring-gray-700/50 hover:shadow-2xl hover:ring-emerald-200/50 dark:hover:ring-emerald-400/30 group/image transition-all duration-500 hover:scale-105 hover:rotate-1 hover:shadow-emerald-500/10">
                         {!imageErrors[item.id] && item.image ? (
-                          <img
+                        <Image
                             src={item.image}
                             alt={item.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 group-hover:shadow-2xl"
+                            fill
+                            sizes="(max-width: 640px) 160px, (max-width: 1024px) 224px, 224px"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            priority={false}
                             onError={() => handleImageError(item.id)}
-                            loading="lazy"
                             draggable={false}
                           />
                         ) : (

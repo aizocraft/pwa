@@ -159,6 +159,63 @@ export interface PaymentResponse {
 }
 
 // Order statistics
+export interface Transaction {
+  _id: string;
+  orderId: {
+    _id: string;
+    orderNumber: string;
+    total: number;
+  };
+  userId?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  guestEmail?: string;
+  customerName: string;
+  amount: number;
+  currency: string;
+  paymentMethod: 'mpesa' | 'card' | 'cod';
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  transactionId: string;
+  mpesaReceipt?: string;
+  cardLast4?: string;
+  cardBrand?: string;
+  createdAt: string;
+  updatedAt: string;
+  orderNumber?: string;
+  customerEmail?: string;
+}
+
+export interface TransactionListResponse {
+  transactions: Transaction[];
+  pagination: {
+    current: number;
+    pages: number;
+    total: number;
+    limit: number;
+  };
+}
+
+export interface TransactionStats {
+  summary: {
+    totalVolume: number;
+    totalTransactions: number;
+    completed: number;
+    pending: number;
+    failed: number;
+    refunded: number;
+    mpesaCount: number;
+    cardCount: number;
+    codCount: number;
+  };
+  statusBreakdown: Array<{
+    _id: string;
+    count: number;
+    volume: number;
+  }>;
+}
+
 export interface OrderStats {
   summary: {
     totalOrders: number;

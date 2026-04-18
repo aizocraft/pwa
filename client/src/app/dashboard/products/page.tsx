@@ -10,8 +10,10 @@ import {
   X, AlertTriangle, CheckCircle, XCircle, Star, TrendingUp, Clock, 
   DollarSign, ShoppingBag, Zap, Grid, List, ChevronLeft, ChevronRight
 } from 'lucide-react'
+import { getImageUrl } from '@/lib/api'
 import Link from 'next/link'
 import Image from 'next/image'
+
 import { Product, ProductListResponse } from '@/types/product'
 import { getProducts, deleteProduct, updateProduct } from '@/lib/api'
 
@@ -225,20 +227,20 @@ export default function DashboardProductsPage() {
             
             <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
               <div className="flex items-center gap-3">
-                {productToDelete.images?.[0] ? (
-                  <img 
-                    src={productToDelete.images[0]} 
-                    alt={productToDelete.name}
+                {productToDelete?.images?.[0] ? (
+                  <img
+                    src={getImageUrl(productToDelete?.images?.[0] ?? '')}
+                    alt={productToDelete?.name ?? ''}
                     className="w-12 h-12 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-500 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to gray-500 rounded-lg flex items-center justify-center">
                     <Package className="w-6 h-6 text-white" />
                   </div>
                 )}
                 <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">{productToDelete.name}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Price: KSh {productToDelete.price.toLocaleString()}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{productToDelete?.name || ''}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Price: {productToDelete?.price ? `KSh ${productToDelete?.price.toLocaleString()}` : ''}</p>
                 </div>
               </div>
             </div>
@@ -506,29 +508,31 @@ export default function DashboardProductsPage() {
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 {/* Product Image */}
-                <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 overflow-hidden">
-                  {product.images?.[0] ? (
-                    <img 
-                      src={product.images[0]} 
-                      alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package className="w-16 h-16 text-gray-400" />
+                <div className="relative h-48 bg-gradient-to-br from-gray-100 to gray-200 dark:from-gray-700 dark:to-gray-800 overflow-hidden">
+                    {product.images?.[0] ? (
+                        <Image 
+                          src={getImageUrl(product.images[0])} 
+                          alt={product.name}
+                          fill
+                          className="object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="w-16 h-16 text-gray-400" />
+                        </div>
+                      )}
+                      {product.featured && (
+                        <div className="absolute top-3 left-3 px-2 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1">
+                          <Star className="w-3 h-3 fill-current" />
+                          Featured
+                        </div>
+                      )}
+                      <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-xs font-semibold rounded-lg">
+                        {product.category}
+                      </div>
                     </div>
-                  )}
-                  {product.featured && (
-                    <div className="absolute top-3 left-3 px-2 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1">
-                      <Star className="w-3 h-3 fill-current" />
-                      Featured
-                    </div>
-                  )}
-                  <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-xs font-semibold rounded-lg">
-                    {product.category}
-                  </div>
-                </div>
-                
+
+
                 {/* Product Info */}
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1">{product.name}</h3>
@@ -598,16 +602,17 @@ export default function DashboardProductsPage() {
                     <tr key={product._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group animate-fade-in-up" style={{ animationDelay: `${index * 30}ms` }}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
-                          <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
+                          <div className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
                             {product.images?.[0] ? (
-                              <img 
-                                src={product.images[0]} 
+                              <Image 
+                                src={getImageUrl(product.images[0])} 
                                 alt={product.name}
-                                className="w-full h-full object-cover"
+                                fill
+                                className="object-cover"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Package className="w-6 h-6 text-gray-400" />
+                                <Package className="w-8 h-8 text-gray-400" />
                               </div>
                             )}
                           </div>
