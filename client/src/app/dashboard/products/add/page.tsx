@@ -53,6 +53,20 @@ export default function AddProductPage() {
 
 
   const [newTag, setNewTag] = useState('');
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  };
+
+  const handleNameChange = (name: string) => {
+    setFormData(prev => ({
+      ...prev,
+      name,
+      slug: generateSlug(name)
+    }));
+  };
   const [specKey, setSpecKey] = useState('');
   const [specValue, setSpecValue] = useState('');
   const [showImageUrls, setShowImageUrls] = useState(false);
@@ -205,7 +219,7 @@ export default function AddProductPage() {
                   id="name"
                   type="text"
                   value={formData.name}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => handleNameChange(e.target.value)}
                   required
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
                   placeholder="e.g., 500W Solar Panel"
@@ -246,18 +260,15 @@ export default function AddProductPage() {
                 <label htmlFor="brand" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                   Brand *
                 </label>
-                <select
+                <input
                   id="brand"
+                  type="text"
                   value={formData.brand}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, brand: e.target.value})}
+                  onChange={(e) => setFormData({...formData, brand: e.target.value})}
                   required
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
-                >
-                  <option value="">Select brand</option>
-                  {brands.map(brand => (
-                    <option key={brand} value={brand}>{brand}</option>
-                  ))}
-                </select>
+                  placeholder="e.g., Pedrollo"
+                />
               </div>
 
               <div className="space-y-2">

@@ -709,7 +709,7 @@ export default function EditProductPage() {
                 </div>
               </div>
               <div className="p-5 sm:p-6">
-                <div className="flex gap-3 mb-4">
+                <div className="flex flex-col sm:flex-row gap-3 mb-4">
                   <input
                     type="text"
                     value={newTag}

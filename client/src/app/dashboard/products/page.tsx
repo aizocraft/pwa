@@ -100,7 +100,7 @@ export default function DashboardProductsPage() {
       return { previousData }
     },
     onSuccess: () => {
-      
+      toast.success('Product deleted successfully')
       setDeleteModalOpen(false)
       setProductToDelete(null)
     },
@@ -234,7 +234,7 @@ export default function DashboardProductsPage() {
                     className="w-12 h-12 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to gray-500 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-500 rounded-lg flex items-center justify-center">
                     <Package className="w-6 h-6 text-white" />
                   </div>
                 )}
@@ -508,30 +508,29 @@ export default function DashboardProductsPage() {
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 {/* Product Image */}
-                <div className="relative h-48 bg-gradient-to-br from-gray-100 to gray-200 dark:from-gray-700 dark:to-gray-800 overflow-hidden">
-                    {product.images?.[0] ? (
-                        <Image 
-                          src={getImageUrl(product.images[0])} 
-                          alt={product.name}
-                          fill
-                          className="object-cover group-hover:scale-110 transition-transform duration-500"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-16 h-16 text-gray-400" />
-                        </div>
-                      )}
-                      {product.featured && (
-                        <div className="absolute top-3 left-3 px-2 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-current" />
-                          Featured
-                        </div>
-                      )}
-                      <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-xs font-semibold rounded-lg">
-                        {product.category}
-                      </div>
+                <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 overflow-hidden">
+                  {product.images?.[0] ? (
+                    <Image 
+                      src={getImageUrl(product.images[0])} 
+                      alt={product.name}
+                      fill
+                      className="object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-16 h-16 text-gray-400" />
                     </div>
-
+                  )}
+                  {product.featured && (
+                    <div className="absolute top-3 left-3 px-2 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-current" />
+                      Featured
+                    </div>
+                  )}
+                  <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-xs font-semibold rounded-lg">
+                    {product.category}
+                  </div>
+                </div>
 
                 {/* Product Info */}
                 <div className="p-4">
@@ -547,25 +546,25 @@ export default function DashboardProductsPage() {
                       {stockConfig.label} ({product.stock})
                     </span>
                   </div>
-                  
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+
+                  <div className="flex gap-2">
+                    <Link 
+                      href={`/dashboard/products/edit/${product.slug}`}
+                      className="flex-1 py-2 bg-gray-50 text-gray-600 dark:bg-gray-700/50 dark:text-gray-400 rounded-xl text-sm font-medium transition-all hover:bg-gray-100 flex items-center justify-center gap-2"
+                    >
+                      <Edit className="w-4 h-4" />
+                      Edit
+                    </Link>
                     <button
-                      onClick={() => toggleFeaturedMutation.mutate({ id: product._id!, featured: !product.featured })}
+                      onClick={() => toggleFeaturedMutation.mutate({ id: product.slug, featured: !product.featured })}
                       className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${buttonHover} ${
                         product.featured 
                           ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 hover:bg-yellow-100' 
                           : 'bg-gray-50 text-gray-600 dark:bg-gray-700/50 dark:text-gray-400 hover:bg-gray-100'
                       }`}
                     >
-                      {product.featured ? '⭐ Featured' : '☆ Mark Featured'}
+                      {product.featured ? 'Featured' : 'Mark Featured'}
                     </button>
-                    <Link 
-                      href={`/dashboard/products/edit/${product.slug}`}
-                      className="p-2 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 rounded-xl hover:bg-blue-100 transition-all"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Link>
                     <button
                       onClick={() => openDeleteModal(product)}
                       className="p-2 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-xl hover:bg-red-100 transition-all"
@@ -602,7 +601,7 @@ export default function DashboardProductsPage() {
                     <tr key={product._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group animate-fade-in-up" style={{ animationDelay: `${index * 30}ms` }}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
-                          <div className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
+                          <div className="relative flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
                             {product.images?.[0] ? (
                               <Image 
                                 src={getImageUrl(product.images[0])} 
@@ -612,7 +611,7 @@ export default function DashboardProductsPage() {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Package className="w-8 h-8 text-gray-400" />
+                                <Package className="w-6 h-6 text-gray-400" />
                               </div>
                             )}
                           </div>
@@ -645,7 +644,7 @@ export default function DashboardProductsPage() {
                         <button
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                           style={{ backgroundColor: product.featured ? '#3B82F6' : '#CBD5E1' }}
-                          onClick={() => toggleFeaturedMutation.mutate({ id: product._id!, featured: !product.featured })}
+                          onClick={() => toggleFeaturedMutation.mutate({ id: product.slug, featured: !product.featured })}
                           disabled={toggleFeaturedMutation.isPending}
                         >
                           <span className="sr-only">Toggle featured</span>
