@@ -14,7 +14,7 @@ const adminMiddleware = (req: Request & { user?: any }, res: Response, next: any
 };
 
 // GET /api/admin/transactions - Get all transactions (paginated)
-router.get('/admin/transactions', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.get('/admin', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
@@ -88,7 +88,7 @@ const formattedTransactions = transactions.map(transaction => ({
 });
 
 // GET /api/admin/transactions/stats - Transaction statistics
-router.get('/admin/transactions/stats', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.get('/admin/stats', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const [summary, statusBreakdown, methodBreakdown, dailyStats] = await Promise.all([
       // Overall summary
@@ -205,7 +205,7 @@ router.get('/admin/transactions/stats', authMiddleware, adminMiddleware, async (
 });
 
 // GET /api/admin/transactions/:id - Get single transaction
-router.get('/admin/transactions/:id', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.get('/admin/:id', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const transaction = await TransactionModel.findById(req.params.id)
       .populate('orderId', 'orderNumber total status shippingAddress items')
@@ -235,7 +235,7 @@ const formattedTransaction = {
 });
 
 // PATCH /api/admin/transactions/:id/status - Update transaction status
-router.patch('/admin/transactions/:id/status', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.patch('/admin/:id/status', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
     const { reason } = req.body;
@@ -282,7 +282,7 @@ router.patch('/admin/transactions/:id/status', authMiddleware, adminMiddleware, 
 });
 
 // GET /api/admin/transactions/export/csv - Export transactions as CSV
-router.get('/admin/transactions/export/csv', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.get('/admin/export/csv', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const { startDate, endDate, status, paymentMethod } = req.query;
     
