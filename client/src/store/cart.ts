@@ -114,11 +114,17 @@ export const useCartStore = create<CartState>()(
                 : item
             );
           } else {
-            newItems = [...state.items, {
+newItems = [...state.items, {
               id: product._id as string,
               slug: product.slug,
               name: product.name,
-              image: product.images?.[0] || '',
+              image: (() => {
+                const img = product.images?.[0];
+                if (!img) return '';
+                if (img.type === 'url' && img.url) return img.url;
+                if (img.type === 'gridfs' && img.fileId) return `/api/files/${img.fileId}`;
+                return product.imageUrls?.[0] || '';
+              })(),
               price: Number(product.price),
               qty,
               rating: product.rating || 0,
