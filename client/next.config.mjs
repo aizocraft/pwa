@@ -2,36 +2,45 @@
 const nextConfig = {
   images: {
     remotePatterns: [
+      // Cloudinary
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
-        port: '',
         pathname: '/**',
       },
+
+      // Unsplash
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
-        port: '',
         pathname: '/**',
       },
+
+      // Placeholder
       {
         protocol: 'https',
         hostname: 'via.placeholder.com',
-        port: '',
         pathname: '/**',
       },
-      // Add any other image hosts you use
+
+      // LOCAL API
       {
         protocol: 'http',
         hostname: 'localhost',
-        port: '3000',
+        port: '4000',
+        pathname: '/**',
+      },
+
+      // RENDER API
+      {
+        protocol: 'https',
+        hostname: 'pwa-6vb1.onrender.com',
         pathname: '/**',
       },
     ],
   },
-  // Enable React strict mode for better development
+
   reactStrictMode: true,
- 
 };
 
 export default nextConfig;

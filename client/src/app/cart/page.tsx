@@ -100,6 +100,25 @@ export default function CartPage() {
     setImageErrors(prev => ({ ...prev, [productId]: true }));
   }, []);
 
+  // Helper function to safely get image URL from cart item (handles both string and object)
+  const getCartItemImageUrl = useCallback((item: any): string => {
+    if (!item.image) return '';
+    
+    // If it's already a string, return it
+    if (typeof item.image === 'string') return item.image;
+    
+    // If it's an object with url property (URL type)
+    if (item.image.url) return item.image.url;
+    
+    // If it's a GridFS object with fileId
+    if (item.image.fileId) {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+      return `${apiUrl}/products/image/${item.image.fileId}`;
+    }
+    
+    return '';
+  }, []);
+
   const handleApplyPromo = useCallback(async () => {
     if (!promoInput.trim()) {
       toast.error('Please enter a promo code');
@@ -191,10 +210,11 @@ export default function CartPage() {
               Looks like you haven't added anything to your cart yet. Start shopping to find amazing products!
             </p>
             <Link href="/products">
-              <button className="group inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-2xl transition-all duration-300 hover:scale-105 shadow-lg">
-                <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                Start Shopping
-                <Sparkles className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <button className="group relative inline-flex items-center gap-3 px-8 py-4 bg-white/20 dark:bg-white/10 backdrop-blur-xl border border-white/30 dark:border-white/20 text-blue-900 dark:text-blue-100 font-semibold rounded-3xl shadow-2xl hover:shadow-blue-500/20 hover:bg-white/30 dark:hover:bg-white/20 transition-all duration-400 hover:scale-105 hover:-translate-y-1 active:scale-95 bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-600/30 hover:to-blue-700/30">
+                <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-all duration-300" />
+                <span className="relative z-10">Start Shopping</span>
+                <Sparkles className="w-4 h-4 ml-1 opacity-70 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/50 to-cyan-400/50 rounded-3xl blur-xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               </button>
             </Link>
           </div>
@@ -257,15 +277,16 @@ export default function CartPage() {
                       <div className="relative w-40 h-40 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-50/70 via-white to-gray-50/70 dark:from-slate-800/50 dark:via-gray-900/20 dark:to-slate-800/50 shadow-lg ring-1 ring-gray-200/50 dark:ring-gray-700/50 hover:shadow-2xl hover:ring-emerald-200/50 dark:hover:ring-emerald-400/30 group/image transition-all duration-500 hover:scale-105 hover:rotate-1 hover:shadow-emerald-500/10">
                         {!imageErrors[item.id] && item.image ? (
                         <Image
-                            src={item.image}
-                            alt={item.name}
-                            fill
-                            sizes="(max-width: 640px) 160px, (max-width: 1024px) 224px, 224px"
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                            priority={false}
-                            onError={() => handleImageError(item.id)}
-                            draggable={false}
-                          />
+                          src={getCartItemImageUrl(item)}
+                          alt={item.name}
+                          fill
+                          sizes="(max-width: 640px) 160px, (max-width: 1024px) 224px, 224px"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          priority={false}
+                          onError={() => handleImageError(item.id)}
+                          draggable={false}
+                          unoptimized={true}
+                        />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-emerald-50/80 to-blue-50/80 dark:from-emerald-950/40 dark:to-blue-950/40">
                             <Package className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-500/80 dark:text-emerald-400 mb-1" />

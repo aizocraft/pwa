@@ -207,15 +207,32 @@ router.get('/brands', async (req: Request, res: Response) => {
     }
   });
 
-  // Delete product
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const product = await ProductModel.findByIdAndDelete(id);
+      
+      // 1. Get the product first (before deletion)
+      const product = await ProductModel.findById(id);
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
-      res.json({ message: 'Product deleted successfully' });
+      
+      // 2. Delete all GridFS images
+      const bucket = getGridFSBucket();
+      for (const image of product.images) {
+        if (image.type === 'gridfs' && image.fileId) {
+          try {
+            await bucket.delete(image.fileId);
+          } catch (err) {
+            console.error(`Failed to delete GridFS file ${image.fileId}:`, err);
+          }
+        }
+      }
+      
+      // 3. Delete the product
+      await product.deleteOne();
+      
+      res.json({ message: 'Product and associated images deleted successfully' });
     } catch (error) {
       res.status(500).json({ error: 'Error deleting product' });
     }

@@ -232,6 +232,9 @@ export default function DashboardProductsPage() {
                     src={getImageUrl(productToDelete?.images?.[0] ?? '')}
                     alt={productToDelete?.name ?? ''}
                     className="w-12 h-12 rounded-lg object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
+                    }}
                   />
                 ) : (
                   <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-500 rounded-lg flex items-center justify-center">
@@ -510,12 +513,18 @@ export default function DashboardProductsPage() {
                 {/* Product Image */}
                 <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 overflow-hidden">
                   {product.images?.[0] ? (
-                    <Image 
-                      src={getImageUrl(product.images[0])} 
-                      alt={product.name}
-                      fill
-                      className="object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
+                    <div className="relative w-full h-full">
+                      <Image 
+                        src={getImageUrl(product.images[0])} 
+                        alt={product.name}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
+                        }}
+                        unoptimized={true}
+                      />
+                    </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Package className="w-16 h-16 text-gray-400" />
@@ -603,12 +612,18 @@ export default function DashboardProductsPage() {
                         <div className="flex items-center gap-4">
                           <div className="relative flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
                             {product.images?.[0] ? (
-                              <Image 
-                                src={getImageUrl(product.images[0])} 
-                                alt={product.name}
-                                fill
-                                className="object-cover"
-                              />
+                              <div className="relative w-full h-full">
+                                <Image 
+                                  src={getImageUrl(product.images[0])} 
+                                  alt={product.name}
+                                  fill
+                                  className="object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
+                                  }}
+                                  unoptimized={true}
+                                />
+                              </div>
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
                                 <Package className="w-6 h-6 text-gray-400" />

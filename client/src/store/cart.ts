@@ -1,5 +1,6 @@
 // src/store/cart.ts
 import { create } from 'zustand';
+import { getImageUrl } from '../lib/api';
 import { persist } from 'zustand/middleware';
 import { Product } from '../types/product';
 import { ShippingArea } from '../types/order';
@@ -118,13 +119,7 @@ newItems = [...state.items, {
               id: product._id as string,
               slug: product.slug,
               name: product.name,
-              image: (() => {
-                const img = product.images?.[0];
-                if (!img) return '';
-                if (img.type === 'url' && img.url) return img.url;
-                if (img.type === 'gridfs' && img.fileId) return `/api/files/${img.fileId}`;
-                return product.imageUrls?.[0] || '';
-              })(),
+              image: product.images?.[0] ? getImageUrl(product.images[0]) : (product.imageUrls?.[0] || ''),
               price: Number(product.price),
               qty,
               rating: product.rating || 0,

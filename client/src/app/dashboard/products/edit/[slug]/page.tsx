@@ -1,75 +1,94 @@
-// src/app/dashboard/products/edit/[slug]/page.tsx
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDropzone } from 'react-dropzone';
+import { toast } from 'react-hot-toast';
 import { 
-  ArrowLeft, 
-  Save, 
-  X, 
-  Plus, 
-  Trash2, 
+  Loader2, 
+  Upload, 
   Image as ImageIcon, 
-  Loader2,
-  Sparkles,
-  AlertCircle,
-  CheckCircle,
-  Upload,
+  Trash2, 
+  ArrowLeft,
+  Plus,
+  X,
   Tag,
   Settings,
   Info,
-  Package,
   DollarSign,
   Layers,
-  Building2
-} from 'lucide-react'
-import Link from 'next/link'
-import toast from 'react-hot-toast'
-import { getImageUrl, getProduct, updateProduct, uploadProductImages } from '@/lib/api'
-import { useDropzone } from 'react-dropzone'
-import type { Product } from '@/types/product'
+  Building2,
+  Package,
+  Star,
+  Sparkles,
+  Link as LinkIcon,
+  Save
+} from 'lucide-react';
+import Link from 'next/link';
+import { getProduct, updateProduct, uploadProductImages, deleteProductImage, getImageUrl } from '@/lib/api';
+import type { Product, ProductImage } from '@/types/product';
+import { cn } from '@/lib/utils';
+
+interface EditProductFormData {
+  name: string;
+  slug: string;
+  category: string;
+  brand: string;
+  type: string;
+  price: number;
+  compareAtPrice?: number;
+  description: string;
+  specs: Record<string, string>;
+  stock: number;
+  tags: string[];
+  images: ProductImage[];
+  featured: boolean;
+  rating: number;
+}
 
 export default function EditProductPage() {
-  const router = useRouter()
-  const params = useParams()
-  const productSlug = params.slug as string
-  const queryClient = useQueryClient()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [activeSection, setActiveSection] = useState('basic')
-
-  // Form state
-  const [formData, setFormData] = useState({
+  const router = useRouter();
+  const params = useParams();
+  const productSlug = params.slug as string;
+  const queryClient = useQueryClient();
+  
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<EditProductFormData>({
     name: '',
     slug: '',
-    description: '',
-    price: '',
-    compareAtPrice: '',
     category: '',
-    stock: '',
-    featured: false,
-        images: [] as string[],
-    tags: [] as string[],
-    specifications: {} as Record<string, string>,
     brand: '',
     type: '',
+    price: 0,
+    compareAtPrice: undefined,
+    description: '',
+    specs: {},
+    stock: 0,
+    tags: [],
+    images: [],
+    featured: false,
     rating: 0,
-  })
+  });
 
-  const [newTag, setNewTag] = useState('')
-  const [specKey, setSpecKey] = useState('')
-  const [specValue, setSpecValue] = useState('')
-  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({})
-  const [images, setImages] = useState<File[]>([])
-  const [previewImages, setPreviewImages] = useState<string[]>([])
-  const [showImageUpload, setShowImageUpload] = useState(false)
+  // Image handling
+  const [newUploadImages, setNewUploadImages] = useState<File[]>([]);
+  const [newPreviewImages, setNewPreviewImages] = useState<string[]>([]);
+  const [newUrlImages, setNewUrlImages] = useState<string[]>([]);
+  const [imageInputType, setImageInputType] = useState<'upload' | 'url'>('upload');
+  const [deletedImageIndices, setDeletedImageIndices] = useState<number[]>([]);
+  const [newUrlImage, setNewUrlImage] = useState('');
 
-  // Fetch product data using slug
-  const { data: product, isLoading, error } = useQuery({
+  const [newTag, setNewTag] = useState('');
+  const [specKey, setSpecKey] = useState('');
+  const [specValue, setSpecValue] = useState('');
+
+  // Fetch product
+  const { data: product, isLoading } = useQuery({
     queryKey: ['product', productSlug],
     queryFn: () => getProduct(productSlug),
     enabled: !!productSlug
-  })
+  });
 
   // Load product data into form
   useEffect(() => {
@@ -77,214 +96,168 @@ export default function EditProductPage() {
       setFormData({
         name: product.name || '',
         slug: product.slug || '',
-        description: product.description || '',
-        price: product.price?.toString() || '',
-        compareAtPrice: product.compareAtPrice?.toString() || '',
         category: product.category || '',
-        stock: product.stock?.toString() || '',
-        featured: product.featured || false,
-        images: product.images?.map(img => getImageUrl(img)) || [],
-        tags: product.tags || [],
-        specifications: product.specs || {},
         brand: product.brand || '',
         type: product.type || '',
+        price: product.price || 0,
+        compareAtPrice: product.compareAtPrice,
+        description: product.description || '',
+        specs: product.specs || {},
+        stock: product.stock || 0,
+        tags: product.tags || [],
+        images: product.images || [],
+        featured: product.featured || false,
         rating: product.rating || 0,
-      })
+      });
     }
-  }, [product])
+  }, [product]);
 
-  // Generate slug from name
-  const generateSlug = useCallback((name: string) => {
+  const generateSlug = (name: string) => {
     return name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-  }, [])
+      .replace(/^-+|-+$/g, '');
+  };
 
-  const handleNameChange = useCallback((name: string) => {
+  const handleNameChange = (name: string) => {
     setFormData(prev => ({
       ...prev,
       name,
       slug: generateSlug(name)
-    }))
-  }, [generateSlug])
+    }));
+  };
 
-  // Add tag
-  const addTag = useCallback(() => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }))
-      setNewTag('')
-      toast.success(`Tag "${newTag.trim()}" added`)
-    }
-  }, [newTag, formData.tags])
-
-  const removeTag = useCallback((tag: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(t => t !== tag)
-    }))
-    toast.success(`Tag "${tag}" removed`)
-  }, [])
-
-  // Add specification
-  const addSpecification = useCallback(() => {
-    if (specKey.trim() && specValue.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        specifications: {
-          ...prev.specifications,
-          [specKey.trim()]: specValue.trim()
-        }
-      }))
-      setSpecKey('')
-      setSpecValue('')
-      toast.success(`Specification "${specKey.trim()}" added`)
-    }
-  }, [specKey, specValue])
-
-  const removeSpecification = useCallback((key: string) => {
-    const newSpecs = { ...formData.specifications }
-    delete newSpecs[key]
-    setFormData(prev => ({
-      ...prev,
-      specifications: newSpecs
-    }))
-    toast.success(`Specification "${key}" removed`)
-  }, [formData.specifications])
-
-  // Handle image URLs
-  const updateImage = useCallback((index: number, value: string) => {
-    const newImages = [...formData.images]
-    newImages[index] = value
-    setFormData(prev => ({ ...prev, images: newImages }))
-    if (imageErrors[index]) {
-      setImageErrors(prev => ({ ...prev, [index]: false }))
-    }
-  }, [formData.images, imageErrors])
-
-  // Drag drop handlers
-  const onDropEdit = useCallback((acceptedFiles: File[]) => {
-    setImages(prev => [...prev, ...acceptedFiles]);
+  // Image dropzone for new uploads
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    setNewUploadImages(prev => [...prev, ...acceptedFiles]);
     const newPreviews = acceptedFiles.map(file => URL.createObjectURL(file));
-    setPreviewImages(prev => [...prev, ...newPreviews]);
+    setNewPreviewImages(prev => [...prev, ...newPreviews]);
   }, []);
 
-  const { getRootProps: getRootPropsEdit, getInputProps: getInputPropsEdit, isDragActive: isDragActiveEdit } = useDropzone({
-    onDrop: onDropEdit,
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
     accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.gif'] },
     maxFiles: 6,
+    maxSize: 5 * 1024 * 1024,
   });
 
-  const handleImageUploadRemove = (index: number) => {
-    const file = images[index];
-    if (file) URL.revokeObjectURL(previewImages[index]);
-    setImages(prev => prev.filter((_, i) => i !== index));
-    setPreviewImages(prev => prev.filter((_, i) => i !== index));
+  const handleNewUploadImageRemove = (index: number) => {
+    const file = newUploadImages[index];
+    if (file) URL.revokeObjectURL(newPreviewImages[index]);
+    setNewUploadImages(prev => prev.filter((_, i) => i !== index));
+    setNewPreviewImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const uploadAndAddImages = async () => {
-    if (images.length > 0) {
-      try {
-        const uploaded = await uploadProductImages(product?._id!, images);
-        const newImageUrls = uploaded.map(img => getImageUrl(img));
-        setFormData(prev => ({ ...prev, images: [...prev.images, ...newImageUrls] }));
-        setImages([]);
-        setPreviewImages([]);
-        toast.success('Images uploaded');
-      } catch (error) {
-        toast.error('Upload failed');
+  const handleUrlImageAdd = () => {
+    if (newUrlImage.trim() && !newUrlImages.includes(newUrlImage.trim())) {
+      setNewUrlImages(prev => [...prev, newUrlImage.trim()]);
+      setNewUrlImage('');
+      toast.success('Image URL added');
+    }
+  };
+
+  const handleUrlImageRemove = (index: number) => {
+    setNewUrlImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleExistingImageDelete = (index: number) => {
+    setDeletedImageIndices(prev => [...prev, index]);
+    toast.success('Image marked for deletion');
+  };
+
+  // Tag handlers
+  const addTag = () => {
+    const trimmed = newTag.trim();
+    if (trimmed && !formData.tags.includes(trimmed)) {
+      setFormData(prev => ({ ...prev, tags: [...prev.tags, trimmed] }));
+      setNewTag('');
+      toast.success('Tag added');
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
+  };
+
+  // Spec handlers
+  const addSpec = () => {
+    const keyTrim = specKey.trim();
+    const valTrim = specValue.trim();
+    if (keyTrim && valTrim && !formData.specs[keyTrim]) {
+      setFormData(prev => ({
+        ...prev,
+        specs: { ...prev.specs, [keyTrim]: valTrim }
+      }));
+      setSpecKey('');
+      setSpecValue('');
+      toast.success('Specification added');
+    }
+  };
+
+  const removeSpec = (key: string) => {
+    setFormData(prev => {
+      const newSpecs = { ...prev.specs };
+      delete newSpecs[key];
+      return { ...prev, specs: newSpecs };
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      let updatedImages = [...formData.images];
+
+      // Remove deleted images
+      for (const index of deletedImageIndices.sort((a, b) => b - a)) {
+        const imageToDelete = updatedImages[index];
+        if (imageToDelete.type === 'gridfs' && imageToDelete.fileId) {
+          await deleteProductImage(product!._id!, index);
+        }
+        updatedImages.splice(index, 1);
       }
+
+      // Upload new files
+      if (newUploadImages.length > 0) {
+        const uploaded = await uploadProductImages(product!._id!, newUploadImages);
+        updatedImages.push(...uploaded);
+      }
+
+      // Add URL images
+      newUrlImages.forEach(url => {
+        updatedImages.push({
+          type: 'url',
+          url: url
+        });
+      });
+
+      const productData = {
+        name: formData.name,
+        slug: formData.slug,
+        category: formData.category,
+        brand: formData.brand,
+        type: formData.type,
+        price: Number(formData.price),
+        compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
+        description: formData.description,
+        specs: formData.specs,
+        stock: Number(formData.stock),
+        tags: formData.tags,
+        images: updatedImages,
+        featured: formData.featured,
+        rating: Number(formData.rating),
+      };
+
+      await updateProduct(productSlug, productData);
+      toast.success('Product updated successfully!');
+      router.push('/dashboard/products');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update product');
+    } finally {
+      setLoading(false);
     }
   };
-
-  const addImage = useCallback(() => {
-    setFormData(prev => ({ ...prev, images: [...prev.images, ''] }))
-  }, [])
-
-  const removeImage = useCallback((index: number) => {
-    if (formData.images.length > 1) {
-      const newImages = formData.images.filter((_, i) => i !== index)
-      setFormData(prev => ({ ...prev, images: newImages }))
-    }
-  }, [formData.images])
-
-  const handleImageError = useCallback((index: number) => {
-    setImageErrors(prev => ({ ...prev, [index]: true }))
-  }, [])
-
-  // Update product mutation
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => updateProduct(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard-products'] })
-      queryClient.invalidateQueries({ queryKey: ['products'] })
-      queryClient.invalidateQueries({ queryKey: ['product', productSlug] })
-      toast.success('Product updated successfully!')
-      router.push('/dashboard/products')
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to update product')
-    },
-    onSettled: () => {
-      setIsSubmitting(false)
-    }
-  })
-
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-
-    // Validate required fields
-    if (!formData.name || !formData.price || !formData.category) {
-      toast.error('Please fill in all required fields')
-      setIsSubmitting(false)
-      return
-    }
-
-    if (!product?._id) {
-      toast.error('Product ID not found')
-      setIsSubmitting(false)
-      return
-    }
-
-    // Prepare product data
-    const productData = {
-      name: formData.name,
-      slug: formData.slug,
-      description: formData.description || '',
-      price: parseFloat(formData.price),
-      compareAtPrice: formData.compareAtPrice ? parseFloat(formData.compareAtPrice) : undefined,
-      category: formData.category,
-      stock: parseInt(formData.stock) || 0,
-      featured: formData.featured,
-      images: formData.images.filter(img => img.trim() !== ''),
-      tags: formData.tags,
-      specs: formData.specifications,
-      brand: formData.brand || '',
-      type: formData.type || '',
-      rating: formData.rating || 0,
-    }
-
-    updateMutation.mutate({ id: productSlug, data: productData })
-  }, [formData, product, updateMutation])
-
-  const sections = [
-    { id: 'basic', label: 'Basic Info', icon: Info },
-    { id: 'images', label: 'Images', icon: ImageIcon },
-    { id: 'details', label: 'Details', icon: Settings },
-    { id: 'specs', label: 'Specifications', icon: Package },
-  ]
-
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      setActiveSection(sectionId)
-    }
-  }
 
   if (isLoading) {
     return (
@@ -294,15 +267,15 @@ export default function EditProductPage() {
           <p className="text-gray-600 dark:text-gray-400">Loading product...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (error || !product) {
+  if (!product) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 px-4">
         <div className="text-center p-8 max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
           <div className="w-20 h-20 bg-red-100 dark:bg-red-950/50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
+            <Package className="w-10 h-10 text-red-600 dark:text-red-400" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Product not found</h2>
           <p className="text-gray-500 dark:text-gray-400 mb-6">
@@ -310,15 +283,17 @@ export default function EditProductPage() {
           </p>
           <Link 
             href="/dashboard/products"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all hover:scale-105"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Products
           </Link>
         </div>
       </div>
-    )
+    );
   }
+
+  const existingImages = formData.images.filter((_, index) => !deletedImageIndices.includes(index));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
@@ -342,481 +317,520 @@ export default function EditProductPage() {
               </p>
             </div>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => router.back()}
-              className="px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="group flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  Save Changes
-                  <Sparkles className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="group flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                Save Changes
+                <Sparkles className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </>
+            )}
+          </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg rounded-2xl mb-6 p-1 shadow-sm">
-          <div className="flex flex-wrap gap-1">
-            {sections.map((section) => (
-              <button
-                key={section.id}
-                onClick={() => scrollToSection(section.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  activeSection === section.id
-                    ? 'bg-blue-600 text-white shadow-md scale-105'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <section.icon className="w-4 h-4" />
-                {section.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
+        {/* Main Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* Basic Information Section */}
-          <section id="basic" className="scroll-mt-20">
-            <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-              <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-950/50 rounded-xl">
-                    <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Basic Information</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Essential product details</p>
-                  </div>
+          {/* Basic Information */}
+          <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
+            <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-950/50 rounded-xl">
+                  <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Basic Information</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Essential product details</p>
                 </div>
               </div>
-              
-              <div className="p-5 sm:p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Product Name <span className="text-red-500">*</span>
-                    </label>
+            </div>
+            
+            <div className="p-5 sm:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Product Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Slug
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.slug}
+                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800 font-mono text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Category <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.category}
+                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Brand <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
-                      value={formData.name}
-                      onChange={(e) => handleNameChange(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                      placeholder="e.g., 500W Solar Panel"
+                      value={formData.brand}
+                      onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
+                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
                       required
                     />
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Slug
-                    </label>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Type <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
-                      value={formData.slug}
-                      onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800 font-mono text-sm"
-                      placeholder="auto-generated from name"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">URL-friendly identifier (auto-generated)</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Category <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                      value={formData.type}
+                      onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
                       required
-                    >
-                      <option value="">Select a category</option>
-                      <option value="solar-panels">☀️ Solar Panels</option>
-                      <option value="inverters">⚡ Inverters</option>
-                      <option value="generators">🔌 Generators</option>
-                      <option value="pumps">💧 Pumps</option>
-                      <option value="batteries">🔋 Batteries</option>
-                      <option value="controllers">🎛️ Controllers</option>
-                    </select>
+                    />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Price (KES) <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="number"
-                        value={formData.price}
-                        onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                        placeholder="0.00"
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Compare at Price (Optional)
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="number"
-                        value={formData.compareAtPrice}
-                        onChange={(e) => setFormData(prev => ({ ...prev, compareAtPrice: e.target.value }))}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                        placeholder="Original price"
-                        step="0.01"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Original price to show discount</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Stock Quantity
-                    </label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Price (KES) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="number"
-                      value={formData.stock}
-                      onChange={(e) => setFormData(prev => ({ ...prev, stock: e.target.value }))}
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                      placeholder="0"
+                      step="0.01"
                       min="0"
+                      value={formData.price}
+                      onChange={(e) => setFormData(prev => ({ ...prev, price: Number(e.target.value) }))}
+                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                      required
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Brand
-                    </label>
-                    <div className="relative">
-                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={formData.brand}
-                        onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                        placeholder="e.g., SolarTech"
-                      />
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Compare at Price (Optional)
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.compareAtPrice ?? ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, compareAtPrice: e.target.value ? Number(e.target.value) : undefined }))}
+                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Type
-                    </label>
-                    <div className="relative">
-                      <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={formData.type}
-                        onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                        placeholder="e.g., Monocrystalline"
-                      />
-                    </div>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Stock Quantity
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.stock}
+                    onChange={(e) => setFormData(prev => ({ ...prev, stock: Number(e.target.value) }))}
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-                  <div className="flex items-center">
-                    <label className="flex items-center gap-3 cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        checked={formData.featured}
-                        onChange={(e) => setFormData(prev => ({ ...prev, featured: e.target.checked }))}
-                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-blue-600 transition-colors">
-                        ⭐ Feature this product
-                      </span>
-                    </label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Rating (0-5)
+                  </label>
+                  <div className="relative">
+                    <Star className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-yellow-400" />
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="5"
+                      value={formData.rating}
+                      onChange={(e) => setFormData(prev => ({ ...prev, rating: Number(e.target.value) }))}
+                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
+                </div>
+
+                <div className="flex items-center">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={formData.featured}
+                      onChange={(e) => setFormData(prev => ({ ...prev, featured: e.target.checked }))}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-blue-600 transition-colors">
+                      ⭐ Feature this product
+                    </span>
+                  </label>
                 </div>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Description Section */}
-          <section id="details" className="scroll-mt-20">
-            <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-950/50 rounded-xl">
-                    <Info className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Description</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Detailed product information</p>
-                  </div>
+          {/* Description */}
+          <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
+            <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 dark:bg-purple-950/50 rounded-xl">
+                  <Package className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Description</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Detailed product information</p>
                 </div>
               </div>
-              <div className="p-5 sm:p-6">
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  rows={8}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 transition-all"
-                  placeholder="Write a detailed description of your product..."
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  {formData.description.length} characters
-                </p>
-              </div>
             </div>
-          </section>
+            <div className="p-5 sm:p-6">
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                rows={6}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 transition-all"
+                placeholder="Write a detailed description of your product..."
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                {formData.description.length} characters
+              </p>
+            </div>
+          </div>
 
           {/* Images Section */}
-          <section id="images" className="scroll-mt-20">
-            <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
+          <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
+            <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
+              <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-green-100 dark:bg-green-950/50 rounded-xl">
                     <ImageIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Product Images</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Add product photos (URLs)</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Add or remove product photos</p>
                   </div>
                 </div>
-              </div>
-              <div className="p-5 sm:p-6">
-                {/* Toggle between URL and Upload */}
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Image Management</h3>
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowImageUpload(!showImageUpload)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+                    onClick={() => setImageInputType('upload')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      imageInputType === 'upload'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                    }`}
                   >
-                    {showImageUpload ? 'Switch to URLs' : 'Upload Images'}
+                    <Upload className="w-4 h-4" />
+                    Upload Files
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageInputType('url')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      imageInputType === 'url'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    <LinkIcon className="w-4 h-4" />
+                    Add URLs
                   </button>
                 </div>
+              </div>
+            </div>
+            
+            <div className="p-5 sm:p-6">
+              {/* Existing Images */}
+              {existingImages.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4" />
+                    Current Images ({existingImages.length})
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {existingImages.map((img, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={getImageUrl(img)}
+                          alt={`Product image ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg shadow-md"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleExistingImageDelete(formData.images.indexOf(img))}
+                          className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                {showImageUpload ? (
+              {/* Add New Images */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Add New Images</h3>
+                
+                {imageInputType === 'upload' ? (
                   <>
-                    <div {...getRootPropsEdit()} className={`p-6 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all mb-4 ${
-                      isDragActiveEdit 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-gray-300 hover:border-blue-400'
-                    }`}>
-                      <input {...getInputPropsEdit()} />
+                    <div
+                      {...getRootProps()}
+                      className={cn(
+                        'p-8 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all',
+                        isDragActive
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                          : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
+                      )}
+                    >
+                      <input {...getInputProps()} />
                       <Upload className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                      <p>{isDragActiveEdit ? 'Drop files here' : 'Drag & drop or click to upload images'}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {isDragActive ? 'Drop the images here...' : 'Drag & drop or click to upload'}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-2">PNG, JPG, WebP, GIF up to 5MB • Max 6 images</p>
                     </div>
-                    {previewImages.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                        {previewImages.map((preview, index) => (
-                          <div key={index} className="relative">
-                            <img src={preview} alt="Preview" className="w-full h-20 object-cover rounded-lg" />
+
+                    {newPreviewImages.length > 0 && (
+                      <div className="mt-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {newPreviewImages.map((preview, index) => (
+                            <div key={index} className="relative group">
+                              <img
+                                src={preview}
+                                alt={`New preview ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-lg shadow-md"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleNewUploadImageRemove(index)}
+                                className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={newUrlImage}
+                        onChange={(e) => setNewUrlImage(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleUrlImageAdd()}
+                        placeholder="https://example.com/image.jpg"
+                        className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleUrlImageAdd}
+                        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {newUrlImages.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {newUrlImages.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={url}
+                              alt={`URL image ${index + 1}`}
+                              className="w-full h-24 object-cover rounded-lg shadow-md"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
+                              }}
+                            />
                             <button
-                              onClick={() => handleImageUploadRemove(index)}
-                              className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full text-xs"
+                              type="button"
+                              onClick={() => handleUrlImageRemove(index)}
+                              className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200"
                             >
-                              ×
+                              <Trash2 className="w-3 h-3" />
                             </button>
                           </div>
                         ))}
                       </div>
                     )}
-                    <button
-                      onClick={uploadAndAddImages}
-                      disabled={images.length === 0}
-                      className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
-                    >
-                      Upload {images.length} image{images.length !== 1 ? 's' : ''}
-                    </button>
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    {formData.images.map((image, index) => (
-                      <div key={index} className="flex gap-3 items-start group">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Upload className="w-4 h-4 text-gray-400" />
-                            <input
-                              type="url"
-                              value={image}
-                              onChange={(e) => updateImage(index, e.target.value)}
-                              className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                                imageErrors[index] 
-                                  ? 'border-red-300 focus:ring-red-500 bg-red-50' 
-                                  : 'border-gray-300'
-                              }`}
-                              placeholder="https://example.com/image.jpg"
-                              onError={() => handleImageError(index)}
-                            />
-                          </div>
-                          {imageErrors[index] && (
-                            <p className="text-xs text-red-500 mt-1">Invalid image URL</p>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                  </div>
+                )}
+              </div>
+
+              {(deletedImageIndices.length > 0 || newPreviewImages.length > 0 || newUrlImages.length > 0) && (
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                  <p className="text-sm text-blue-700 dark:text-blue-400">
+                    {deletedImageIndices.length > 0 && `🗑️ ${deletedImageIndices.length} image(s) will be deleted • `}
+                    {newPreviewImages.length > 0 && `📤 ${newPreviewImages.length} new upload(s) • `}
+                    {newUrlImages.length > 0 && `🔗 ${newUrlImages.length} new URL(s)`}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
+            <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-100 dark:bg-yellow-950/50 rounded-xl">
+                  <Tag className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tags</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Help customers find your product</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 sm:p-6">
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addTag()}
+                  placeholder="Add a tag..."
+                  className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={addTag}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {formData.tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-full text-sm font-medium"
+                  >
+                    <Tag className="w-3 h-3" />
+                    #{tag}
                     <button
                       type="button"
-                      onClick={addImage}
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                      onClick={() => removeTag(tag)}
+                      className="text-gray-500 hover:text-red-500 transition-colors"
                     >
-                      <Plus className="w-4 h-4" />
-                      Add URL image
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              {formData.tags.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">No tags added yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Specifications */}
+          <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
+            <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 dark:bg-orange-950/50 rounded-xl">
+                  <Settings className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Specifications</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Technical details and features</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 sm:p-6">
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <input
+                  type="text"
+                  value={specKey}
+                  onChange={(e) => setSpecKey(e.target.value)}
+                  placeholder="Specification name (e.g., Wattage)"
+                  className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  value={specValue}
+                  onChange={(e) => setSpecValue(e.target.value)}
+                  placeholder="Value (e.g., 500W)"
+                  className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={addSpec}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {Object.entries(formData.specs).map(([key, value]) => (
+                  <div key={key} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div>
+                      <span className="font-semibold text-gray-900 dark:text-white">{key}:</span>
+                      <span className="ml-2 text-gray-600 dark:text-gray-400">{value}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeSpec(key)}
+                      className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                )}
+                ))}
               </div>
+              {Object.keys(formData.specs).length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">No specifications added yet</p>
+              )}
             </div>
-          </section>
-
-          {/* Tags Section */}
-          <section id="details" className="scroll-mt-20">
-            <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-yellow-100 dark:bg-yellow-950/50 rounded-xl">
-                    <Tag className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tags</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Help customers find your product</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-5 sm:p-6">
-                <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                  <input
-                    type="text"
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Add a tag..."
-                  />
-                  <button
-                    type="button"
-                    onClick={addTag}
-                    className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {formData.tags.map(tag => (
-                    <span
-                      key={tag}
-                      className="group inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-full text-sm font-medium animate-in fade-in zoom-in duration-200"
-                    >
-                      <Tag className="w-3 h-3" />
-                      #{tag}
-                      <button
-                        type="button"
-                        onClick={() => removeTag(tag)}
-                        className="text-gray-500 hover:text-red-500 transition-colors ml-1"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                {formData.tags.length === 0 && (
-                  <p className="text-sm text-gray-500 text-center py-4">No tags added yet</p>
-                )}
-              </div>
-            </div>
-          </section>
-
-          {/* Specifications Section */}
-          <section id="specs" className="scroll-mt-20">
-            <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-orange-100 dark:bg-orange-950/50 rounded-xl">
-                    <Settings className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Specifications</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Technical details and features</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-5 sm:p-6">
-                <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                  <input
-                    type="text"
-                    value={specKey}
-                    onChange={(e) => setSpecKey(e.target.value)}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Specification name (e.g., Wattage)"
-                  />
-                  <input
-                    type="text"
-                    value={specValue}
-                    onChange={(e) => setSpecValue(e.target.value)}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Value (e.g., 500W)"
-                  />
-                  <button
-                    type="button"
-                    onClick={addSpecification}
-                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {Object.entries(formData.specifications).map(([key, value]) => (
-                    <div 
-                      key={key} 
-                      className="group flex justify-between items-center p-3 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-200 animate-in fade-in slide-in-from-left"
-                    >
-                      <div>
-                        <span className="font-semibold text-gray-900 dark:text-white">{key}:</span>
-                        <span className="ml-2 text-gray-600 dark:text-gray-400">{value}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeSpecification(key)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {Object.keys(formData.specifications).length === 0 && (
-                  <p className="text-sm text-gray-500 text-center py-4">No specifications added yet</p>
-                )}
-              </div>
-            </div>
-          </section>
+          </div>
         </form>
       </div>
     </div>
-  )
+  );
 }

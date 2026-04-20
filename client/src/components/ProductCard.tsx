@@ -91,7 +91,16 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
             <div className="absolute inset-0 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 animate-shimmer" />
           )}
           <Image
-            src={getImageUrl(product.images[0] || { type: 'url', url: '/placeholder-solar.jpg' })}
+            src={(() => {
+              try {
+                if (product.images?.[0]) {
+                  return getImageUrl(product.images[0]);
+                }
+              } catch (e) {
+                console.warn('Image error:', e);
+              }
+              return '/placeholder-solar.jpg';
+            })()}
             alt={product.name}
             fill
             className={cn(
@@ -101,7 +110,12 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
               isList && 'rounded-xl'
             )}
             onLoad={() => setImageLoaded(true)}
+            onError={(e) => {
+              setImageLoaded(true);
+              (e.target as HTMLImageElement).src = '/placeholder-solar.jpg';
+            }}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            unoptimized={true}
           />
           {isList && (
             <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-transparent rounded-xl" />

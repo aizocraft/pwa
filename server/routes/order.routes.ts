@@ -24,6 +24,14 @@ const isValidPhone = (phone: string) => {
   return /^(07|\+2547|2547)\d{8}$/.test(phone);
 };
 
+// Helper function to get product image URL
+const getImageUrl = (image: any): string => {
+  if (!image) return '';
+  if (image.url) return image.url;
+  if (image.fileId) return `${process.env.API_URL || 'http://localhost:4000/api'}/products/image/${image.fileId}`;
+  return '';
+};
+
 // POST /api/orders - Create order (supports both auth and guest)
 router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
@@ -117,7 +125,7 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
         productId: item.productId,
         name: product.name,
         slug: product.slug,
-        image: product.images?.[0] || '',
+        image: getImageUrl(product.images?.[0]),
         price: price,
         qty: item.qty
       });

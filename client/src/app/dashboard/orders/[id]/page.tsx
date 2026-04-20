@@ -799,19 +799,43 @@ export default function AdminOrderDetails() {
                   >
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                       <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-md mx-auto sm:mx-0">
-                        <Image
-                          src={item.image || '/logo.png'}
-                          alt={item.name}
-                          fill
-                          sizes="(max-width: 640px) 100vw, 224px"
-                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
-                          priority={index === 0}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/logo.png'
-                          }}
-                        />
-
-                      </div>
+  {(() => {
+    // Safely get image URL (handle both string and object)
+    let imageUrl = '/logo.png';
+    try {
+      if (item.image) {
+        if (typeof item.image === 'string') {
+          imageUrl = item.image;
+        } else {
+          const img = item.image as any;
+          if (img?.url) {
+            imageUrl = img.url;
+          } else if (img?.fileId) {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+            imageUrl = `${apiUrl}/products/image/${img.fileId}`;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error getting image URL:', error);
+      imageUrl = '/logo.png';
+    }
+    return (
+      <Image
+        src={imageUrl}
+        alt={item.name}
+        fill
+        sizes="(max-width: 640px) 100vw, 224px"
+        className="object-cover transition-transform duration-300 hover:scale-110"
+        priority={index === 0}
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = '/logo.png';
+        }}
+        unoptimized={true}
+      />
+    );
+  })()}
+</div>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
