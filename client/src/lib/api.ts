@@ -103,13 +103,23 @@ export async function registerUser(userData: {
 }
 
 export async function getProfile() {
+  const token = getToken();
+  
+  // Don't make the request if no token exists
+  if (!token) {
+    return null;
+  }
+  
   try {
     const response = await api.get('/auth/profile');
     const { user } = response.data;
     localStorage.setItem('user', JSON.stringify(user));
     return user;
   } catch (error: any) {
-    toast.error(error.response?.data?.error || 'Failed to fetch profile');
+    // Silent fail - don't show toast for auth errors
+    if (error.response?.status !== 401) {
+      toast.error(error.response?.data?.error || 'Failed to fetch profile');
+    }
     throw error;
   }
 }

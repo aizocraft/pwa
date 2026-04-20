@@ -22,7 +22,8 @@ import {
   Star,
   Sparkles,
   Link as LinkIcon,
-  Grid3x3
+  Grid3x3,
+  ChevronDown
 } from 'lucide-react';
 import { getBrands, createProduct, uploadProductImages } from '@/lib/api';
 import type { Product, ProductImage } from '@/types/product';
@@ -314,19 +315,29 @@ export default function AddProductPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Category <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.category}
-                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., Solar Panels"
-                    required
-                  />
-                </div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+    Category <span className="text-red-500">*</span>
+  </label>
+  <div className="relative">
+    <select
+      value={formData.category}
+      onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 appearance-none"
+      required
+    >
+      <option value="">Select a category</option>
+      <option value="Solar Panels">Solar Panels</option>
+      <option value="Inverters">Inverters</option>
+      <option value="Batteries">Batteries</option>
+      <option value="Water Pumps">Water Pumps</option>
+      <option value="Cables & Connectors">Cables & Connectors</option>
+      <option value="Solar Lights">Solar Lights</option>
+      <option value="Accessories">Accessories</option>
+    </select>
+    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+  </div>
+</div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
