@@ -332,7 +332,7 @@ export default function DashboardOrdersPage() {
                           {order.user?.email && (
                             <div className="flex items-center gap-1 text-xs text-gray-500">
                               <Mail className="w-3 h-3" />
-                              {order.user.email}
+                              {order.user?.email}
                             </div>
                           )}
                         </div>

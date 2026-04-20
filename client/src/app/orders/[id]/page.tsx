@@ -51,7 +51,7 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
   const companyEmail = settings?.email || '';
   const slogan = settings?.slogan || '';
 
-  const customerName = order.user?.name || order.guestInfo?.name || order.shippingAddress?.fullName || 'Guest Customer';
+const customerName = order.user?.name || order.guestInfo?.name || order.shippingAddress?.fullName || 'Guest Customer';
   const customerEmail = order.user?.email || order.guestInfo?.email || order.shippingAddress?.email || '';
   const customerPhone = order.guestInfo?.phone || order.shippingAddress?.phone || '';
 

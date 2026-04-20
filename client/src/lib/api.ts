@@ -786,7 +786,7 @@ export async function createShippingArea(data: CreateShippingAreaRequest): Promi
 export async function updateShippingArea(id: string, data: UpdateShippingAreaRequest): Promise<ShippingArea> {
   try {
     const response = await api.put(`/shipping/${id}`, data);
-    toast.success('Shipping area updated');
+   
     return response.data;
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Failed to update shipping area');

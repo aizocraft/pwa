@@ -181,7 +181,7 @@ const stats = statsQuery.data?.summary || {
       id: tx._id,
       transactionId: tx.transactionId,
       orderNumber: tx.orderNumber || (typeof tx.orderId === 'object' ? tx.orderId?.orderNumber : 'N/A'),
-      customerName: tx.customerInfo?.name || tx.customerName,
+customerName: tx.customerInfo?.name || tx.customerName,
       customerEmail: tx.customerInfo?.email || tx.guestEmail || 'N/A',
       customerPhone: tx.customerInfo?.phone || tx.guestPhone || 'N/A',
       amount: tx.amount,

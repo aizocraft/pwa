@@ -95,7 +95,7 @@ export default function ShippingAreas({ areas, onUpdateAreas }: ShippingAreasPro
       setEditingArea(null)
       setRegionsInput('')
       setFreeShippingEnabled(false)
-      toast.success('Shipping area updated!')
+      
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update shipping area')
     } finally {
@@ -123,7 +123,7 @@ export default function ShippingAreas({ areas, onUpdateAreas }: ShippingAreasPro
     try {
       await updateShippingArea(id, { isActive: !areas.find(a => a._id === id)?.isActive })
       await reloadAreas()
-      toast.success('Status updated!')
+      
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update status')
     } finally {

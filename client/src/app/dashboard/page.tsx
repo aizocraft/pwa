@@ -239,7 +239,7 @@ export default function DashboardOverviewPage() {
           </div>
           <div className="flex-1 divide-y divide-gray-200/50 dark:divide-gray-700/50">
             {recentOrders.length > 0 ? recentOrders.map((order, idx) => {
-              const customerName = order.user?.name || order.guestInfo?.name || order.shippingAddress?.fullName || 'Guest'
+const customerName = order.user?.name || order.guestInfo?.name || order.shippingAddress?.fullName || 'Guest'
               const isPaid = order.paymentStatus === 'completed' || order.status === 'paid' || order.status === 'delivered'
               return (
                 <Link 
