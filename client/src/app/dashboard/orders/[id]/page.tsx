@@ -244,7 +244,7 @@ const InvoiceTemplate = ({ order, settings, logoUrl, isPaid }: { order: Order; s
               </div>
               {tax > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-                  <span style={{ color: '#666' }}>VAT (16%):</span>
+                  <span style={{ color: '#666' }}>VAT:</span>
                   <span>Ksh {tax.toLocaleString()}</span>
                 </div>
               )}
@@ -887,7 +887,7 @@ export default function AdminOrderDetails() {
                   )}
                   {order.tax > 0 && (
                     <div className="flex gap-8 text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Tax (16% VAT):</span>
+                      <span className="text-gray-600 dark:text-gray-400">Tax (VAT):</span>
                       <span className="font-medium">Ksh {order.tax.toLocaleString()}</span>
                     </div>
                   )}

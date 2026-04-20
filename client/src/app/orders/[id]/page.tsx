@@ -188,7 +188,7 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
             )}
             {tax > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                <span style={{ color: '#666' }}>VAT (16%):</span>
+                <span style={{ color: '#666' }}>VAT:</span>
                 <span>Ksh {tax.toLocaleString()}</span>
               </div>
             )}
@@ -789,7 +789,7 @@ export default function UserOrderDetails() {
                   )}
                   {order.tax > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Tax (16% VAT)</span>
+                      <span className="text-gray-600 dark:text-gray-400">Tax (VAT)</span>
                       <span className="font-medium">Ksh {order.tax.toLocaleString()}</span>
                     </div>
                   )}
