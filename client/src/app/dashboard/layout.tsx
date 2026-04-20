@@ -12,11 +12,11 @@ import {
   Menu, X, Search, Star, ChevronRight, Bell, User, LogOut, 
   BarChart3, AlertCircle, Moon, ClipboardList, Sun, AlertTriangle,
   Receipt, MessageSquare, Mail
-
 } from 'lucide-react'
 import { useCompanySettings } from '@/lib/use-company-settings'
 import { getFaviconUrl, getLogoUrl } from '@/lib/company'
 import { useTheme } from '@/context/ThemeContext'
+import { useUnreadCount } from '@/lib/notifications'
 
 export default function DashboardLayout({
   children,
@@ -31,6 +31,19 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  
+  // Get unread notifications count
+  const { data: unreadCountData, refetch: refetchUnreadCount } = useUnreadCount()
+  const unreadCount = unreadCountData?.data?.unreadCount ?? 0
+  
+  // Auto-refetch unread count every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetchUnreadCount()
+    }, 30000) // 30 seconds
+    
+    return () => clearInterval(interval)
+  }, [refetchUnreadCount])
   
   // Prevent multiple redirects
   const hasRedirected = useRef(false)
@@ -52,11 +65,12 @@ export default function DashboardLayout({
     if (path.startsWith('/dashboard/submissions')) return 'submissions'
     if (path.startsWith('/dashboard/emails')) return 'emails'
     if (path.startsWith('/dashboard/auditlog')) return 'auditlog'
+    if (path.startsWith('/dashboard/notifications')) return 'notifications'
     if (path.startsWith('/dashboard/settings')) return 'settings'
     return 'overview'
   }
 
-  const [activePage, setActivePage] = useState<'overview'|'products'|'orders'|'shipping'|'users'|'emails'|'submissions'|'transactions'|'reviews'|'auditlog'|'settings'>(
+  const [activePage, setActivePage] = useState<'overview'|'products'|'orders'|'shipping'|'users'|'emails'|'submissions'|'transactions'|'reviews'|'auditlog'|'notifications'|'settings'>(
     getActivePageFromPath(pathname)
   )
 
@@ -67,7 +81,11 @@ export default function DashboardLayout({
   useEffect(() => {
     const newActivePage = getActivePageFromPath(pathname)
     setActivePage(newActivePage)
-  }, [pathname])
+    // Refetch unread count when navigating to notifications page
+    if (pathname === '/dashboard/notifications') {
+      refetchUnreadCount()
+    }
+  }, [pathname, refetchUnreadCount])
 
   // Improved auth redirect - prevents infinite loops
   useEffect(() => {
@@ -114,6 +132,7 @@ export default function DashboardLayout({
     { name: 'Submissions', icon: Star, page: 'submissions' as const, path: '/dashboard/submissions', color: 'text-yellow-500' },
     { name: 'Emails', icon: Mail, page: 'emails' as const, path: '/dashboard/emails', color: 'text-indigo-500' },
     { name: 'Audit Log', icon: ClipboardList, page: 'auditlog' as const, path: '/dashboard/auditlog', color: 'text-indigo-500' },
+    { name: 'Notifications', icon: Bell, page: 'notifications' as const, path: '/dashboard/notifications', color: 'text-blue-500' },
     { name: 'Settings', icon: Settings, page: 'settings' as const, path: '/dashboard/settings', color: 'text-gray-500' },
   ]
 
@@ -300,6 +319,8 @@ export default function DashboardLayout({
               {navigation.map((item) => {
                 const Icon = item.icon
                 const isActive = activePage === item.page
+                // Show badge on notifications icon in sidebar if unread > 0
+                const showBadge = item.page === 'notifications' && unreadCount > 0
                 return (
                   <button
                     key={item.name}
@@ -314,6 +335,11 @@ export default function DashboardLayout({
                   >
                     <Icon className={`h-5 w-5 transition-all ${isActive ? item.color : 'text-gray-500 group-hover:text-gray-700 dark:group-hover:text-gray-300'}`} />
                     <span>{item.name}</span>
+                    {showBadge && (
+                      <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
                     {isActive && (
                       <div className="absolute left-0 w-1 h-8 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-r-full" />
                     )}
@@ -360,22 +386,36 @@ export default function DashboardLayout({
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3">
-<button 
-    onClick={() => router.push('/profile')}
-    title="Profile"
-    className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-  >
-    <User className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-    <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
-  </button>
-  <button 
-    onClick={() => router.push('/dashboard/notifications')}
-    title="Notifications"
-    className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-  >
-    <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-  </button>
+                <button 
+                  onClick={() => router.push('/profile')}
+                  title="Profile"
+                  className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <User className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
+                </button>
+                
+                {/* Notifications Button with Unread Count Badge */}
+                <button 
+                  onClick={() => router.push('/dashboard/notifications')}
+                  title="Notifications"
+                  className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 group"
+                >
+                  <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:scale-105 transition-transform" />
+                  
+                  {/* Unread Count Badge */}
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold rounded-full shadow-lg ring-2 ring-white dark:ring-gray-900 animate-pulse">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                  
+                  {/* Subtle indicator dot for unread */}
+                  {unreadCount === 0 && (
+                    <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-gray-400 rounded-full" />
+                  )}
+                </button>
+                
                 <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block" />
                 
                 {/* Theme Toggle Button */}

@@ -135,15 +135,15 @@ export default function DashboardProductsPage() {
       
       return { previousData }
     },
-    onSuccess: (data, variables) => {
-      toast.success(variables.featured ? '✨ Product marked as featured' : 'Product removed from featured', {
-        duration: 2000,
-        icon: variables.featured ? '⭐' : '📌'
-      })
+    onSuccess: (_, { featured }) => {
+    //  toast.success(`Product ${featured ? 'featured' : 'unfeatured'} successfully!`)
     },
     onError: (err, variables, context) => {
       queryClient.setQueryData(['dashboard-products', buildQueryParams()], context?.previousData)
       toast.error('Failed to update featured status')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-products'] })
     },
   })
 

@@ -5,6 +5,8 @@ import ProductModel, { IProduct, Image } from '../models/Product';
 import { getGridFSBucket } from '../config/gridfs';
 import mongoose from 'mongoose';
 import authMiddleware from '../middleware/auth';
+import { createNotification, NOTIFICATION_TEMPLATES } from '../services/notification.service';
+import UserModel from '../models/User';
 
 function productRoutes(productModel: typeof ProductModel) {
   const router = Router();
@@ -69,7 +71,7 @@ function productRoutes(productModel: typeof ProductModel) {
         ];
       }
 
-const pageNum = Math.max(1, parseInt(page as string));
+      const pageNum = Math.max(1, parseInt(page as string));
       const limitNum = Math.max(1, Math.min(100, parseInt(limit as string)));
       const skip = (pageNum - 1) * limitNum;
 
@@ -104,18 +106,18 @@ const pageNum = Math.max(1, parseInt(page as string));
     }
   });
 
+  // Get all unique brands
+  router.get('/brands', async (req: Request, res: Response) => {
+    try {
+      const brands = await ProductModel.distinct('brand');
+      const validBrands = brands.filter(brand => brand && brand !== '');
+      res.json(validBrands);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Error fetching brands' });
+    }
+  });
 
-// Get all unique brands
-router.get('/brands', async (req: Request, res: Response) => {
-  try {
-    const brands = await ProductModel.distinct('brand');
-    const validBrands = brands.filter(brand => brand && brand !== '');
-    res.json(validBrands);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error fetching brands' });
-  }
-});
   // Get single product by slug
   router.get('/:slug', async (req: Request, res: Response) => {
     try {
@@ -132,8 +134,12 @@ router.get('/brands', async (req: Request, res: Response) => {
   });
 
   // Create product
-  router.post('/', async (req: Request, res: Response) => {
+  router.post('/', authMiddleware, async (req: Request, res: Response) => {
     try {
+      if (!isAdmin(req)) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+      
       const productData = { ...req.body };
       
       // Ensure price is a number
@@ -145,6 +151,36 @@ router.get('/brands', async (req: Request, res: Response) => {
       
       const product = new ProductModel(productData);
       const savedProduct = await product.save();
+      
+      // 🔔 CREATE NOTIFICATION FOR NEW PRODUCT (notify admins)
+      try {
+        const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+        if (adminUsers.length > 0) {
+          const notificationPromises = adminUsers.map(admin => 
+            createNotification({
+              userId: admin._id.toString(),
+              type: 'system',
+              title: `🆕 New Product Added: ${savedProduct.name}`,
+              message: `A new product "${savedProduct.name}" has been added to the store. Price: KES ${savedProduct.price}`,
+              actionUrl: `/dashboard/products/${savedProduct._id}`,
+              metadata: {
+                productId: savedProduct._id.toString(),
+                productName: savedProduct.name,
+                productSlug: savedProduct.slug,
+                price: savedProduct.price,
+                category: savedProduct.category,
+                createdBy: (req.user as any)?.email || (req.user as any)?.name || 'Admin'
+              }
+            })
+          );
+          
+          await Promise.all(notificationPromises);
+          console.log(`✅ Created ${adminUsers.length} notifications for new product: ${savedProduct.name}`);
+        }
+      } catch (notificationErr) {
+        console.error('Failed to create product notification:', notificationErr);
+      }
+      
       res.status(201).json(savedProduct);
     } catch (error: any) {
       res.status(400).json({ error: error.message || 'Error creating product' });
@@ -152,10 +188,20 @@ router.get('/brands', async (req: Request, res: Response) => {
   });
 
   // Update product
-  router.put('/:id', async (req: Request, res: Response) => {
+  router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
     try {
+      if (!isAdmin(req)) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+      
       const { id } = req.params;
       const updateData = { ...req.body };
+      
+      // Get the original product before update
+      const originalProduct = await ProductModel.findById(id);
+      if (!originalProduct) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
       
       // Ensure price is a number if it exists in the update
       if (updateData.price !== undefined) {
@@ -173,6 +219,71 @@ router.get('/brands', async (req: Request, res: Response) => {
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
+      
+      // 🔔 CREATE NOTIFICATIONS FOR PRODUCT UPDATES
+      try {
+        const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+        const changes: string[] = [];
+        
+        // Check for important changes
+        if (originalProduct.stock !== product.stock) {
+          changes.push(`stock changed from ${originalProduct.stock} to ${product.stock}`);
+          
+          // Send low stock alert if stock is low (e.g., less than 10)
+          if (product.stock < 10 && product.stock > 0 && adminUsers.length > 0) {
+            const lowStockTemplate = NOTIFICATION_TEMPLATES.lowStock(product.name, product.stock);
+            
+            const notificationPromises = adminUsers.map(admin => 
+              createNotification({
+                userId: admin._id.toString(),
+                type: lowStockTemplate.type,
+                title: lowStockTemplate.title,
+                message: lowStockTemplate.message,
+                actionUrl: `/dashboard/products/${product._id}`,
+                metadata: {
+                  productId: product._id.toString(),
+                  productName: product.name,
+                  currentStock: product.stock,
+                  previousStock: originalProduct.stock
+                }
+              })
+            );
+            
+            await Promise.all(notificationPromises);
+            console.log(`✅ Created low stock notifications for ${product.name}`);
+          }
+        }
+        
+        if (originalProduct.price !== product.price) {
+          changes.push(`price changed from KES ${originalProduct.price} to KES ${product.price}`);
+        }
+        
+
+        // Send general update notification if there are changes
+        if (changes.length > 0 && adminUsers.length > 0) {
+          const notificationPromises = adminUsers.map(admin => 
+            createNotification({
+              userId: admin._id.toString(),
+              type: 'system',
+              title: `✏️ Product Updated: ${product.name}`,
+              message: `Product "${product.name}" was updated: ${changes.join(', ')}`,
+              actionUrl: `/dashboard/products/${product._id}`,
+              metadata: {
+                productId: product._id.toString(),
+                productName: product.name,
+                changes: changes,
+                updatedBy: (req.user as any)?.email || (req.user as any)?.name || 'Admin'
+              }
+            })
+          );
+          
+          await Promise.all(notificationPromises);
+          console.log(`✅ Created ${adminUsers.length} update notifications for product: ${product.name}`);
+        }
+      } catch (notificationErr) {
+        console.error('Failed to create product update notification:', notificationErr);
+      }
+      
       res.json(product);
     } catch (error: any) {
       res.status(400).json({ error: error.message || 'Error updating product' });
@@ -180,10 +291,20 @@ router.get('/brands', async (req: Request, res: Response) => {
   });
 
   // Update product by slug
-  router.put('/slug/:slug', async (req: Request, res: Response) => {
+  router.put('/slug/:slug', authMiddleware, async (req: Request, res: Response) => {
     try {
+      if (!isAdmin(req)) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+      
       const { slug } = req.params;
       const updateData = { ...req.body };
+      
+      // Get the original product before update
+      const originalProduct = await ProductModel.findOne({ slug });
+      if (!originalProduct) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
       
       // Ensure price is a number if it exists in the update
       if (updateData.price !== undefined) {
@@ -201,14 +322,78 @@ router.get('/brands', async (req: Request, res: Response) => {
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
+      
+      // 🔔 CREATE NOTIFICATIONS FOR PRODUCT UPDATES
+      try {
+        const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+        const changes: string[] = [];
+        
+        if (originalProduct.stock !== product.stock) {
+          changes.push(`stock changed from ${originalProduct.stock} to ${product.stock}`);
+          
+          if (product.stock < 10 && product.stock > 0 && adminUsers.length > 0) {
+            const lowStockTemplate = NOTIFICATION_TEMPLATES.lowStock(product.name, product.stock);
+            
+            const notificationPromises = adminUsers.map(admin => 
+              createNotification({
+                userId: admin._id.toString(),
+                type: lowStockTemplate.type,
+                title: lowStockTemplate.title,
+                message: lowStockTemplate.message,
+                actionUrl: `/dashboard/products/${product._id}`,
+                metadata: {
+                  productId: product._id.toString(),
+                  productName: product.name,
+                  currentStock: product.stock,
+                  previousStock: originalProduct.stock
+                }
+              })
+            );
+            
+            await Promise.all(notificationPromises);
+          }
+        }
+        
+        if (originalProduct.price !== product.price) {
+          changes.push(`price changed from KES ${originalProduct.price} to KES ${product.price}`);
+        }
+        
+        if (changes.length > 0 && adminUsers.length > 0) {
+          const notificationPromises = adminUsers.map(admin => 
+            createNotification({
+              userId: admin._id.toString(),
+              type: 'system',
+              title: `✏️ Product Updated: ${product.name}`,
+              message: `Product "${product.name}" was updated: ${changes.join(', ')}`,
+              actionUrl: `/dashboard/products/${product._id}`,
+              metadata: {
+                productId: product._id.toString(),
+                productName: product.name,
+                changes: changes,
+                updatedBy: (req.user as any)?.email || (req.user as any)?.name || 'Admin'
+              }
+            })
+          );
+          
+          await Promise.all(notificationPromises);
+        }
+      } catch (notificationErr) {
+        console.error('Failed to create product update notification:', notificationErr);
+      }
+      
       res.json(product);
     } catch (error: any) {
       res.status(400).json({ error: error.message || 'Error updating product' });
     }
   });
 
-  router.delete('/:id', async (req: Request, res: Response) => {
+  // Delete product
+  router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
     try {
+      if (!isAdmin(req)) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+      
       const { id } = req.params;
       
       // 1. Get the product first (before deletion)
@@ -232,8 +417,37 @@ router.get('/brands', async (req: Request, res: Response) => {
       // 3. Delete the product
       await product.deleteOne();
       
+      // 🔔 CREATE NOTIFICATION FOR PRODUCT DELETION
+      try {
+        const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+        if (adminUsers.length > 0) {
+          const notificationPromises = adminUsers.map(admin => 
+            createNotification({
+              userId: admin._id.toString(),
+              type: 'system',
+              title: `🗑️ Product Deleted: ${product.name}`,
+              message: `Product "${product.name}" has been deleted from the store.`,
+              actionUrl: `/dashboard/products`,
+              metadata: {
+                productId: product._id.toString(),
+                productName: product.name,
+                productSlug: product.slug,
+                deletedBy: (req.user as any)?.email || (req.user as any)?.name || 'Admin',
+                deletedAt: new Date().toISOString()
+              }
+            })
+          );
+          
+          await Promise.all(notificationPromises);
+          console.log(`✅ Created ${adminUsers.length} notifications for product deletion: ${product.name}`);
+        }
+      } catch (notificationErr) {
+        console.error('Failed to create product deletion notification:', notificationErr);
+      }
+      
       res.json({ message: 'Product and associated images deleted successfully' });
     } catch (error) {
+      console.error('Delete product error:', error);
       res.status(500).json({ error: 'Error deleting product' });
     }
   });

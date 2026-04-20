@@ -11,6 +11,7 @@ import { sendOrderConfirmation, sendAdminOrderNotification } from '../services/e
 import ShippingAreaModel from '../models/ShippingArea';
 import PromoCodeModel from '../models/PromoCode';
 import { CompanySettings } from '../models/CompanySettings';
+import { createNotification } from '../services/notification.service';
 
 const router = Router();
 
@@ -228,7 +229,7 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
       price: item.price
     }));
 
-    // Send order confirmation to customer (don't await - let it run in background)
+// Send order confirmation to customer (don't await - let it run in background)
 sendOrderConfirmation({
   orderId: order._id.toString(),
   customerName: customerName,
@@ -262,6 +263,55 @@ if (process.env.ADMIN_EMAIL) {
     items: emailItems,
     orderDate: order.createdAt || new Date()
   }).catch(err => console.error('Failed to send admin notification:', err));
+}
+
+// 🔔 CREATE NEW ORDER NOTIFICATION for admin users
+try {
+  const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+  if (adminUsers.length > 0) {
+    // Create notifications for ALL admin users, not just first one
+    const notificationPromises = adminUsers.map(admin => 
+      createNotification({
+        userId: admin._id.toString(), // Convert ObjectId to string
+        type: 'order',
+        title: `🛍️ New Order #${order.orderNumber}`,
+        message: `Order placed by ${customerName} (Total: KES ${finalTotal.toFixed(2)})`,
+        actionUrl: `/dashboard/orders/${order._id}`,
+        metadata: {
+          orderId: order._id.toString(),
+          orderNumber: order.orderNumber,
+          customerName: customerName,
+          customerEmail: customerEmail,
+          paymentMethod: paymentMethod,
+          total: finalTotal
+        }
+      })
+    );
+    
+    await Promise.all(notificationPromises);
+    console.log(`✅ Created ${adminUsers.length} admin notifications for order ${order.orderNumber}`);
+  }
+  
+  // Also notify the customer if they are an authenticated user
+  if (userId) {
+    await createNotification({
+      userId: userId.toString(), // Convert ObjectId to string if needed
+      type: 'order',
+      title: `✅ Order Confirmed #${order.orderNumber}`,
+      message: `Your order has been confirmed. Total: KES ${finalTotal.toFixed(2)}`,
+      actionUrl: `/orders/${order._id}`,
+      metadata: {
+        orderId: order._id.toString(),
+        orderNumber: order.orderNumber,
+        total: finalTotal,
+        status: order.status
+      }
+    });
+    console.log(`✅ Created customer notification for order ${order.orderNumber}`);
+  }
+  
+} catch (notificationErr) {
+  console.error('Failed to create order notifications:', notificationErr);
 }
 
     // Populate product details for response
@@ -401,7 +451,8 @@ router.get('/:id', optionalAuthMiddleware, async (req: Request & { user?: any },
 
     // Try to find by ID
     if (mongoose.Types.ObjectId.isValid(orderId)) {
-      order = await OrderModel.findById(orderId)
+      const validOrderId = new mongoose.Types.ObjectId(orderId);
+      order = await OrderModel.findById(validOrderId)
         .populate('items.productId', 'name images rating');
     }
 
@@ -584,13 +635,19 @@ router.patch('/admin/orders/:id/status', authMiddleware, async (req: Request & {
     }
 
     const { status, trackingNumber, estimatedDelivery } = req.body;
+    const orderId = req.params.id;
     const validStatuses = ['pending', 'processing', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'];
     
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    const order = await OrderModel.findById(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+
+    const validOrderId = new mongoose.Types.ObjectId(orderId);
+    const order = await OrderModel.findById(validOrderId);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -605,7 +662,7 @@ router.patch('/admin/orders/:id/status', authMiddleware, async (req: Request & {
     }
 
     // Update order fields
-    order.status = status as any;
+order.status = status as any;
     if (trackingNumber) order.trackingNumber = trackingNumber;
     if (estimatedDelivery) order.estimatedDelivery = new Date(estimatedDelivery);
     
@@ -615,6 +672,28 @@ router.patch('/admin/orders/:id/status', authMiddleware, async (req: Request & {
     }
     
     await order.save();
+
+// 🔔 CREATE STATUS UPDATE NOTIFICATION
+try {
+  const adminUsers = await UserModel.find({ role: 'admin', isActive: true }).limit(1);
+  if (adminUsers.length > 0 && status !== 'pending') {
+    const firstAdmin = adminUsers[0];
+    await createNotification({
+      userId: firstAdmin._id.toString(), // Convert ObjectId to string
+      type: 'order',
+      title: `Order #${order.orderNumber} - ${status.toUpperCase()}`,
+      message: `Status updated to: ${status}`,
+      actionUrl: `/dashboard/orders/${order._id}`,
+      metadata: {
+        orderId: order._id.toString(),
+        oldStatus: req.body.oldStatus || 'unknown',
+        newStatus: status
+      }
+    });
+  }
+} catch (notificationErr) {
+  console.error('Failed to create status notification:', notificationErr);
+}
 
     const populated = await OrderModel.findById(req.params.id)
       .populate('userId', 'name email')
@@ -645,7 +724,13 @@ router.patch('/admin/orders/:id/status', authMiddleware, async (req: Request & {
 router.post('/:id/retry-payment', optionalAuthMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
     const orderId = req.params.id;
-    const order = await OrderModel.findById(orderId);
+    
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const validOrderId = new mongoose.Types.ObjectId(orderId);
+    const order = await OrderModel.findById(validOrderId);
     
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });

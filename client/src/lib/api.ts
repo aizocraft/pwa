@@ -686,7 +686,7 @@ export async function updateOrderStatus(id: string, status: Order['status'], dat
 }): Promise<Order> {
   try {
     const response = await api.patch(`/orders/admin/orders/${id}/status`, { status, ...data });
-    toast.success('Order status updated');
+    
     return response.data.order;
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Failed to update status');

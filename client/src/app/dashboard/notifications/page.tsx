@@ -2,71 +2,66 @@
 
 "use client"
 
-import { useState, useEffect } from 'react'
-import { Bell, X, Check, AlertCircle, Package, Users, ShoppingBag, Truck, Clock } from 'lucide-react'
+import { useState } from 'react'
+import { 
+  Bell, X, Check, AlertCircle, Package, Users, ShoppingBag, Truck, Clock, CreditCard, Star, Settings, RefreshCw 
+} from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-
-// Types
-interface Notification {
-  id: string
-  type: 'order' | 'stock' | 'user' | 'system' | 'payment'
-  title: string
-  message: string
-  read: boolean
-  createdAt: string
-  actionUrl?: string
-  metadata?: Record<string, any>
-}
+import { toast } from 'react-hot-toast'
+import { 
+  useNotifications, 
+  useUnreadCount,
+  useMarkAsRead, 
+  useMarkAllAsRead,
+  useDeleteNotification,
+  useDeleteAllRead
+} from '@/lib/notifications'
+import { Notification } from '@/types/notification'
 
 const NotificationsPage = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'order',
-      title: 'New Order Received',
-      message: 'Order #ORD-12345 has been placed by John Doe',
-      read: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-      actionUrl: '/dashboard/orders/12345'
-    },
-    {
-      id: '2',
-      type: 'stock',
-      title: 'Low Stock Alert',
-      message: 'Product "Solar Panel 500W" is running low (Only 5 left)',
-      read: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      actionUrl: '/dashboard/products/prod_123'
-    },
-    {
-      id: '3',
-      type: 'user',
-      title: 'New Customer Registered',
-      message: 'Jane Smith just created an account',
-      read: true,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-      actionUrl: '/dashboard/users/user_456'
-    },
-    {
-      id: '4',
-      type: 'payment',
-      title: 'Payment Received',
-      message: 'Payment of KES 25,000 received for order #ORD-12340',
-      read: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-    },
-    {
-      id: '5',
-      type: 'system',
-      title: 'System Update',
-      message: 'System maintenance scheduled for tomorrow at 2 AM',
-      read: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    }
-  ])
-
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  
+  // Real API data
+  const notificationsQuery = useNotifications({ 
+    limit: 50,
+    page: 1 
+  })
+  const unreadCountQuery = useUnreadCount()
+  
+  const markAsReadMutation = useMarkAsRead()
+  const markAllAsReadMutation = useMarkAllAsRead()
+  const deleteNotificationMutation = useDeleteNotification()
+  const deleteAllReadMutation = useDeleteAllRead()
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await Promise.all([
+        notificationsQuery.refetch(),
+        unreadCountQuery.refetch()
+      ])
+      toast.success('Notifications refreshed!')
+    } catch (error) {
+      toast.error('Failed to refresh notifications')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  // Filter notifications by current tab
+  const allNotifications = notificationsQuery.data?.data?.notifications ?? []
+  const filteredNotifications = allNotifications.filter(notification => {
+    if (filter === 'unread') return !notification.read
+    if (filter === 'read') return notification.read
+    return true
+  })
+  
+  const totalCount = notificationsQuery.data?.data?.pagination?.total ?? 0
+  const unreadCount = unreadCountQuery.data?.data?.unreadCount ?? 0
+  const readCount = totalCount - unreadCount
+  
+  const isLoading = notificationsQuery.isLoading || notificationsQuery.isFetching
 
   const getIcon = (type: Notification['type']) => {
     switch (type) {
@@ -77,9 +72,13 @@ const NotificationsPage = () => {
       case 'user':
         return { icon: Users, color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' }
       case 'payment':
-        return { icon: Truck, color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-900/30' }
+        return { icon: CreditCard, color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-900/30' }
+      case 'shipping':
+        return { icon: Truck, color: 'text-teal-500', bg: 'bg-teal-100 dark:bg-teal-900/30' }
+      case 'review':
+        return { icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30' }
       case 'system':
-        return { icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30' }
+        return { icon: Settings, color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30' }
       default:
         return { icon: Bell, color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-800' }
     }
@@ -100,35 +99,21 @@ const NotificationsPage = () => {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   }
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(notification =>
-        notification.id === id ? { ...notification, read: true } : notification
-      )
-    )
+  const handleMarkAsRead = (id: string) => {
+    markAsReadMutation.mutate(id)
   }
 
-  const markAllAsRead = () => {
-    setNotifications(prev =>
-      prev.map(notification => ({ ...notification, read: true }))
-    )
+  const handleMarkAllAsRead = () => {
+    markAllAsReadMutation.mutate()
   }
 
-  const deleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id))
+  const handleDeleteNotification = (id: string) => {
+    deleteNotificationMutation.mutate(id)
   }
 
-  const deleteAllRead = () => {
-    setNotifications(prev => prev.filter(notification => !notification.read))
+  const handleDeleteAllRead = () => {
+    deleteAllReadMutation.mutate()
   }
-
-  const filteredNotifications = notifications.filter(notification => {
-    if (filter === 'unread') return !notification.read
-    if (filter === 'read') return notification.read
-    return true
-  })
-
-  const unreadCount = notifications.filter(n => !n.read).length
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
@@ -156,20 +141,31 @@ const NotificationsPage = () => {
             </div>
             
             <div className="flex gap-3">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing || notificationsQuery.isFetching || unreadCountQuery.isFetching}
+                className="px-4 py-2 text-sm text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                title="Refresh notifications"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
               {unreadCount > 0 && (
                 <button
-                  onClick={markAllAsRead}
-                  className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all duration-200 font-medium"
+                  onClick={handleMarkAllAsRead}
+                  disabled={markAllAsReadMutation.isPending || isRefreshing}
+                  className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Mark all as read
+                  {markAllAsReadMutation.isPending ? 'Marking...' : 'Mark all as read'}
                 </button>
               )}
-              {notifications.some(n => n.read) && (
+              {readCount > 0 && (
                 <button
-                  onClick={deleteAllRead}
-                  className="px-4 py-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 font-medium"
+                  onClick={handleDeleteAllRead}
+                  disabled={deleteAllReadMutation.isPending || isRefreshing}
+                  className="px-4 py-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Clear read
+                  {deleteAllReadMutation.isPending ? 'Clearing...' : 'Clear read'}
                 </button>
               )}
             </div>
@@ -187,7 +183,7 @@ const NotificationsPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{notifications.length}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalCount}</p>
               </div>
               <Bell className="w-8 h-8 text-blue-500 opacity-50" />
             </div>
@@ -205,7 +201,7 @@ const NotificationsPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Read</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{notifications.filter(n => n.read).length}</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{readCount}</p>
               </div>
               <Check className="w-8 h-8 text-green-500 opacity-50" />
             </div>
@@ -220,9 +216,9 @@ const NotificationsPage = () => {
           className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-800"
         >
           {[
-            { id: 'all', label: 'All', count: notifications.length },
+            { id: 'all', label: 'All', count: totalCount },
             { id: 'unread', label: 'Unread', count: unreadCount },
-            { id: 'read', label: 'Read', count: notifications.filter(n => n.read).length }
+            { id: 'read', label: 'Read', count: readCount }
           ].map(tab => (
             <button
               key={tab.id}
@@ -272,7 +268,7 @@ const NotificationsPage = () => {
                 const { icon: Icon, color, bg } = getIcon(notification.type)
                 return (
                   <motion.div
-                    key={notification.id}
+                    key={notification._id}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
@@ -324,7 +320,8 @@ const NotificationsPage = () => {
                         <div className="flex gap-1">
                           {!notification.read && (
                             <button
-                              onClick={() => markAsRead(notification.id)}
+                              onClick={() => handleMarkAsRead(notification._id)}
+                              disabled={markAsReadMutation.isPending}
                               className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-all duration-200"
                               title="Mark as read"
                             >
@@ -332,7 +329,8 @@ const NotificationsPage = () => {
                             </button>
                           )}
                           <button
-                            onClick={() => deleteNotification(notification.id)}
+                            onClick={() => handleDeleteNotification(notification._id)}
+                            disabled={deleteNotificationMutation.isPending}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all duration-200"
                             title="Delete"
                           >
@@ -354,14 +352,14 @@ const NotificationsPage = () => {
         </motion.div>
 
         {/* Footer Info */}
-        {notifications.length > 0 && (
+        {totalCount > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
             className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400"
           >
-            <p>Notifications are automatically cleaned up after 30 days</p>
+            <p>Notifications are automatically cleaned up after 90 days</p>
           </motion.div>
         )}
       </div>
