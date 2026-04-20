@@ -240,6 +240,25 @@ export const getCurrentUser = (): {
     return null;
   }
 };
+
+// Avatar API functions
+export async function uploadAvatar(userId: string, file: File): Promise<{ success: true; data: { avatar: string } }> {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const response = await api.post(`/users/${userId}/avatar`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return response.data;
+}
+
+export async function deleteAvatar(userId: string): Promise<{ success: true; message: string }> {
+  const response = await api.delete(`/users/${userId}/avatar`);
+  return response.data;
+}
+
+export function getAvatarUrl(userId: string): string {
+  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/users/${userId}/avatar`;
+}
 // ========== USER MANAGEMENT API ==========
 
 

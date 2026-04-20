@@ -6,6 +6,10 @@ import UserModel from '../models/User';
 import OrderModel from '../models/Order';
 import type { IUser } from '../models/User';
 import type { AuthUser } from '../types/express';
+import multer from 'multer';
+import { compressImage } from '../middleware/imageCompression';
+import { getGridFSBucket } from '../config/gridfs';
+import mongoose from 'mongoose';
 
 const router = Router();
 
@@ -29,6 +33,21 @@ const adminOnly = requireRoles(['admin']);
 
 // Admin or sales middleware
 const adminOrSales = requireRoles(['admin', 'sales']);
+
+// Multer for avatar upload
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  },
+fileFilter: (req, file: Express.Multer.File, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files allowed'));
+    }
+  }
+});
 
 // ==================== GET Routes ====================
 
@@ -545,6 +564,169 @@ router.get('/export/csv', authMiddleware, adminOnly, async (req: Request, res: R
       success: false,
       error: 'Failed to export users' 
     });
+  }
+});
+
+
+/**
+ * POST /api/users/:id/avatar - Upload profile picture to GridFS with compression
+ * Access: Authenticated user or admin/sales
+ */
+router.post('/:id/avatar', 
+  authMiddleware, 
+  upload.single('avatar'), 
+  compressImage({ 
+    maxWidth: 500, 
+    maxHeight: 500, 
+    quality: 80,
+    fit: 'cover'
+  }), 
+  async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const currentUser = req.user as AuthUser;
+
+      // Auth check: self or admin/sales
+      if (currentUser.role !== 'admin' && currentUser.role !== 'sales' && currentUser.userId !== userId) {
+        return res.status(403).json({ error: 'Can only update own avatar or admin access required' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const bucket = getGridFSBucket();
+      const fileExtension = req.file.originalname.split('.').pop();
+      const filename = `avatar_${userId}_${Date.now()}.${fileExtension}`;
+
+      // Upload compressed image to GridFS
+      const uploadStream = bucket.openUploadStream(filename, { 
+        contentType: req.file.mimetype,
+        metadata: {
+          originalName: req.file.originalname,
+          originalSize: (req as any).compressionInfo?.originalSize,
+          compressedSize: (req as any).compressionInfo?.compressedSize,
+          compressionRatio: (req as any).compressionInfo?.ratio,
+          uploadedAt: new Date()
+        }
+      });
+      
+      const buffer = req.file.buffer;
+
+      uploadStream.on('finish', async (file: any) => {
+        await UserModel.findByIdAndUpdate(userId, { avatar: filename });
+
+        const response: any = {
+          success: true,
+          message: 'Avatar uploaded successfully',
+          data: { avatar: filename }
+        };
+
+        // Include compression stats in response if available
+        if ((req as any).compressionInfo) {
+          response.compression = {
+            originalSize: (req as any).compressionInfo.originalSize,
+            compressedSize: (req as any).compressionInfo.compressedSize,
+            savedBytes: (req as any).compressionInfo.savedBytes,
+            reductionPercentage: (req as any).compressionInfo.ratio,
+            originalFormat: (req as any).compressionInfo.originalMimeType,
+            finalFormat: (req as any).compressionInfo.finalMimeType
+          };
+          
+          console.log(`Avatar compressed: ${(response.compression.reductionPercentage)}% reduction`);
+        }
+
+        res.json(response);
+      });
+
+      uploadStream.on('error', (error) => {
+        console.error('GridFS upload error:', error);
+        res.status(500).json({ error: 'Failed to upload avatar' });
+      });
+
+      uploadStream.end(buffer);
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+/**
+ * GET /api/users/:id/avatar - Serve profile picture from GridFS or redirect to URL
+ * Access: Public read for images
+ */
+router.get('/:id/avatar', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const user = await UserModel.findById(userId).select('avatar').lean();
+
+    if (!user || !user.avatar) {
+      return res.status(404).json({ error: 'Avatar not found' });
+    }
+
+    // Check if it's GridFS filename or URL
+    if (user.avatar.match(/^https?:\/\//)) {
+      // Redirect to external URL
+      return res.redirect(user.avatar);
+    }
+
+    // GridFS filename
+    const bucket = getGridFSBucket();
+    const downloadStream = bucket.openDownloadStreamByName(user.avatar);
+
+    downloadStream.on('error', () => {
+      res.status(404).json({ error: 'Avatar file not found' });
+    });
+
+    downloadStream.pipe(res);
+  } catch (error) {
+    console.error('Avatar serve error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * DELETE /api/users/:id/avatar - Delete profile picture from GridFS
+ * Access: Self or admin/sales
+ */
+router.delete('/:id/avatar', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const currentUser = req.user as AuthUser;
+
+    // Auth check
+    if (currentUser.role !== 'admin' && currentUser.role !== 'sales' && currentUser.userId !== userId) {
+      return res.status(403).json({ error: 'Can only delete own avatar or admin access required' });
+    }
+
+    const user = await UserModel.findById(userId).select('avatar');
+
+    if (!user || !user.avatar) {
+      return res.status(404).json({ error: 'No avatar to delete' });
+    }
+
+    // Only delete if GridFS filename (not URL)
+    if (user.avatar.match(/^https?:\/\//)) {
+      await UserModel.findByIdAndUpdate(userId, { $unset: { avatar: '' } });
+      return res.json({ success: true, message: 'Avatar URL removed' });
+    }
+
+    // GridFS delete
+    const bucket = getGridFSBucket();
+    const files = await bucket.find({ filename: user.avatar }).toArray();
+
+    for (const file of files) {
+      await bucket.delete(file._id);
+    }
+
+    // Clear user avatar
+    await UserModel.findByIdAndUpdate(userId, { $unset: { avatar: '' } });
+
+    res.json({ success: true, message: 'Avatar deleted successfully' });
+  } catch (error) {
+    console.error('Avatar delete error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

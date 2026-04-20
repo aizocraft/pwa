@@ -1,4 +1,4 @@
-// src/app/Navbar.tsx 
+// src/app/Navbar.tsx
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
@@ -9,17 +9,29 @@ import { useRouter, usePathname } from 'next/navigation'
 import { LayoutDashboard, ShoppingCart, LogOut, Sun, Moon, Menu, X, Search, User, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/context/ThemeContext'
+import Avatar from '@/components/Avatar'
+
+import { useProfile } from '@/lib/profile' 
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [avatarRefreshKey, setAvatarRefreshKey] = useState(Date.now())
   const { totalItems, loading: cartLoading } = useCartStore()
 
   const { user, isLoggedIn, loading: authLoading, logout, isAdmin } = useAuth()
+  const { profile, refetch: refetchProfile } = useProfile()  // Get profile data
   const { theme, toggleTheme } = useTheme()
   const router = useRouter()
   const pathname = usePathname()
+
+  // Refresh avatar when profile changes
+  useEffect(() => {
+    if (profile?.avatar) {
+      setAvatarRefreshKey(Date.now())
+    }
+  }, [profile?.avatar])
 
   // Use local logo
   const logoUrl = '/logo.png'
@@ -153,7 +165,6 @@ export default function Navbar() {
                 >
                   <Search className="w-5 h-5" />
                 </button>
-
               </div>
 
               {/* Cart Button */}
@@ -173,7 +184,6 @@ export default function Navbar() {
                   </span>
                 )}
               </Link>
-
 
               {/* Theme Toggle */}
               <button
@@ -197,9 +207,12 @@ export default function Navbar() {
                         onClick={toggleProfileMenu}
                         className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
                       >
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white font-semibold text-sm shadow-md">
-                          {user.name?.charAt(0).toUpperCase() || 'U'}
-                        </div>
+                        {/* Replace the div with Avatar component */}
+                        <Avatar 
+                          size="sm"
+                          userId={user?.id || user?._id}
+                          className="ring-2 ring-white dark:ring-gray-800 shadow-md"
+                        />
                         <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`} />
                       </button>
 
@@ -207,8 +220,16 @@ export default function Navbar() {
                       {showProfileMenu && (
                         <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                           <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800">
-                            <p className="font-semibold text-gray-900 dark:text-white">{user.name}</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                            <div className="flex items-center gap-3">
+                              <Avatar 
+                                size="md"
+                                userId={user?.id || user?._id}
+                              />
+                              <div>
+                                <p className="font-semibold text-gray-900 dark:text-white">{user.name}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                              </div>
+                            </div>
                           </div>
                           
                           <div className="py-2">
@@ -306,9 +327,11 @@ export default function Navbar() {
                   {isLoggedIn && user ? (
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                       <div className="flex items-center gap-3 px-4 py-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white font-semibold shadow-md">
-                          {user.name?.charAt(0).toUpperCase() || 'U'}
-                        </div>
+                        {/* Replace with Avatar component */}
+                        <Avatar 
+                          size="md"
+                          userId={user?.id || user?._id}
+                        />
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-gray-900 dark:text-white">{user.name}</p>
                           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>

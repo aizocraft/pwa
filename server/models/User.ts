@@ -52,7 +52,10 @@ const userSchema = new Schema<IUser>({
     trim: true,
     match: [/^\+?[\d\s-]{10,}$/, 'Please enter a valid phone number']
   },
-  avatar: { type: String },
+avatar: { 
+  type: String,
+  match: [/^(https?:\/\/.*|[\w\.\-\s]+)$/i, 'Avatar must be valid URL or GridFS filename']
+},
   isActive: { 
     type: Boolean, 
     default: true

@@ -1,23 +1,21 @@
 'use client'
 
-import { useProfile, useChangePassword, useDeleteProfile, useUserOrders } from '@/lib/profile'
-import { useState, useEffect, ChangeEvent, FormEvent } from 'react'
+import { useProfile, useChangePassword, useDeleteProfile, useUserOrders, useUploadAvatar, useDeleteAvatar } from '@/lib/profile'
+import { useAuth } from '@/lib/auth'
+import { Avatar } from '@/components/Avatar'
+import { useState, useEffect, ChangeEvent, FormEvent, DragEvent, useRef, useCallback } from 'react'
 import React from 'react'
 import { 
   Loader2, User, Mail, Phone, Lock, Trash2, Package, MapPin, 
-  Activity, Calendar, DollarSign, Edit2, Save, X, Check, 
+  Calendar, DollarSign, Edit2, Save, X, Check, 
   ShoppingBag, Heart, Star, Clock, CreditCard, Shield, 
-  Bell, Globe, Smartphone, LogOut, AlertTriangle, Home,
-  ChevronRight, ChevronDown, Copy, ExternalLink, Sparkles,
-  Award, TrendingUp, Clock as ClockIcon, Eye, Settings,
-  Layers, Truck, Gift, Zap, ArrowRight, CircleDot
+  AlertTriangle, Home, ArrowRight, CircleDot, Image as ImageIcon
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { OrderStatusBadge } from '@/components/OrderStatusBadge'
 import { Order } from '@/types/order'
 import { format } from 'date-fns'
-import { motion, AnimatePresence } from 'framer-motion'
 
 // ========== UI Components ==========
 type ButtonVariant = 'default' | 'destructive' | 'outline' | 'ghost' | 'success'
@@ -32,6 +30,8 @@ type ButtonProps = {
   onClick?: React.MouseEventHandler<HTMLButtonElement>
   type?: 'button' | 'submit' | 'reset'
 }
+
+
 
 const Button = ({ children, className = '', variant = 'default', size = 'default', disabled, onClick, type = 'button' }: ButtonProps) => {
   const baseClasses = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:pointer-events-none disabled:opacity-50 gap-2'
@@ -62,18 +62,25 @@ const Button = ({ children, className = '', variant = 'default', size = 'default
   )
 }
 
-const Card = ({ children, className = '' }: any) => (
+const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
   <div className={`bg-white dark:bg-gray-900/80 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-gray-800/50 shadow-sm hover:shadow-md transition-all duration-200 ${className}`}>
     {children}
   </div>
 )
 
-const CardHeader = ({ children, className = '' }: any) => <div className={`p-4 border-b border-gray-100 dark:border-gray-800 ${className}`}>{children}</div>
-const CardContent = ({ children, className = '' }: any) => <div className={`p-4 ${className}`}>{children}</div>
-const CardTitle = ({ children, className = '' }: any) => (
+const CardHeader = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <div className={`p-4 border-b border-gray-100 dark:border-gray-800 ${className}`}>{children}</div>
+)
+
+const CardContent = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <div className={`p-4 ${className}`}>{children}</div>
+)
+
+const CardTitle = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
   <h3 className={`text-base font-semibold text-gray-900 dark:text-white ${className}`}>{children}</h3>
 )
-const CardDescription = ({ children, className = '' }: any) => (
+
+const CardDescription = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
   <p className={`text-xs text-gray-500 dark:text-gray-400 ${className}`}>{children}</p>
 )
 
@@ -94,7 +101,7 @@ const Input = ({ id, value, onChange, type = 'text', placeholder, required, clas
   </div>
 )
 
-const Label = ({ htmlFor, children, required }: any) => (
+const Label = ({ htmlFor, children, required }: { htmlFor?: string; children: React.ReactNode; required?: boolean }) => (
   <label htmlFor={htmlFor} className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
     {children}
     {required && <span className="text-red-500 ml-0.5">*</span>}
@@ -103,13 +110,7 @@ const Label = ({ htmlFor, children, required }: any) => (
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info'
 
-type BadgeProps = {
-  children: React.ReactNode
-  variant?: BadgeVariant
-  className?: string
-}
-
-const Badge = ({ children, variant = 'default', className = '' }: BadgeProps) => {
+const Badge = ({ children, variant = 'default', className = '' }: { children: React.ReactNode; variant?: BadgeVariant; className?: string }) => {
   const variants: Record<BadgeVariant, string> = {
     default: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
     success: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
@@ -124,17 +125,12 @@ const Badge = ({ children, variant = 'default', className = '' }: BadgeProps) =>
   )
 }
 
-const StatCard = ({ icon: Icon, label, value, trend }: any) => (
+const StatCard = ({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) => (
   <div className="bg-white dark:bg-gray-900/80 rounded-xl border border-gray-200/50 dark:border-gray-800/50 p-4 hover:shadow-md transition-all group">
     <div className="flex items-center justify-between mb-2">
       <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg group-hover:scale-110 transition-transform">
         <Icon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
       </div>
-      {trend && (
-        <Badge variant={trend > 0 ? 'success' : 'danger'} className="text-xs">
-          {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
-        </Badge>
-      )}
     </div>
     <p className="text-xl font-bold text-gray-900 dark:text-white">{value}</p>
     <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
@@ -187,7 +183,18 @@ export default function ProfilePage() {
   const changePasswordMutation = useChangePassword()
   const deleteProfileMutation = useDeleteProfile()
   const { data: ordersData, isLoading: ordersLoading } = useUserOrders(1, 5)
+  const uploadAvatarMutation = useUploadAvatar()
+  const deleteAvatarMutation = useDeleteAvatar()
+  const { user: authUser } = useAuth()
 
+  const getUserId = useCallback(() => {
+    return authUser?.id || authUser?._id || profile?.id || profile?._id || null;
+  }, [authUser, profile]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [editForm, setEditForm] = useState({
     name: '',
     email: '',
@@ -196,13 +203,11 @@ export default function ProfilePage() {
   })
   const [isEditing, setIsEditing] = useState(false)
   const [updating, setUpdating] = useState(false)
-
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [passwordErrors, setPasswordErrors] = useState({ current: '', new: '', confirm: '' })
-
   const [addresses, setAddresses] = useState<any[]>([])
   const [newAddress, setNewAddress] = useState({
     fullName: '',
@@ -211,6 +216,98 @@ export default function ProfilePage() {
     phone: ''
   })
   const [showAddressForm, setShowAddressForm] = useState(false)
+
+  // Get avatar URL function
+  const getAvatarUrl = (userId: string) => {
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/users/${userId}/avatar`
+  }
+
+  // Clear preview on unmount
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview)
+      }
+    }
+  }, [avatarPreview])
+
+  // Reset preview when profile avatar changes
+  useEffect(() => {
+    if (profile?.avatar && !avatarFile) {
+      setAvatarPreview(null)
+    }
+  }, [profile?.avatar, avatarFile])
+
+  // Avatar handlers
+ // Avatar handlers
+const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (file) {
+    // Validate
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+    
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }
+};
+
+const handleAvatarDrop = (e: DragEvent<HTMLDivElement>) => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }
+};
+
+// NEW: Handle upload using React Query hook
+const handleAvatarUploadWithHook = () => {
+  if (!avatarFile) {
+    toast.error('Please select an image first');
+    return;
+  }
+  
+  uploadAvatarMutation.mutate(avatarFile, {
+    onSuccess: () => {
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      refetch();
+    }
+  });
+};
+
+// NEW: Handle remove using React Query hook
+const handleAvatarRemoveWithHook = () => {
+  if (!profile?.avatar) {
+    toast.error('No profile picture to remove');
+    return;
+  }
+  
+  if (confirm('Are you sure you want to remove your profile picture?')) {
+    deleteAvatarMutation.mutate(undefined, {
+      onSuccess: () => {
+        setAvatarFile(null);
+        setAvatarPreview(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        refetch();
+      }
+    });
+  }
+};
+
+  // Removed unused displayAvatarUrl
 
   useEffect(() => {
     if (profile) {
@@ -353,25 +450,28 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <div className="max-w-5xl mx-auto px-4 py-6 lg:py-8">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="relative inline-block mb-3">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-              {profile.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-900"></div>
-          </div>
-          
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {profile.name}
-          </h1>
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="relative inline-block mb-3">
+                <Avatar 
+                  size="lg" 
+                  previewUrl={avatarPreview || undefined} 
+                  userId={getUserId() || undefined}
+                  className="shadow-lg border-4 border-white dark:border-gray-900"
+                />
+                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-900"></div>
+              </div>
+              
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {profile?.name}
+              </h1>
           
           <div className="flex items-center justify-center gap-2 mt-1 flex-wrap">
-            <Badge variant="info">{profile.role?.toUpperCase() || 'USER'}</Badge>
-            <Badge>{profile.provider?.toUpperCase() || 'EMAIL'}</Badge>
+            <Badge variant="info">{profile?.role?.toUpperCase() || 'USER'}</Badge>
+            <Badge>{profile?.provider?.toUpperCase() || 'EMAIL'}</Badge>
             <div className="flex items-center gap-1 text-xs text-gray-500">
               <Calendar className="w-3 h-3" />
-              Joined {format(new Date(profile.createdAt || Date.now()), 'MMM yyyy')}
+              Joined {format(new Date(profile?.createdAt || Date.now()), 'MMM yyyy')}
             </div>
           </div>
         </div>
@@ -447,18 +547,82 @@ export default function ProfilePage() {
                       />
                     </div>
                     
-                    <div>
-                      <Label htmlFor="avatar">Avatar URL</Label>
-                      <Input 
-                        id="avatar" 
-                        type="url" 
-                        placeholder="https://..."
-                        value={editForm.avatar}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => setEditForm({...editForm, avatar: e.target.value})}
-                        disabled={!isEditing}
-                        icon={Globe}
-                      />
-                    </div>
+<div>
+  <Label>Profile Picture</Label>
+  <div className="space-y-4">
+    <div className="flex items-center gap-4">
+<Avatar 
+  size="lg" 
+  previewUrl={avatarPreview || undefined}
+  userId={authUser?.id || authUser?._id || profile?.id || profile?._id}
+  className="border-2 border-gray-200"
+/>
+
+      
+      {/* Upload Controls */}
+      <div className="flex-1">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleAvatarChange}
+          className="hidden"
+        />
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <ImageIcon className="w-4 h-4 mr-2" />
+            Choose Image
+          </Button>
+          
+          {avatarFile && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleAvatarUploadWithHook}
+              disabled={uploadAvatarMutation.isPending}
+            >
+              {uploadAvatarMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              Upload
+            </Button>
+          )}
+          
+          {profile?.avatar && !avatarFile && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleAvatarRemoveWithHook}
+              disabled={deleteAvatarMutation.isPending}
+              className="text-red-500 hover:text-red-600"
+            >
+              {deleteAvatarMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Remove
+            </Button>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          Recommended: Square image, at least 200x200px. Max 5MB.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
                   </div>
                   
                   {isEditing && (
