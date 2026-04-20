@@ -218,7 +218,7 @@ export default function AddProductPage() {
       };
 
       await createProduct(productData);
-      toast.success('Product created successfully!');
+      
       router.push('/dashboard/products');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create product');

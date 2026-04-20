@@ -100,7 +100,6 @@ export default function DashboardProductsPage() {
       return { previousData }
     },
     onSuccess: () => {
-      toast.success('Product deleted successfully')
       setDeleteModalOpen(false)
       setProductToDelete(null)
     },

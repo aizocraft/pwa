@@ -250,7 +250,7 @@ export default function EditProductPage() {
       };
 
       await updateProduct(productSlug, productData);
-      toast.success('Product updated successfully!');
+      
       router.push('/dashboard/products');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update product');
