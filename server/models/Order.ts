@@ -7,6 +7,7 @@ export interface IOrderItem {
   image: string;
   price: number;
   qty: number;
+  description?: string;
 }
 
 export interface IOrder extends Document {
@@ -36,7 +37,11 @@ export interface IOrder extends Document {
   stripeId?: string;
   selectedShippingArea?: mongoose.Types.ObjectId;
   appliedPromoCode?: mongoose.Types.ObjectId;
+  // Sales integration
+  salesCustomerId?: mongoose.Types.ObjectId;
+  quotationId?: mongoose.Types.ObjectId;
   shippingAddress: {
+
     fullName: string;
     address1: string;
     address2?: string;
@@ -67,7 +72,8 @@ const orderItemSchema = new Schema({
   slug: { type: String, required: true },
   image: { type: String, required: true },
   price: { type: Number, required: true },
-  qty: { type: Number, required: true, min: 1 }
+  qty: { type: Number, required: true, min: 1 },
+  description: { type: String }
 });
 
 const orderSchema = new Schema<IOrder, IOrderModel>({

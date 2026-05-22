@@ -32,6 +32,7 @@ export interface OrderItem {
   image: string;
   price: number;
   qty: number;
+  description?: string;
 }
 
 export interface ShippingAddress {

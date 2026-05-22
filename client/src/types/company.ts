@@ -1,6 +1,5 @@
 // src/types/company.ts
 
-// ✅ Correct structure matching backend
 export interface CompanyLogo {
   type: 'url' | 'gridfs';
   url?: string;

@@ -569,3 +569,94 @@ export const sendPaymentFailedNotification = async (data: {
   // Implement your email sending logic
   console.log(`Payment failure notification sent to ${data.email} for order ${data.orderNumber}`);
 };
+
+
+/**
+ * Send quotation email to customer
+ */
+export const sendQuotationEmail = async (data: {
+  to: string;
+  customerName: string;
+  quoteNumber: string;
+  quoteTotal: number;
+  validUntil: Date;
+  quoteLink: string;
+  items: Array<{ name: string; quantity: number; price: number }>;
+}) => {
+  const itemsHtml = data.items.map(item => `
+    <tr>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${item.name}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">KES ${item.price.toFixed(2)}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">KES ${(item.quantity * item.price).toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  return await sendEmail({
+    to: data.to,
+    subject: `Quotation #${data.quoteNumber} from ${process.env.COMPANY_NAME || 'Our Store'}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { padding: 30px; background: #f9fafb; }
+          .quotation-details { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: #f3f4f6; padding: 12px; text-align: left; font-weight: 600; }
+          td { padding: 12px; border-bottom: 1px solid #e5e7eb; }
+          .total { font-size: 18px; font-weight: bold; text-align: right; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e5e7eb; }
+          .button { display: inline-block; padding: 12px 24px; background: #10b981; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+          .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+          .valid-badge { display: inline-block; background: #fef3c7; color: #d97706; padding: 4px 8px; border-radius: 5px; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Quotation #${data.quoteNumber}</h1>
+          </div>
+          <div class="content">
+            <p>Dear <strong>${data.customerName}</strong>,</p>
+            <p>Thank you for your interest in our products. Please find your quotation below.</p>
+            
+            <div class="quotation-details">
+              <h3>Quotation Details</h3>
+              <p><strong>Quote Number:</strong> ${data.quoteNumber}</p>
+              <p><strong>Total Amount:</strong> <span style="font-size: 20px; color: #10b981;">KES ${data.quoteTotal.toFixed(2)}</span></p>
+              <p><strong>Valid Until:</strong> <span class="valid-badge">${new Date(data.validUntil).toLocaleDateString()}</span></p>
+              
+              <table>
+                <thead>
+                  <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr>
+                </thead>
+                <tbody>
+                  ${itemsHtml}
+                </tbody>
+              </table>
+              
+              <div class="total">
+                <strong>Total: KES ${data.quoteTotal.toFixed(2)}</strong>
+              </div>
+            </div>
+            
+            <div style="text-align: center;">
+              <a href="${data.quoteLink}" class="button">View Full Quotation</a>
+            </div>
+            
+            <p>To accept this quotation, please contact our sales team or click the link above.</p>
+            <p>Best regards,<br><strong>The Sales Team</strong></p>
+          </div>
+          <div class="footer">
+            <p>This quotation is valid until ${new Date(data.validUntil).toLocaleDateString()}</p>
+            <p>© ${new Date().getFullYear()} ${process.env.COMPANY_NAME || 'Our Store'}. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  });
+};
