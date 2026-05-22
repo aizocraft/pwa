@@ -40,7 +40,7 @@ export default function LoginPage() {
         if (user.role === "admin") {
           redirectPath = "/dashboard"
         } else if (user.role === "sales") {
-          redirectPath = "/sale"
+          redirectPath = "/sales"
         } else {
           redirectPath = "/orders"
         }

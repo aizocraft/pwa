@@ -101,8 +101,10 @@ export default function Navbar() {
     { href: '/', label: 'Home' },
     { href: '/products', label: 'Products' },
     { href: '/categories', label: 'Categories' },
+    { href: '/about', label: 'About' },
     { href: '/orders', label: 'Orders' },
   ]
+
 
   return (
     <>

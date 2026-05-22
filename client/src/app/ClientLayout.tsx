@@ -8,7 +8,8 @@ import Navbar from './Navbar';
 import Footer from './Footer';
 import { QueryProvider } from '@/lib/query-provider';
 import { Toaster } from 'react-hot-toast';
-import { ThemeProvider } from '@/context/ThemeContext'; 
+import { ThemeProvider } from '@/context/ThemeContext';
+import WhatsAppButton from '@/components/WhatsAppButton';
 import './globals.css';
 
 interface ClientLayoutProps {
@@ -18,14 +19,17 @@ interface ClientLayoutProps {
 export default function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname();
   const isDashboard = pathname?.startsWith('/dashboard');
+  const isCheckout = pathname?.startsWith('/checkout');
+  const isAdmin = pathname?.startsWith('/admin');
   const [mounted, setMounted] = useState(false);
   const hasInitialized = useRef(false);
 
-  // 🔧 ONLY initial mount hydration - once
+  // Check if we should show WhatsApp button (hide on dashboard, checkout, admin)
+  const shouldShowWhatsApp = !isDashboard && !isCheckout && !isAdmin;
+
   useEffect(() => {
     setMounted(true);
     
-    // Only hydrate once on initial load
     if (!hasInitialized.current) {
       hasInitialized.current = true;
       const initialSync = async () => {
@@ -33,15 +37,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           const { useCartStore } = await import('@/store/cart');
           const state = useCartStore.getState();
           
-          // Only load if not already hydrated
           if (!state.isHydrated) {
             await state.loadInitialData();
-
-          } else {
-
           }
         } catch (error) {
-
+          console.error('Failed to load cart data:', error);
         }
       };
       initialSync();
@@ -56,6 +56,10 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           {children}
         </main>
         {!isDashboard && <Footer />}
+        
+        {/* WhatsApp Button */}
+        {shouldShowWhatsApp && <WhatsAppButton />}
+        
         <Toaster 
           position="top-right"
           reverseOrder={false}
