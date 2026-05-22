@@ -574,89 +574,160 @@ export const sendPaymentFailedNotification = async (data: {
 /**
  * Send quotation email to customer
  */
-export const sendQuotationEmail = async (data: {
+export interface EmailOptions {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  attachments?: Array<{
+    filename: string;
+    content: string; // Base64 encoded string
+    contentType?: string;
+  }>;
+}
+
+export interface QuotationEmailData {
   to: string;
   customerName: string;
   quoteNumber: string;
   quoteTotal: number;
   validUntil: Date;
-  quoteLink: string;
+  pdfBuffer: Buffer;
+  pdfFilename: string;
   items: Array<{ name: string; quantity: number; price: number }>;
-}) => {
+}
+
+/**
+ * Send email with PDF attachment using Resend
+ */
+export const sendEmailWithAttachment = async (options: EmailOptions) => {
+  try {
+    console.log(`📧 Sending email with attachment to: ${options.to}`);
+    console.log(`📧 Subject: ${options.subject}`);
+    console.log(`📎 Attachment: ${options.attachments?.length} file(s)`);
+    
+    // Convert Buffer to base64 string for Resend
+    const attachments = options.attachments?.map(att => ({
+      filename: att.filename,
+      content: att.content, // Already base64 string
+      contentType: att.contentType || 'application/pdf',
+    }));
+
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text || options.html.replace(/<[^>]*>/g, ''),
+      attachments: attachments,
+    });
+
+    if (error) {
+      console.error('❌ Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Email sent successfully! Message ID:', data?.id);
+    return { success: true, messageId: data?.id };
+  } catch (error: any) {
+    console.error('❌ Email service error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send quotation email with PDF attachment
+ */
+export const sendQuotationWithPDF = async (data: QuotationEmailData) => {
   const itemsHtml = data.items.map(item => `
     <tr>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${item.name}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">KES ${item.price.toFixed(2)}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">KES ${(item.quantity * item.price).toFixed(2)}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${item.name}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">KES ${item.price.toFixed(2)}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">KES ${(item.quantity * item.price).toFixed(2)}</td>
     </tr>
   `).join('');
 
-  return await sendEmail({
-    to: data.to,
-    subject: `Quotation #${data.quoteNumber} from ${process.env.COMPANY_NAME || 'Our Store'}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { padding: 30px; background: #f9fafb; }
-          .quotation-details { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th { background: #f3f4f6; padding: 12px; text-align: left; font-weight: 600; }
-          td { padding: 12px; border-bottom: 1px solid #e5e7eb; }
-          .total { font-size: 18px; font-weight: bold; text-align: right; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e5e7eb; }
-          .button { display: inline-block; padding: 12px 24px; background: #10b981; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
-          .valid-badge { display: inline-block; background: #fef3c7; color: #d97706; padding: 4px 8px; border-radius: 5px; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Quotation #${data.quoteNumber}</h1>
-          </div>
-          <div class="content">
-            <p>Dear <strong>${data.customerName}</strong>,</p>
-            <p>Thank you for your interest in our products. Please find your quotation below.</p>
-            
-            <div class="quotation-details">
-              <h3>Quotation Details</h3>
-              <p><strong>Quote Number:</strong> ${data.quoteNumber}</p>
-              <p><strong>Total Amount:</strong> <span style="font-size: 20px; color: #10b981;">KES ${data.quoteTotal.toFixed(2)}</span></p>
-              <p><strong>Valid Until:</strong> <span class="valid-badge">${new Date(data.validUntil).toLocaleDateString()}</span></p>
-              
-              <table>
-                <thead>
-                  <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr>
-                </thead>
-                <tbody>
-                  ${itemsHtml}
-                </tbody>
-              </table>
-              
-              <div class="total">
-                <strong>Total: KES ${data.quoteTotal.toFixed(2)}</strong>
-              </div>
-            </div>
-            
-            <div style="text-align: center;">
-              <a href="${data.quoteLink}" class="button">View Full Quotation</a>
-            </div>
-            
-            <p>To accept this quotation, please contact our sales team or click the link above.</p>
-            <p>Best regards,<br><strong>The Sales Team</strong></p>
-          </div>
-          <div class="footer">
-            <p>This quotation is valid until ${new Date(data.validUntil).toLocaleDateString()}</p>
-            <p>© ${new Date().getFullYear()} ${process.env.COMPANY_NAME || 'Our Store'}. All rights reserved.</p>
-          </div>
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #0a2540 0%, #1a4a6f 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { padding: 30px; background: #f9fafb; }
+        .quotation-details { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th { background: #f3f4f6; padding: 12px; text-align: left; font-weight: 600; font-size: 13px; }
+        td { padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+        .total { font-size: 20px; font-weight: bold; text-align: right; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e5e7eb; }
+        .button { display: inline-block; padding: 12px 24px; background: #0a2540; color: white; text-decoration: none; border-radius: 8px; margin: 20px 10px 0 0; }
+        .button-wa { background: #25D366; }
+        .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb; margin-top: 20px; }
+        .badge { display: inline-block; background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-left: 10px; }
+        .attachment-note { background: #e0f2fe; padding: 10px; border-radius: 8px; margin: 15px 0; text-align: center; font-size: 12px; color: #0369a1; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1 style="margin: 0;">Quotation #${data.quoteNumber}</h1>
         </div>
-      </body>
-      </html>
-    `
+        <div class="content">
+          <p>Dear <strong>${data.customerName}</strong>,</p>
+          <p>Thank you for your interest in our products.</p>
+          
+          <div class="attachment-note">
+            📎 <strong>PDF Attachment:</strong> Your quotation has been attached to this email as a PDF file.
+          </div>
+          
+          <div class="quotation-details">
+            <h3 style="margin-top: 0;">Quotation Summary</h3>
+            <p><strong>Quote Number:</strong> ${data.quoteNumber}</p>
+            <p><strong>Total Amount:</strong> <span style="font-size: 24px; color: #0a2540; font-weight: bold;">KES ${data.quoteTotal.toLocaleString()}</span></p>
+            <p><strong>Valid Until:</strong> <span class="badge">${new Date(data.validUntil).toLocaleDateString()}</span></p>
+            
+            <h3>Items Summary</h3>
+            <table>
+              <thead>
+                <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+            
+            <div class="total">
+              <strong>Total: KES ${data.quoteTotal.toLocaleString()}</strong>
+            </div>
+          </div>
+          
+          <p>Please find the detailed quotation attached to this email.</p>
+          <p>To accept this quotation, please reply to this email or contact our sales team.</p>
+          <p>Best regards,<br><strong>Sales Team</strong></p>
+        </div>
+        <div class="footer">
+          <p>This quotation is valid until ${new Date(data.validUntil).toLocaleDateString()}</p>
+          <p>© ${new Date().getFullYear()} Plasma Water Africa. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Convert PDF buffer to base64 string
+  const pdfBase64 = data.pdfBuffer.toString('base64');
+
+  return await sendEmailWithAttachment({
+    to: data.to,
+    subject: `Quotation #${data.quoteNumber} from Plasma Water Africa`,
+    html: emailHtml,
+    attachments: [{
+      filename: data.pdfFilename,
+      content: pdfBase64,
+      contentType: 'application/pdf',
+    }],
   });
 };

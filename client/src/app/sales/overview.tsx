@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   DollarSign,
   ShoppingCart,
@@ -25,12 +26,23 @@ import { toast } from 'react-hot-toast';
 
 export default function SalesOverview() {
   const { user } = useAuth();
+  const router = useRouter();
   const [analytics, setAnalytics] = useState<SalesAnalyticsOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Redirect admin users away from overview
   useEffect(() => {
-    fetchAnalytics();
-  }, []);
+    if (user?.role === 'admin') {
+      router.replace('/sales/analytics');
+    }
+  }, [user, router]);
+
+  useEffect(() => {
+    // Only fetch analytics for sales users
+    if (user?.role === 'sales') {
+      fetchAnalytics();
+    }
+  }, [user]);
 
   const fetchAnalytics = async () => {
     try {
@@ -44,6 +56,24 @@ export default function SalesOverview() {
       setLoading(false);
     }
   };
+
+  // Show loading while checking role
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
+      </div>
+    );
+  }
+
+  // Admin users should be redirected, but show loading while redirect happens
+  if (user.role === 'admin') {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

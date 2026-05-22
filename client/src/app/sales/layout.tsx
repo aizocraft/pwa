@@ -29,7 +29,7 @@ const salesNavItems = [
   { id: 'transactions', label: 'Transactions', icon: Receipt, href: '/sales/transactions' },
 ];
 
-// Navigation items for admin users (top bar) - NO DASHBOARD
+// Navigation items for admin users - Dashboard removed
 const adminNavItems = [
   { id: 'analytics', label: 'Analytics', icon: BarChart3, href: '/sales/analytics' },
   { id: 'customers', label: 'Customers', icon: Users2, href: '/sales/customers' },
@@ -88,23 +88,15 @@ export default function SalesLayout({
     );
   }
 
-  // Admin view - No sidebar, just top navigation (no dashboard)
+  // Admin view - Clean layout with only navigation tabs, no user details/logout
   if (isAdmin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
-        {/* Admin Top Navigation Bar */}
+        {/* Admin Top Navigation Bar - Simplified, no user info or logout */}
         <header className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-          <div className="px-6 py-4">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              {/* Logo */}
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
-                  <BarChart3 className="w-4 h-4 text-white" />
-                </div>
-                <span className="font-bold text-gray-900 dark:text-white">Admin Portal</span>
-              </div>
-
-              {/* Admin Navigation Tabs - No Dashboard */}
+          <div className="px-6 py-3">
+            <div className="flex items-center justify-center">
+              {/* Admin Navigation Tabs - Centered, Dashboard removed */}
               <nav className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                 {adminNavItems.map((item) => {
                   const isActive = pathname === item.href;
@@ -124,30 +116,6 @@ export default function SalesLayout({
                   );
                 })}
               </nav>
-
-              {/* User Profile & Logout */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                    {user.name?.charAt(0) || user.email?.charAt(0) || 'U'}
-                  </div>
-                  <div className="hidden sm:block">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {user.name || 'Admin User'}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {user.email}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  title="Logout"
-                >
-                  <LogOut className="w-4 h-4 text-gray-500" />
-                </button>
-              </div>
             </div>
           </div>
         </header>
@@ -160,7 +128,7 @@ export default function SalesLayout({
     );
   }
 
-  // Sales view - With Sidebar Navigation
+  // Sales view - With Sidebar Navigation (keeps user details and logout)
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
       {/* Sidebar */}
@@ -217,7 +185,7 @@ export default function SalesLayout({
             })}
           </nav>
 
-          {/* User Profile */}
+          {/* User Profile - Only for sales users */}
           <div className="p-4 border-t border-gray-200 dark:border-gray-800">
             <div className={`flex items-center gap-3 ${!sidebarOpen && 'justify-center'}`}>
               <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
