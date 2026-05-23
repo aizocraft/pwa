@@ -12,6 +12,8 @@ import {
   ChevronDown,
   Sparkles,
   ArrowRight,
+  Download,
+  Loader2,
 } from 'lucide-react';
 
 interface HeroProps {
@@ -22,6 +24,8 @@ const stagger = (i: number, base = 0.08) => ({ delay: i * base });
 
 export default function Hero({ onOpenProfile }: HeroProps) {
   const [mounted, setMounted] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const { scrollY } = useScroll();
   const opacity = useTransform(scrollY, [0, 300], [1, 0.8]);
   const scale = useTransform(scrollY, [0, 300], [1, 0.95]);
@@ -29,6 +33,59 @@ export default function Hero({ onOpenProfile }: HeroProps) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    
+    try {
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setDownloadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 100);
+
+      // Fetch the PDF file
+      const response = await fetch('/profile.pdf');
+      
+      if (!response.ok) {
+        throw new Error('Failed to download file');
+      }
+      
+      const blob = await response.blob();
+      
+      // Complete progress
+      clearInterval(progressInterval);
+      setDownloadProgress(100);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Plasma_Water_Africa_Profile.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      // Reset after short delay
+      setTimeout(() => {
+        setIsDownloading(false);
+        setDownloadProgress(0);
+      }, 500);
+      
+    } catch (error) {
+      console.error('Download failed:', error);
+      setIsDownloading(false);
+      setDownloadProgress(0);
+      alert('Download failed. Please try again later.');
+    }
+  };
 
   const cards = useMemo(
     () => [
@@ -64,8 +121,6 @@ export default function Hero({ onOpenProfile }: HeroProps) {
           className="w-full h-full object-cover object-center"
           style={{ filter: 'brightness(0.45) saturate(0.9)' }}
         />
- 
-     
       </div>
 
       {/* Subtle Grid Pattern */}
@@ -135,8 +190,6 @@ export default function Hero({ onOpenProfile }: HeroProps) {
             </span>
           </motion.div>
 
-         
-
           {/* Main Headline */}
           <motion.h1
             className="font-black leading-[1.08] mb-8"
@@ -173,7 +226,6 @@ export default function Hero({ onOpenProfile }: HeroProps) {
               Water Revolution
             </motion.span>
             <br />
-
           </motion.h1>
 
           {/* Description */}
@@ -194,22 +246,52 @@ export default function Hero({ onOpenProfile }: HeroProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.4 }}
           >
-            {/* Primary CTA */}
-            <motion.button
-              onClick={onOpenProfile}
-              className="group relative inline-flex items-center gap-2.5 px-7 py-3.5 rounded-xl font-semibold text-sm text-white overflow-hidden shadow-2xl transition-all duration-300"
-              style={{
-                background: 'linear-gradient(135deg, #06b6d4, #2563eb)',
-                boxShadow: '0 4px 20px rgba(6, 182, 212, 0.3)',
-              }}
-              whileHover={{ scale: 1.02, y: -2 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-              <FileText size={17} strokeWidth={1.8} />
-              <span>View Company Profile</span>
-              <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform duration-200" />
-            </motion.button>
+            {/* Primary CTA - Download Button with Progress */}
+            <div className="relative">
+              <motion.button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="group relative inline-flex items-center gap-2.5 px-7 py-3.5 rounded-xl font-semibold text-sm text-white overflow-hidden shadow-2xl transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(135deg, #06b6d4, #2563eb)',
+                  boxShadow: '0 4px 20px rgba(6, 182, 212, 0.3)',
+                }}
+                whileHover={!isDownloading ? { scale: 1.02, y: -2 } : {}}
+                whileTap={!isDownloading ? { scale: 0.98 } : {}}
+              >
+                <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                
+                {isDownloading ? (
+                  <>
+                    <Loader2 size={17} className="animate-spin" />
+                    <span>Downloading... {downloadProgress}%</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={17} strokeWidth={1.8} />
+                    <span>Download Company Profile</span>
+                    <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform duration-200" />
+                  </>
+                )}
+              </motion.button>
+              
+              {/* Progress Bar */}
+              {isDownloading && (
+                <motion.div
+                  className="absolute -bottom-2 left-0 right-0 h-1 bg-white/30 rounded-full overflow-hidden"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full"
+                    initial={{ width: '0%' }}
+                    animate={{ width: `${downloadProgress}%` }}
+                    transition={{ duration: 0.1 }}
+                  />
+                </motion.div>
+              )}
+            </div>
 
             {/* Divider */}
             <div className="w-px h-6 bg-white/15 hidden sm:block" />
@@ -217,8 +299,8 @@ export default function Hero({ onOpenProfile }: HeroProps) {
             {/* Contact Icons */}
             <div className="flex gap-2">
               {[
-                { href: 'tel:+254700000000', icon: Phone, label: 'Call us' },
-                { href: 'mailto:info@plasmawater.co.ke', icon: Mail, label: 'Email us' },
+                { href: 'tel:+254728749722', icon: Phone, label: 'Call us' },
+                { href: 'mailto:plasmawaterafrica@gmail.com', icon: Mail, label: 'Email us' },
               ].map((item, i) => (
                 <motion.a
                   key={i}
@@ -240,7 +322,7 @@ export default function Hero({ onOpenProfile }: HeroProps) {
                 >
                   <item.icon size={14} className="text-cyan-400 group-hover:rotate-12 transition-transform duration-200" />
                   <span className="text-xs font-medium text-white/80 group-hover:text-white hidden sm:inline">
-                    {item.label === 'Call us' ? '+254 700 000 000' : 'info@plasmawater.co.ke'}
+                    {item.label === 'Call us' ? '+254 728 749 722' : 'plasmawaterafrica@gmail.com'}
                   </span>
                 </motion.a>
               ))}
