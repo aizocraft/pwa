@@ -22,7 +22,7 @@ const faqs = [
   },
   { 
     q: "How can I contact you?", 
-    a: "Reach us via our contact form, phone (+254 700 000 000), or email (info@plasmawater.co.ke) — we respond within 24 hours. Our support team is available Monday to Friday, 8am-6pm EAT." 
+    a: "Reach us via our contact form, phone (+254 728 749 722 /+254 728 899 757), or email (plasmawaterafrica@gmail.com)." 
   },
   { 
     q: "What areas do you serve?", 
@@ -134,14 +134,6 @@ export default function FAQ() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
           >
-            <motion.span
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 text-xs font-bold tracking-widest uppercase mb-5 border border-cyan-200 dark:border-cyan-800"
-              initial={{ scale: 0.9 }}
-              whileInView={{ scale: 1 }}
-            >
-              <Sparkles size={12} /> Support Center
-            </motion.span>
-
             <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-4">
               Frequently Asked{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600">
@@ -236,13 +228,6 @@ export default function FAQ() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ delay: 0.2 }}
           >
-            <motion.span
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-yellow-50 dark:bg-yellow-950/50 text-yellow-600 dark:text-yellow-400 text-xs font-bold tracking-widest uppercase mb-5 border border-yellow-200 dark:border-yellow-800"
-              initial={{ scale: 0.9 }}
-              whileInView={{ scale: 1 }}
-            >
-              <Star size={12} className="fill-yellow-500" /> Your Voice Matters
-            </motion.span>
 
             <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-4">
               Share Your{' '}
@@ -276,34 +261,7 @@ export default function FAQ() {
                 </motion.div>
               ) : (
                 <>
-                  {/* Name Field - Optional */}
-                  <div className="mb-4">
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
-                      Name <span className="text-gray-400">(Optional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full p-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none text-sm transition-all duration-200"
-                      placeholder="Your name"
-                    />
-                  </div>
-
-                  {/* Email Field - Optional */}
-                  <div className="mb-4">
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
-                      Email <span className="text-gray-400">(Optional)</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full p-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none text-sm transition-all duration-200"
-                      placeholder="your@email.com"
-                    />
-                  </div>
-
+                 
                   {/* Rating Stars */}
                   <div className="text-center mb-4">
                     <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
