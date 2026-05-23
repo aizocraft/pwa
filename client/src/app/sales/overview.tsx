@@ -20,14 +20,14 @@ import {
   Clock,
   XCircle
 } from 'lucide-react';
-import { getSalesAnalyticsOverview, type SalesAnalyticsOverview } from '@/lib/sales';
+import { getSalesAnalyticsOverview, type SalesAnalytics } from '@/lib/sales';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'react-hot-toast';
 
 export default function SalesOverview() {
   const { user } = useAuth();
   const router = useRouter();
-  const [analytics, setAnalytics] = useState<SalesAnalyticsOverview | null>(null);
+  const [analytics, setAnalytics] = useState<SalesAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Redirect admin users away from overview
@@ -83,34 +83,61 @@ export default function SalesOverview() {
     );
   }
 
+  // Helper to safely get values
+  const getTotalRevenue = () => analytics?.orders?.totalRevenue || 0;
+  const getTotalOrders = () => analytics?.orders?.totalOrders || 0;
+  const getTotalQuotations = () => analytics?.quotations?.totalQuotations || 0;
+  const getConvertedCount = () => analytics?.quotations?.convertedCount || 0;
+  const getAcceptedCount = () => analytics?.quotations?.acceptedCount || 0;
+  const getPaidOrders = () => analytics?.orders?.paidOrders || 0;
+  const getCancelledOrders = () => analytics?.orders?.cancelledOrders || 0;
+  const getSuccessRate = () => analytics?.transactions?.successRate || 0;
+  const getCompletedTransactions = () => analytics?.transactions?.completed || 0;
+  const getPendingTransactions = () => analytics?.transactions?.pending || 0;
+  const getFailedTransactions = () => analytics?.transactions?.failed || 0;
+  const getRefundedTransactions = () => analytics?.transactions?.refunded || 0;
+  const getTotalVolume = () => analytics?.transactions?.totalVolume || 0;
+  
+  const getConversionRate = () => {
+    const total = getTotalQuotations();
+    const converted = getConvertedCount();
+    return total > 0 ? (converted / total) * 100 : 0;
+  };
+  
+  const getCompletionRate = () => {
+    const total = getTotalOrders();
+    const paid = getPaidOrders();
+    return total > 0 ? (paid / total) * 100 : 0;
+  };
+
   const stats = [
     {
       title: 'Total Revenue',
-      value: `KES ${(analytics?.orders.totalRevenue || 0).toLocaleString()}`,
+      value: `KES ${getTotalRevenue().toLocaleString()}`,
       icon: DollarSign,
       color: 'green',
-      change: '+12.5%'
+      change: analytics?.overview?.revenueGrowth ? `+${analytics.overview.revenueGrowth}%` : '+0%'
     },
     {
       title: 'Total Orders',
-      value: analytics?.orders.totalOrders || 0,
+      value: getTotalOrders(),
       icon: ShoppingCart,
       color: 'blue',
-      change: '+8.3%'
+      change: analytics?.overview?.orderGrowth ? `+${analytics.overview.orderGrowth}%` : '+0%'
     },
     {
       title: 'Quotations',
-      value: analytics?.quotations.totalQuotations || 0,
+      value: getTotalQuotations(),
       icon: FileSpreadsheet,
       color: 'orange',
-      change: `${analytics?.quotations.convertedCount || 0} converted`
+      change: `${getConvertedCount()} converted`
     },
     {
       title: 'Success Rate',
-      value: `${(analytics?.transactions.successRate || 0).toFixed(1)}%`,
+      value: `${getSuccessRate().toFixed(1)}%`,
       icon: TrendingUp,
       color: 'purple',
-      change: '+5.2%'
+      change: '+0%'
     }
   ];
 
@@ -175,37 +202,33 @@ export default function SalesOverview() {
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400">Total Created</span>
               <span className="font-semibold text-gray-900 dark:text-white">
-                {analytics?.quotations.totalQuotations || 0}
+                {getTotalQuotations()}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400">Accepted</span>
               <span className="font-semibold text-green-600">
-                {analytics?.quotations.acceptedCount || 0}
+                {getAcceptedCount()}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400">Converted to Orders</span>
               <span className="font-semibold text-blue-600">
-                {analytics?.quotations.convertedCount || 0}
+                {getConvertedCount()}
               </span>
             </div>
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Conversion Rate</span>
                 <span className="text-sm font-semibold text-cyan-600">
-                  {analytics?.quotations.totalQuotations
-                    ? ((analytics.quotations.convertedCount / analytics.quotations.totalQuotations) * 100).toFixed(1)
-                    : 0}%
+                  {getConversionRate().toFixed(1)}%
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
                 <div
                   className="bg-cyan-600 h-2 rounded-full transition-all"
                   style={{
-                    width: analytics?.quotations.totalQuotations
-                      ? `${(analytics.quotations.convertedCount / analytics.quotations.totalQuotations) * 100}%`
-                      : '0%'
+                    width: `${getConversionRate()}%`
                   }}
                 />
               </div>
@@ -227,7 +250,7 @@ export default function SalesOverview() {
                 <span className="text-gray-600 dark:text-gray-400">Paid Orders</span>
               </div>
               <span className="font-semibold text-green-600">
-                {analytics?.orders.paidOrders || 0}
+                {getPaidOrders()}
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -236,25 +259,21 @@ export default function SalesOverview() {
                 <span className="text-gray-600 dark:text-gray-400">Cancelled</span>
               </div>
               <span className="font-semibold text-red-600">
-                {analytics?.orders.cancelledOrders || 0}
+                {getCancelledOrders()}
               </span>
             </div>
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Completion Rate</span>
                 <span className="text-sm font-semibold text-cyan-600">
-                  {analytics?.orders.totalOrders
-                    ? ((analytics.orders.paidOrders / analytics.orders.totalOrders) * 100).toFixed(1)
-                    : 0}%
+                  {getCompletionRate().toFixed(1)}%
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
                 <div
                   className="bg-green-600 h-2 rounded-full transition-all"
                   style={{
-                    width: analytics?.orders.totalOrders
-                      ? `${(analytics.orders.paidOrders / analytics.orders.totalOrders) * 100}%`
-                      : '0%'
+                    width: `${getCompletionRate()}%`
                   }}
                 />
               </div>
@@ -271,27 +290,27 @@ export default function SalesOverview() {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">
-                  {analytics?.transactions.completed || 0}
+              <div className="text-center p-4 rounded-lg bg-green-50 dark:bg-green-900/20">
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {getCompletedTransactions()}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">Completed</p>
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-yellow-600">
-                  {analytics?.transactions.pending || 0}
+              <div className="text-center p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
+                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                  {getPendingTransactions()}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">Pending</p>
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-red-600">
-                  {analytics?.transactions.failed || 0}
+              <div className="text-center p-4 rounded-lg bg-red-50 dark:bg-red-900/20">
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {getFailedTransactions()}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">Failed</p>
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-orange-600">
-                  {analytics?.transactions.refunded || 0}
+              <div className="text-center p-4 rounded-lg bg-orange-50 dark:bg-orange-900/20">
+                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                  {getRefundedTransactions()}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">Refunded</p>
               </div>
@@ -299,13 +318,73 @@ export default function SalesOverview() {
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600 dark:text-gray-400">Total Volume</span>
-                <span className="font-bold text-gray-900 dark:text-white">
-                  KES {(analytics?.transactions.totalVolume || 0).toLocaleString()}
+                <span className="font-bold text-xl text-gray-900 dark:text-white">
+                  KES {getTotalVolume().toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-sm text-gray-500">Average Transaction</span>
+                <span className="font-semibold text-gray-700 dark:text-gray-300">
+                  KES {Math.round(analytics?.transactions?.averageValue || 0).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-sm text-gray-500">Success Rate</span>
+                <span className="font-semibold text-green-600">
+                  {getSuccessRate().toFixed(1)}%
                 </span>
               </div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <button
+          onClick={() => router.push('/sales/customers')}
+          className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 text-left hover:shadow-md transition-all group"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg group-hover:bg-cyan-200 dark:group-hover:bg-cyan-800/50 transition-colors">
+              <Users className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <h3 className="font-semibold text-gray-900 dark:text-white">Manage Customers</h3>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            View and manage your customer list, track their purchase history
+          </p>
+        </button>
+
+        <button
+          onClick={() => router.push('/sales/quotations')}
+          className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 text-left hover:shadow-md transition-all group"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg group-hover:bg-cyan-200 dark:group-hover:bg-cyan-800/50 transition-colors">
+              <FileSpreadsheet className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <h3 className="font-semibold text-gray-900 dark:text-white">Create Quotation</h3>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Generate new quotations for your customers
+          </p>
+        </button>
+
+        <button
+          onClick={() => router.push('/sales/analytics')}
+          className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 text-left hover:shadow-md transition-all group"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg group-hover:bg-cyan-200 dark:group-hover:bg-cyan-800/50 transition-colors">
+              <TrendingUp className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <h3 className="font-semibold text-gray-900 dark:text-white">View Analytics</h3>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Dive deeper into your sales performance metrics
+          </p>
+        </button>
       </div>
     </div>
   );

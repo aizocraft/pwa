@@ -9,8 +9,7 @@ import { createAuditLog } from '../middleware/auditMiddleware';
 import ShippingAreaModel from '../models/ShippingArea';
 import PromoCodeModel from '../models/PromoCode';
 import { CompanySettings } from '../models/CompanySettings';
-import { sendQuotationWithPDF } from '../services/email.service';
-import { generateQuotationPDFBuffer } from '../services/pdfGenerator';
+import { sendQuotation } from '../services/email.service';
 
 
 const router = Router();
@@ -506,7 +505,7 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
   }
 });
 
-// POST /api/sales/quotations/:id/send - Send quotation email with PDF attachment
+// POST /api/sales/quotations/:id/send - Send quotation email 
 router.post('/quotations/:id/send', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { id } = req.params;
@@ -528,45 +527,31 @@ router.post('/quotations/:id/send', authMiddleware, requireSalesRole, async (req
       return res.status(400).json({ error: 'Customer has no email address' });
     }
 
-    // Get customer details
-    const customer = await SalesCustomerModel.findById(quotation.customerId).lean();
-    if (!customer) {
-      return res.status(404).json({ error: 'Customer not found' });
-    }
-
-    // Get company settings for PDF generation
-    const settings = await CompanySettings.findOne().lean();
-
-    // Generate PDF buffer with timeout
-    let pdfBuffer: Buffer;
-    try {
-      // Add timeout for PDF generation
-      const pdfPromise = generateQuotationPDFBuffer(quotation, customer, settings);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('PDF generation timeout after 30 seconds')), 30000)
-      );
-      pdfBuffer = await Promise.race([pdfPromise, timeoutPromise]) as Buffer;
-    } catch (pdfError) {
-      console.error('PDF generation failed:', pdfError);
-      // Return error but don't fail the request - maybe send without attachment?
-      return res.status(500).json({ error: 'Failed to generate PDF attachment. Please try again.' });
-    }
-
-    // Send email with PDF attachment
-    const emailResult = await sendQuotationWithPDF({
-      to: quotation.customerEmail,
-      customerName: quotation.customerName,
-      quoteNumber: quotation.quoteNumber,
-      quoteTotal: quotation.total,
-      validUntil: quotation.validUntil,
-      pdfBuffer: pdfBuffer,
-      pdfFilename: `Quotation-${quotation.quoteNumber}.pdf`,
-      items: quotation.items.map(item => ({
-        name: item.name,
-        quantity: item.qty,
-        price: item.price
-      }))
-    });
+    const emailResult = await sendQuotation({
+  to: quotation.customerEmail,
+  customerName: quotation.customerName,
+  quoteNumber: quotation.quoteNumber,
+  quoteTotal: quotation.total,
+  validUntil: quotation.validUntil,
+  items: quotation.items.map(item => ({
+    name: item.name,
+    quantity: item.qty,
+    price: item.price,
+    description: item.description
+  })),
+  shippingInfo: quotation.shippingInfo ? {
+    areaName: quotation.shippingInfo.areaName,
+    cost: quotation.shippingInfo.cost,
+    freeThreshold: quotation.shippingInfo.freeThreshold,
+    estimatedDelivery: quotation.shippingInfo.estimatedDelivery
+  } : undefined,
+  discount: quotation.discount,
+  discountType: quotation.discountType,
+  tax: quotation.tax,
+  subtotal: quotation.subtotal,
+  notes: quotation.notes,
+  terms: quotation.terms
+});
 
     if (!emailResult.success) {
       console.error('Email sending failed:', emailResult.error);
@@ -585,13 +570,13 @@ router.post('/quotations/:id/send', authMiddleware, requireSalesRole, async (req
       action: 'send',
       resource: 'quotation',
       resourceId: quotation._id.toString(),
-      details: `Quotation sent to ${quotation.customerEmail} with PDF attachment`,
+      details: `Quotation sent to ${quotation.customerEmail}`,
       skipIfNoUser: false
     });
 
     res.json({ 
       success: true, 
-      message: 'Quotation sent successfully with PDF attachment',
+      message: 'Quotation sent successfully via email',
       emailResult: { messageId: emailResult.messageId }
     });
   } catch (error: any) {
@@ -600,7 +585,7 @@ router.post('/quotations/:id/send', authMiddleware, requireSalesRole, async (req
   }
 });
 
-// Optionally add a route to resend quotation with PDF
+// POST /api/sales/quotations/:id/resend - Resend quotation email (without PDF)
 router.post('/quotations/:id/resend', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { id } = req.params;
@@ -622,35 +607,31 @@ router.post('/quotations/:id/resend', authMiddleware, requireSalesRole, async (r
       return res.status(400).json({ error: 'Customer has no email address' });
     }
 
-    const customer = await SalesCustomerModel.findById(quotation.customerId).lean();
-    if (!customer) {
-      return res.status(404).json({ error: 'Customer not found' });
-    }
-
-    const settings = await CompanySettings.findOne().lean();
-    
-    let pdfBuffer: Buffer;
-    try {
-      pdfBuffer = await generateQuotationPDFBuffer(quotation, customer, settings);
-    } catch (pdfError) {
-      console.error('PDF generation failed:', pdfError);
-      return res.status(500).json({ error: 'Failed to generate PDF attachment' });
-    }
-
-    const emailResult = await sendQuotationWithPDF({
-      to: quotation.customerEmail,
-      customerName: quotation.customerName,
-      quoteNumber: quotation.quoteNumber,
-      quoteTotal: quotation.total,
-      validUntil: quotation.validUntil,
-      pdfBuffer: pdfBuffer,
-      pdfFilename: `Quotation-${quotation.quoteNumber}.pdf`,
-      items: quotation.items.map(item => ({
-        name: item.name,
-        quantity: item.qty,
-        price: item.price
-      }))
-    });
+const emailResult = await sendQuotation({
+  to: quotation.customerEmail,
+  customerName: quotation.customerName,
+  quoteNumber: quotation.quoteNumber,
+  quoteTotal: quotation.total,
+  validUntil: quotation.validUntil,
+  items: quotation.items.map(item => ({
+    name: item.name,
+    quantity: item.qty,
+    price: item.price,
+    description: item.description
+  })),
+  shippingInfo: quotation.shippingInfo ? {
+    areaName: quotation.shippingInfo.areaName,
+    cost: quotation.shippingInfo.cost,
+    freeThreshold: quotation.shippingInfo.freeThreshold,
+    estimatedDelivery: quotation.shippingInfo.estimatedDelivery
+  } : undefined,
+  discount: quotation.discount,
+  discountType: quotation.discountType,
+  tax: quotation.tax,
+  subtotal: quotation.subtotal,
+  notes: quotation.notes,
+  terms: quotation.terms
+});
 
     if (!emailResult.success) {
       return res.status(500).json({ error: emailResult.error || 'Failed to send email' });
@@ -660,13 +641,13 @@ router.post('/quotations/:id/resend', authMiddleware, requireSalesRole, async (r
       action: 'resend',
       resource: 'quotation',
       resourceId: quotation._id.toString(),
-      details: `Quotation resent to ${quotation.customerEmail} with PDF attachment`,
+      details: `Quotation resent to ${quotation.customerEmail}`,
       skipIfNoUser: false
     });
 
     res.json({ 
       success: true, 
-      message: 'Quotation resent successfully with PDF attachment',
+      message: 'Quotation resent successfully via email',
       emailResult: { messageId: emailResult.messageId }
     });
   } catch (error: any) {

@@ -58,6 +58,7 @@ export default function DashboardLayout({
     if (path === '/dashboard' || path === '/dashboard/') return 'overview'
     if (path.startsWith('/dashboard/products')) return 'products'
     if (path.startsWith('/dashboard/orders')) return 'orders'
+    if (path.startsWith('/dashboard/sales')) return 'sales'
     if (path.startsWith('/dashboard/shipping')) return 'shipping'
     if (path.startsWith('/dashboard/users')) return 'users'
     if (path.startsWith('/dashboard/transactions')) return 'transactions'
@@ -70,7 +71,7 @@ export default function DashboardLayout({
     return 'overview'
   }
 
-  const [activePage, setActivePage] = useState<'overview'|'products'|'orders'|'shipping'|'users'|'emails'|'submissions'|'transactions'|'reviews'|'auditlog'|'notifications'|'settings'>(
+  const [activePage, setActivePage] = useState<'overview'|'products'|'orders'|'sales'|'shipping'|'users'|'emails'|'submissions'|'transactions'|'reviews'|'auditlog'|'notifications'|'settings'>(
     getActivePageFromPath(pathname)
   )
 
@@ -125,6 +126,7 @@ export default function DashboardLayout({
     { name: 'Overview', icon: LayoutDashboard, page: 'overview' as const, path: '/dashboard', color: 'text-blue-500' },
     { name: 'Products', icon: Package, page: 'products' as const, path: '/dashboard/products', color: 'text-emerald-500' },
     { name: 'Orders', icon: ShoppingCart, page: 'orders' as const, path: '/dashboard/orders', color: 'text-purple-500' },
+    { name: 'Sales', icon: Receipt, page: 'sales' as const, path: '/dashboard/sales', color: 'text-rose-500' },
     { name: 'Shipping', icon: Truck, page: 'shipping' as const, path: '/dashboard/shipping', color: 'text-indigo-500' },
     { name: 'Transactions', icon: Receipt, page: 'transactions' as const, path: '/dashboard/transactions', color: 'text-amber-500' },
     { name: 'Users', icon: Users, page: 'users' as const, path: '/dashboard/users', color: 'text-orange-500' },

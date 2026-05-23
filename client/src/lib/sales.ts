@@ -1,4 +1,4 @@
-// lib/sales.ts
+// lib/sales.ts - Updated with correct types
 import api from './api';
 import type { ApiResponse } from '@/types/api';
 import type { Order } from '@/types/order';
@@ -87,27 +87,244 @@ export interface Transaction {
   updatedAt: string;
 }
 
-export interface SalesAnalyticsOverview {
-  quotations: {
-    totalQuotations: number;
-    convertedCount: number;
-    acceptedCount: number;
+// ==================== ANALYTICS TYPES ====================
+
+export interface PeriodInfo {
+  from: Date | string;
+  to: Date | string;
+  label: string;
+}
+
+export interface OverviewMetrics {
+  totalRevenue: number;
+  totalOrders: number;
+  averageOrderValue: number;
+  conversionRate: number | string;
+  totalCustomers?: number;
+  activeCustomers?: number;
+  totalQuotations?: number;
+  successRate?: number;
+  revenueGrowth?: string;
+  orderGrowth?: string;
+  customerConversionRate?: string;
+}
+
+export interface QuotationMetrics {
+  totalQuotations: number;
+  convertedCount: number;
+  acceptedCount: number;
+  draftCount: number;
+  sentCount: number;
+  rejectedCount: number;
+  expiredCount?: number;
+  conversionRate: number | string;
+  acceptanceRate?: number;
+  totalQuotationValue: number;
+}
+
+export interface OrderMetrics {
+  totalOrders: number;
+  totalRevenue: number;
+  paidOrders: number;
+  pendingOrders: number;
+  cancelledOrders: number;
+  averageOrderValue: number;
+  completionRate: number;
+  failedPayments?: number;
+  refundedOrders?: number;
+}
+
+export interface TransactionMetrics {
+  totalTransactions: number;
+  totalVolume: number;
+  completed: number;
+  pending: number;
+  failed: number;
+  refunded: number;
+  successRate: number;
+  averageValue: number;
+  methodBreakdown?: {
+    mpesa: { count: number; volume: number };
+    card: { count: number; volume: number };
+    cod: { count: number; volume: number };
   };
-  orders: {
-    totalOrders: number;
-    totalRevenue: number;
-    paidOrders: number;
-    cancelledOrders: number;
+}
+
+export interface CustomerMetrics {
+  totalCustomers: number;
+  activeCustomers: number;
+  inactiveCustomers?: number;
+  totalCustomerValue: number;
+  avgCustomerValue?: number;
+  totalCustomerSpent?: number;
+  avgCustomerSpent?: number;
+  conversionRate?: number;
+  convertedCustomers?: number;
+}
+
+export interface ProductMetrics {
+  totalProducts: number;
+  lowStockProducts: number;
+  outOfStockProducts: number;
+  totalStockValue: number;
+}
+
+export interface UserMetrics {
+  totalUsers: number;
+  adminUsers: number;
+  salesUsers: number;
+  regularUsers: number;
+  activeUsers: number;
+}
+
+export interface MonthlyTarget {
+  target: number;
+  current: number;
+  remaining: number;
+  progress: number;
+}
+
+export interface DailySalesData {
+  _id: string;
+  revenue: number;
+  orders: number;
+}
+
+export interface TopProduct {
+  id: string;
+  name: string;
+  revenue: number;
+  quantity: number;
+  orders: number;
+  stock?: number;
+}
+
+export interface TopCustomer {
+  id: string;
+  name: string;
+  totalSpent: number;
+  orderCount: number;
+}
+
+export interface ConversionFunnel {
+  quotations: number;
+  accepted: number;
+  converted: number;
+  ordered: number;
+  paid: number;
+  rates: {
+    quoteToAccepted: number;
+    acceptedToConverted: number;
+    convertedToOrder: number;
+    orderToPayment: number;
+    overall: number;
   };
-  transactions: {
-    totalTransactions: number;
-    totalVolume: number;
-    completed: number;
-    pending: number;
-    failed: number;
-    refunded: number;
-    successRate: number;
+}
+
+export interface ChartsData {
+  dailySales?: DailySalesData[];
+  dailyPerformance?: Array<{ date: string; revenue: number; orders: number }>;
+  ordersByDay?: Array<{ date: string; total: number; paid: number; pending: number }>;
+  quotationTrends?: Array<{ date: string; [key: string]: any }>;
+  paymentMethods?: {
+    labels: string[];
+    datasets: Array<{ label: string; data: number[] }>;
   };
+  hourlyDistribution?: Array<{ hour: number; orders: number; revenue: number }>;
+  categorySales?: Array<{ category: string; revenue: number; quantity: number }>;
+}
+
+export interface RecentActivities {
+  quotations: any[];
+  orders: any[];
+}
+
+export interface SalesRepInfo {
+  name: string;
+  email: string;
+}
+
+// Base analytics interface with common fields
+export interface BaseAnalytics {
+  period: PeriodInfo;
+  overview: OverviewMetrics;
+  quotations: QuotationMetrics;
+  orders: OrderMetrics;
+  transactions: TransactionMetrics;
+  customers?: CustomerMetrics;
+  monthlyTarget?: MonthlyTarget;
+  charts?: ChartsData;
+  topProducts?: TopProduct[];
+  recentActivities?: RecentActivities;
+}
+
+// Sales analytics interface
+export interface SalesAnalytics extends BaseAnalytics {
+  salesRep?: SalesRepInfo;
+  customers: CustomerMetrics; // Required for sales
+  topProducts: TopProduct[];
+  recentActivities: RecentActivities;
+  charts: ChartsData; // Required for sales
+}
+
+// Admin analytics interface (extends sales with additional fields)
+export interface AdminAnalytics extends BaseAnalytics {
+  products: ProductMetrics;
+  users: UserMetrics;
+  topCustomers: TopCustomer[];
+  conversionFunnel: ConversionFunnel;
+  charts: Required<ChartsData>;
+  company?: {
+    taxRate: number;
+  };
+  customers: CustomerMetrics; // Required for admin too
+}
+
+// Performance metrics types
+export interface SalesRepMetrics {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  metrics: {
+    quotes: {
+      total: number;
+      converted: number;
+      accepted: number;
+      conversionRate: number;
+      acceptanceRate: number;
+      totalValue: number;
+    };
+    orders: {
+      total: number;
+      revenue: number;
+      paid: number;
+      pending: number;
+      averageValue: number;
+      completionRate: number;
+    };
+    customers: {
+      total: number;
+      active: number;
+      totalValue: number;
+      avgValue: number;
+    };
+  };
+}
+
+export interface TeamSummary {
+  totalRevenue: number;
+  totalOrders: number;
+  totalQuotes: number;
+  totalCustomers: number;
+  avgConversionRate: number;
+  topPerformer: SalesRepMetrics | null;
+}
+
+export interface PerformanceMetrics {
+  salesRepPerformance: SalesRepMetrics[] | any[];
+  teamSummary?: TeamSummary | null;
+  period: string;
 }
 
 // ==================== SALES CUSTOMERS API ====================
@@ -149,8 +366,6 @@ export async function updateSalesCustomer(
 }
 
 // ==================== QUOTATIONS API ====================
-// lib/sales.ts - Update the createSalesQuotation function
-
 export async function createSalesQuotation(payload: {
   customerId: string;
   items: Array<{
@@ -266,17 +481,16 @@ export async function listOrderTransactions(orderId: string): Promise<{ orderNum
 }
 
 // ==================== ANALYTICS API ====================
-export async function getSalesAnalyticsOverview(): Promise<SalesAnalyticsOverview> {
-  const res = await api.get('/analytics/sales/overview');
-  // Handle the new response structure { success: true, data: {...} }
+
+export async function getSalesAnalyticsOverview(period?: string): Promise<SalesAnalytics> {
+  const res = await api.get('/analytics/sales/overview', { params: { period } });
   if (res.data.success) {
     return res.data.data;
   }
   return res.data;
 }
 
-// Add admin analytics function
-export async function getAdminAnalyticsOverview(period?: string): Promise<any> {
+export async function getAdminAnalyticsOverview(period?: string): Promise<AdminAnalytics> {
   const res = await api.get('/analytics/admin/overview', { params: { period } });
   if (res.data.success) {
     return res.data.data;
@@ -284,15 +498,21 @@ export async function getAdminAnalyticsOverview(period?: string): Promise<any> {
   return res.data;
 }
 
-// Add performance metrics function
-export async function getPerformanceMetrics(): Promise<any> {
-  const res = await api.get('/analytics/performance');
+export async function getPerformanceMetrics(period?: string): Promise<PerformanceMetrics> {
+  const res = await api.get('/analytics/performance', { params: { period } });
   if (res.data.success) {
     return res.data.data;
   }
   return res.data;
 }
 
+export async function exportAnalytics(period?: string, type?: string): Promise<any> {
+  const res = await api.get('/analytics/export', { params: { period, type } });
+  if (res.data.success) {
+    return res.data;
+  }
+  return res.data;
+}
 
 // ==================== SHIPPING & PRODUCTS HELPERS ====================
 export async function listShippingAreas(): Promise<any[]> {
@@ -310,13 +530,11 @@ export async function listProducts(params?: { search?: string; page?: number; li
   return res.data;
 }
 
-// Function to send quotation email
 export async function sendQuotationEmail(quotationId: string): Promise<{ success: boolean }> {
   const res = await api.post(`/sales/quotations/${quotationId}/send`);
   return res.data;
 }
 
-// Function to accept quotation
 export async function acceptQuotation(
   quotationId: string,
   payload?: {

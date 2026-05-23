@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -7,22 +7,19 @@ import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from
 import { 
   ArrowRight, 
   Zap, 
-  Shield, 
   Star, 
-  Clock, 
-  Award,
-  Sparkles,
-  ChevronDown,
-  Battery,
-  Droplet,
-  Sun,
-  ThumbsUp,
   Headphones,
-  Heart
+  ThumbsUp,
+  Droplet,
+  Sun
 } from 'lucide-react';
+import SplitText from './SplitText';
+import ShinyText from './ShinyText';
+import Counter from './Counter';
 
 export default function Hero() {
   const [activeImage, setActiveImage] = useState(0);
+  const [currentBgImage, setCurrentBgImage] = useState(0);
   const heroRef = useRef<HTMLDivElement>(null);
   const cursorX = useMotionValue(0);
   const cursorY = useMotionValue(0);
@@ -32,6 +29,73 @@ export default function Hero() {
   const cursorXSpring = useSpring(cursorX, springConfig);
   const cursorYSpring = useSpring(cursorY, springConfig);
 
+  // Background images for carousel - using public folder images
+  const bgImages = [
+    {
+      src: "/images/borehole-drilling5.jpg",
+      alt: 'Borehole drilling in Africa',
+      opacity: 40
+    },
+    {
+      src: "/images/solar.jpg",
+      alt: 'Solar installations in Africa',
+      opacity: 30
+    },
+    {
+      src: "/images/watertower.jpg",
+      alt: 'Water tower construction in Africa',
+      opacity: 35
+    }
+  ];
+
+  const products = [
+    {
+      image: 'https://res.cloudinary.com/duxnsu61a/image/upload/v1775035077/dc2_rbbsin.jpg',
+      title: 'Industrial Borehole Pump',
+      badge: 'Best Seller',
+      price: 'KSh 45,000',
+      description: 'High-efficiency submersible pump'
+    },
+    {
+      image: 'https://res.cloudinary.com/duxnsu61a/image/upload/v1776678927/natures-generator-elite-671170_qelk6n.webp',
+      title: 'Solar Power System',
+      badge: 'Eco Friendly',
+      price: 'KSh 125,000',
+      rating: 4.9,
+      description: 'Complete home solar solution'
+    },
+    {
+      image: 'https://res.cloudinary.com/duxnsu61a/image/upload/v1776678680/solar_panel_kit_xosdup.webp',
+      title: 'Water Tower Tank',
+      badge: 'Premium',
+      price: 'KSh 85,000',
+      description: 'Elevated steel water tank'
+    }
+  ];
+
+  const categories = [
+    { name: 'Borehole', icon: Droplet, color: 'from-cyan-500 to-blue-500', href: '/borehole-services' },
+    { name: 'Solar', icon: Sun, color: 'from-sky-500 to-blue-500', href: '/solar-solutions' },
+    { name: 'Water Towers', icon: Zap, color: 'from-blue-600 to-cyan-600', href: '/water-towers' }
+  ];
+
+  // Background image carousel - 4 seconds interval like old hero
+  useEffect(() => {
+    const bgInterval = setInterval(() => {
+      setCurrentBgImage((prev) => (prev + 1) % bgImages.length);
+    }, 4000);
+    return () => clearInterval(bgInterval);
+  }, [bgImages.length]);
+
+  // Product carousel
+  useEffect(() => {
+    const productInterval = setInterval(() => {
+      setActiveImage((prev) => (prev + 1) % products.length);
+    }, 6000);
+    return () => clearInterval(productInterval);
+  }, [products.length]);
+
+  // Mouse move effect for 3D tilt
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       cursorX.set(e.clientX - 16);
@@ -48,75 +112,82 @@ export default function Hero() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [cursorX, cursorY, mouseX, mouseY]);
 
-  const stats = [
-    { value: '1K+', label: 'Happy Customers', icon: Heart, gradient: 'from-blue-500 to-cyan-500' },
-    { value: '100+', label: ' Products', icon: Star, gradient: 'from-blue-600 to-indigo-600' },
-    { value: '24/7', label: 'Expert Support', icon: Headphones, gradient: 'from-cyan-500 to-teal-500' },
-    { value: '100%', label: 'Satisfaction', icon: ThumbsUp, gradient: 'from-blue-500 to-sky-500' }
-  ];
+  const rotateX = useTransform(mouseX, [0, 1], [8, -8]);
+  const rotateY = useTransform(mouseY, [0, 1], [-8, 8]);
 
-  const categories = [
-    { name: 'Pumps', icon: Droplet, color: 'from-cyan-500 to-blue-500' },
-    { name: 'Generators', icon: Zap, color: 'from-blue-500 to-indigo-500' },
-    { name: 'Solar', icon: Sun, color: 'from-sky-500 to-blue-500' },
-    { name: 'Inverters', icon: Battery, color: 'from-blue-600 to-cyan-600' }
-  ];
+  const handleTitleAnimationComplete = () => {
+    console.log('Hero title animation completed!');
+  };
 
-  const products = [
-    {
-      image: 'https://res.cloudinary.com/duxnsu61a/image/upload/v1775035077/dc2_rbbsin.jpg',
-      title: 'Industrial Pump Systems',
-      badge: 'Best Seller',
-      price: 'KSh 45,000',
-      rating: 4.8
-    },
-    {
-      image: 'https://res.cloudinary.com/duxnsu61a/image/upload/v1776678927/natures-generator-elite-671170_qelk6n.webp',
-      title: 'Solar Power Generator',
-      badge: 'Eco Friendly',
-      price: 'KSh 125,000',
-      rating: 4.9
-    },
-    {
-      image: 'https://res.cloudinary.com/duxnsu61a/image/upload/v1776678680/solar_panel_kit_xosdup.webp',
-      title: 'Solar Panel Kit',
-      badge: 'Energy Saver',
-      price: 'KSh 85,000',
-      rating: 4.7
-    }
-  ];
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveImage((prev) => (prev + 1) % products.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [products.length]);
-
-  const rotateX = useTransform(mouseX, [0, 1], [5, -5]);
-  const rotateY = useTransform(mouseY, [0, 1], [-5, 5]);
+  const goToBgImage = (index: number) => {
+    setCurrentBgImage(index);
+  };
 
   return (
     <>
       {/* Custom Cursor */}
       <motion.div
-        className="fixed top-0 left-0 w-6 h-6 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full pointer-events-none z-50 hidden lg:block"
+        className="fixed top-0 left-0 w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full pointer-events-none z-50 hidden lg:block mix-blend-difference"
         style={{
           x: cursorXSpring,
           y: cursorYSpring,
         }}
       />
 
-      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-900 dark:to-slate-900">
+      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden">
         
+        {/* Background Images Carousel  */}
+        <div className="absolute inset-0 z-0">
+          {bgImages.map((image, index) => (
+            <div
+              key={index}
+              className={`absolute inset-0 transition-opacity duration-1000 ${
+                index === currentBgImage ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              <img 
+                src={image.src} 
+                alt={image.alt} 
+                className="w-full h-full object-cover"
+                style={{ opacity: image.opacity / 100 }}
+              />
+            </div>
+          ))}
+          
+          {/* Enhanced Overlay - Improved for better visibility in both light/dark mode */}
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/70 via-primary/60 to-primary/50" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
+            {/* Additional overlay for better text contrast */}
+            <div className="absolute inset-0 bg-black/20" />
+          </div>
+
+          {/* Dot Indicators for Background - Positioned exactly like old hero */}
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex gap-3">
+            {bgImages.map((_, index) => (
+              <button
+                key={index}
+                className={`w-3 h-3 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 ${
+                  index === currentBgImage 
+                    ? 'bg-white scale-125' 
+                    : 'bg-white/50 hover:bg-white/70'
+                }`}
+                onClick={() => goToBgImage(index)}
+                aria-label={`Go to slide ${index + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+
         {/* Animated Background Grid */}
-        <div className="absolute inset-0 w-full h-full">
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px]" />
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-blue-500/5 to-cyan-500/5" />
+        <div className="absolute inset-0 w-full h-full z-0">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:40px_40px]" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/5" />
         </div>
 
         {/* Animated Orbs */}
-        <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden z-0">
           <motion.div
             animate={{
               scale: [1, 1.2, 1],
@@ -124,7 +195,7 @@ export default function Hero() {
               y: [0, -50, 0],
             }}
             transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute top-20 -left-20 w-96 h-96 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-full blur-3xl"
+            className="absolute top-20 -left-20 w-96 h-96 bg-gradient-to-r from-blue-500/30 to-cyan-500/30 rounded-full blur-3xl"
           />
           <motion.div
             animate={{
@@ -133,7 +204,7 @@ export default function Hero() {
               y: [0, 50, 0],
             }}
             transition={{ duration: 25, repeat: Infinity, ease: "linear", delay: 5 }}
-            className="absolute bottom-20 -right-20 w-96 h-96 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-full blur-3xl"
+            className="absolute bottom-20 -right-20 w-96 h-96 bg-gradient-to-r from-cyan-500/30 to-blue-500/30 rounded-full blur-3xl"
           />
         </div>
 
@@ -147,51 +218,35 @@ export default function Hero() {
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="text-center lg:text-left"
             >
-          
+              {/* Animated Main Title with SplitText */}
+              <div className="mb-8">
+                <SplitText
+                  text="Plasma Water Africa"
+                  className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight drop-shadow-2xl"
+                  delay={50}
+                  duration={0.8}
+                  ease="power3.out"
+                  splitType="chars"
+                  from={{ opacity: 0, y: 80 }}
+                  to={{ opacity: 1, y: 0 }}
+                  threshold={0.1}
+                  rootMargin="-100px"
+                  textAlign="center lg:text-left"
+                  onLetterAnimationComplete={handleTitleAnimationComplete}
+                />
+              </div>
 
-              {/* Main Heading */}
-              <motion.h1 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 dark:text-white mb-6 leading-[1.2] tracking-tight"
-              >
-                Power Your
-                <span className="relative inline-block mx-2">
-                  <span className="relative z-10 bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400 bg-clip-text text-transparent">
-                    World
-                  </span>
-                  <motion.svg 
-                    className="absolute -bottom-2 left-0 w-full h-2"
-                    viewBox="0 0 100 10"
-                    preserveAspectRatio="none"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ delay: 1, duration: 1 }}
-                  >
-                    <path 
-                      d="M0,5 L100,5" 
-                      stroke="#3B82F6" 
-                      strokeWidth="2" 
-                      strokeLinecap="round"
-                    />
-                  </motion.svg>
-                </span>
-                <br />
-                with Premium Equipment
-              </motion.h1>
+              {/* Shiny Text Subtitle  */}
+              <div className="mb-10 max-w-2xl lg:mx-0 mx-auto">
+                <ShinyText 
+                  text="Experts in borehole drilling, solar installations, and water tower construction. Bringing clean water and renewable energy to communities across Africa." 
+                  disabled={false} 
+                  speed={2} 
+                  className="text-xl md:text-2xl text-white/95 leading-relaxed font-medium drop-shadow-lg" 
+                />
+              </div>
               
-              {/* Description */}
-              <motion.p 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-8 leading-relaxed max-w-2xl lg:mx-0 mx-auto"
-              >
-                Discover top-quality pumps, generators, solar panels, and inverters for residential and industrial use. Engineered for excellence, built to last.
-              </motion.p>
-              
-              {/* CTA Buttons */}
+              {/* CTA Buttons with Premium Styling */}
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -202,93 +257,136 @@ export default function Hero() {
                   <motion.button 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.98 }}
-                    className="group relative px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-bold text-base rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden"
+                    className="group relative px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-bold text-base rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 overflow-hidden"
                   >
-                    <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                    <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
                     <span className="relative z-10 flex items-center">
-                      Explore Collection
+                      Shop Now 
                       <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                     </span>
+                    <div className="absolute inset-0 overflow-hidden">
+                      <div className="absolute inset-0 ripple-effect"></div>
+                    </div>
                   </motion.button>
                 </Link>
-                <Link href="/categories">
+                <Link href="/about">
                   <motion.button 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.98 }}
-                    className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-500 text-gray-700 dark:text-gray-200 font-bold text-base rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl"
+                    className="relative px-8 py-4 border-2 border-white text-white hover:bg-white hover:text-gray-900 font-bold text-base rounded-2xl transition-all duration-300 backdrop-blur-sm bg-white/10 group overflow-hidden"
                   >
-                    View Categories
+                    <div className="absolute inset-0 bg-white transform -translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out"></div>
+                    <span className="relative z-10 group-hover:text-gray-900 transition-colors duration-300">
+                      Learn More
+                    </span>
+                    <div className="absolute inset-0 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                      <div className="absolute w-1 h-1 bg-white/50 rounded-full top-1/4 left-1/4 animate-float"></div>
+                      <div className="absolute w-1 h-1 bg-white/50 rounded-full top-1/3 right-1/3 animate-float" style={{animationDelay: '0.5s'}}></div>
+                    </div>
                   </motion.button>
                 </Link>
               </motion.div>
 
-              {/* Stats Section */}
+              {/* Stats Section with Counter - Using old hero styling and positioning */}
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
-                className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto lg:mx-0"
+                className="grid grid-cols-2 sm:grid-cols-4 gap-4 md:gap-6 max-w-2xl mx-auto lg:mx-0"
               >
-                {stats.map((stat, index) => {
-                  const Icon = stat.icon;
-                  return (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.7 + index * 0.1 }}
-                      whileHover={{ y: -5 }}
-                      className="group text-center lg:text-left"
-                    >
-                      <div className="flex items-center justify-center lg:justify-start gap-2 mb-2">
-                        <div className={`p-2 rounded-xl bg-gradient-to-br ${stat.gradient} bg-opacity-10 group-hover:scale-110 transition-all duration-300`}>
-                          <Icon className="w-4 h-4 text-white" />
-                        </div>
-                        <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                          {stat.value}
-                        </span>
-                      </div>
-                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium">{stat.label}</p>
-                    </motion.div>
-                  );
-                })}
+                <div className="text-center group">
+                  <div className="relative">
+                    <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-accent drop-shadow-lg">
+                      <Counter end={500} duration={2} suffix="+" />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 group-hover:via-white/20 transition-all duration-500"></div>
+                  </div>
+                  <div className="text-xs sm:text-sm md:text-base text-white/90 mt-2 group-hover:text-white transition-colors duration-300 flex items-center justify-center gap-1">
+                    <Droplet className="w-3 h-3 md:w-4 md:h-4" />
+                    Boreholes Drilled
+                  </div>
+                  <div className="w-0 group-hover:w-12 h-0.5 bg-accent mx-auto mt-2 transition-all duration-500"></div>
+                </div>
+
+                <div className="text-center group">
+                  <div className="relative">
+                    <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-accent drop-shadow-lg">
+                      <Counter end={100} duration={2.5} suffix="+" />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 group-hover:via-white/20 transition-all duration-500"></div>
+                  </div>
+                  <div className="text-xs sm:text-sm md:text-base text-white/90 mt-2 group-hover:text-white transition-colors duration-300 flex items-center justify-center gap-1">
+                    <Sun className="w-3 h-3 md:w-4 md:h-4" />
+                    Solar Installations
+                  </div>
+                  <div className="w-0 group-hover:w-12 h-0.5 bg-accent mx-auto mt-2 transition-all duration-500"></div>
+                </div>
+
+                <div className="text-center group">
+                  <div className="relative">
+                    <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-accent drop-shadow-lg">
+                      <Counter end={24} duration={1.5} suffix="/7" />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 group-hover:via-white/20 transition-all duration-500"></div>
+                  </div>
+                  <div className="text-xs sm:text-sm md:text-base text-white/90 mt-2 group-hover:text-white transition-colors duration-300 flex items-center justify-center gap-1">
+                    <Headphones className="w-3 h-3 md:w-4 md:h-4" />
+                    Expert Support
+                  </div>
+                  <div className="w-0 group-hover:w-12 h-0.5 bg-accent mx-auto mt-2 transition-all duration-500"></div>
+                </div>
+
+                <div className="text-center group">
+                  <div className="relative">
+                    <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-accent drop-shadow-lg">
+                      <Counter end={100} duration={2} suffix="%" />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 group-hover:via-white/20 transition-all duration-500"></div>
+                  </div>
+                  <div className="text-xs sm:text-sm md:text-base text-white/90 mt-2 group-hover:text-white transition-colors duration-300 flex items-center justify-center gap-1">
+                    <ThumbsUp className="w-3 h-3 md:w-4 md:h-4" />
+                    Satisfaction
+                  </div>
+                  <div className="w-0 group-hover:w-12 h-0.5 bg-accent mx-auto mt-2 transition-all duration-500"></div>
+                </div>
               </motion.div>
             </motion.div>
 
-            {/* Right Side - 3D Image Carousel */}
+            {/* Right Side - 3D Product Carousel */}
             <motion.div
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="hidden lg:block"
             >
-              <div className="relative">
+              <motion.div 
+                className="relative"
+                style={{ rotateX, rotateY }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              >
                 {/* Main Image Container */}
                 <div className="relative aspect-[4/3] w-full max-w-md lg:max-w-lg xl:max-w-xl mx-auto">
                   {/* Glow Effect */}
-                  <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-3xl blur-2xl opacity-20 animate-pulse" />
+                  <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-3xl blur-2xl opacity-30 animate-pulse" />
                   
                   {/* Image Card */}
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={activeImage}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.5 }}
+                      initial={{ opacity: 0, scale: 0.95, rotateY: -10 }}
+                      animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, rotateY: 10 }}
+                      transition={{ duration: 0.5, type: "spring", stiffness: 300 }}
                       className="relative h-full rounded-2xl overflow-hidden shadow-2xl bg-white dark:bg-gray-800"
                     >
-                      <Image
+                      <img
                         src={products[activeImage].image}
                         alt={products[activeImage].title}
-                        fill
-                        className="object-cover"
-                        priority
-                        unoptimized
+                        className="w-full h-full object-cover"
                       />
                       
                       {/* Gradient Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                       
                       {/* Content Overlay */}
                       <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
@@ -303,6 +401,14 @@ export default function Hero() {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 0.1 }}
+                          className="text-sm text-white/80 mb-2"
+                        >
+                          {products[activeImage].description}
+                        </motion.p>
+                        <motion.p 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.15 }}
                           className="text-2xl font-bold text-amber-400"
                         >
                           {products[activeImage].price}
@@ -313,21 +419,22 @@ export default function Hero() {
                           transition={{ delay: 0.2 }}
                           className="flex items-center gap-1 mt-2"
                         >
-                          <div className="flex">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className={`w-4 h-4 ${i < Math.floor(products[activeImage].rating) ? 'text-yellow-400 fill-current' : 'text-gray-400'}`} />
-                            ))}
-                          </div>
-                          <span className="text-sm">{products[activeImage].rating}</span>
+                       
+                          <span className="text-sm text-white/80">{products[activeImage].rating}</span>
                         </motion.div>
                       </div>
                       
                       {/* Badge */}
-                      <div className="absolute top-4 right-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full px-3 py-1.5 shadow-lg">
+                      <motion.div 
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="absolute top-4 right-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full px-3 py-1.5 shadow-lg"
+                      >
                         <span className="text-xs font-bold text-white flex items-center gap-1">
                           <Zap className="w-3 h-3" /> {products[activeImage].badge}
                         </span>
-                      </div>
+                      </motion.div>
                     </motion.div>
                   </AnimatePresence>
                 </div>
@@ -342,16 +449,14 @@ export default function Hero() {
                       onClick={() => setActiveImage(idx)}
                       className={`relative w-16 h-16 rounded-xl overflow-hidden transition-all duration-300 ${
                         activeImage === idx 
-                          ? 'ring-2 ring-blue-500 shadow-lg' 
-                          : 'opacity-50 hover:opacity-100'
+                          ? 'ring-2 ring-blue-500 shadow-lg scale-105' 
+                          : 'opacity-60 hover:opacity-100'
                       }`}
                     >
-                      <Image
+                      <img
                         src={product.image}
                         alt={product.title}
-                        fill
-                        className="object-cover"
-                        unoptimized
+                        className="w-full h-full object-cover"
                       />
                     </motion.button>
                   ))}
@@ -370,8 +475,8 @@ export default function Hero() {
                         whileHover={{ y: -3 }}
                         className="relative group"
                       >
-                        <Link href={`/products?category=${cat.name}`}>
-                          <div className="flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-full border border-gray-200/50 dark:border-gray-700/50 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer">
+                        <Link href={cat.href}>
+                          <div className="flex items-center gap-2 px-4 py-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-full border border-white/20 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer">
                             <div className={`p-1 rounded-lg bg-gradient-to-br ${cat.color}`}>
                               <Icon className="w-3.5 h-3.5 text-white" />
                             </div>
@@ -382,9 +487,16 @@ export default function Hero() {
                     );
                   })}
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           </div>
+        </div>
+
+        {/* Decorative Wave - Improved position like old hero */}
+        <div className="absolute bottom-0 left-0 right-0 z-10">
+          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
+            <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="hsl(var(--background) / 0.95)"/>
+          </svg>
         </div>
 
         {/* Scroll Indicator */}
@@ -392,29 +504,43 @@ export default function Hero() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.5 }}
-          className="absolute bottom-20 left-1/2 transform -translate-x-1/2 cursor-pointer z-20"
+          className="absolute bottom-24 left-1/2 transform -translate-x-1/2 cursor-pointer z-20"
           onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
         >
           <motion.div 
             animate={{ y: [0, 10, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="w-8 h-12 border-2 border-gray-400 dark:border-gray-600 rounded-full flex flex-col items-center justify-start pt-2 hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
+            className="w-8 h-12 border-2 border-white/50 rounded-full flex flex-col items-center justify-start pt-2 hover:border-white transition-colors"
           >
             <motion.div 
               animate={{ height: [6, 12, 6] }}
               transition={{ duration: 2, repeat: Infinity }}
-              className="w-1.5 bg-gradient-to-t from-blue-600 to-cyan-400 rounded-full"
+              className="w-1.5 bg-gradient-to-t from-blue-400 to-cyan-300 rounded-full"
             />
           </motion.div>
         </motion.div>
       </section>
 
       <style jsx global>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
+        }
         @keyframes pulse {
           0%, 100% { opacity: 0.2; }
-          50% { opacity: 0.4; }
+          50% { opacity: 0.5; }
         }
         .animate-pulse { animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes ripple {
+          0% { transform: scale(0); opacity: 0.5; }
+          100% { transform: scale(4); opacity: 0; }
+        }
+        .ripple-effect {
+          animation: ripple 0.6s ease-out;
+        }
       `}</style>
     </>
   );

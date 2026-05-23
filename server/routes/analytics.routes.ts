@@ -16,6 +16,53 @@ const isAdmin = (user: any) => user && user.role === 'admin';
 const isSales = (user: any) => user && user.role === 'sales';
 const isAdminOrSales = (user: any) => isAdmin(user) || isSales(user);
 
+// ==================== HELPER FUNCTIONS ====================
+function getDateRange(period: string): { start: Date; end: Date } {
+  const now = new Date();
+  const start = new Date();
+  const end = new Date();
+  
+  end.setHours(23, 59, 59, 999);
+  
+  switch (period) {
+    case 'week':
+      start.setDate(now.getDate() - 7);
+      break;
+    case 'month':
+      start.setMonth(now.getMonth() - 1);
+      break;
+    case 'quarter':
+      start.setMonth(now.getMonth() - 3);
+      break;
+    case 'year':
+      start.setFullYear(now.getFullYear() - 1);
+      break;
+    default:
+      start.setMonth(now.getMonth() - 1);
+  }
+  
+  start.setHours(0, 0, 0, 0);
+  
+  return { start, end };
+}
+
+function getDateFilter(period: string): any {
+  const { start } = getDateRange(period);
+  return { createdAt: { $gte: start } };
+}
+
+function getPreviousPeriodRange(period: string): { start: Date; end: Date } {
+  const { start, end } = getDateRange(period);
+  const duration = end.getTime() - start.getTime();
+  const prevEnd = new Date(start.getTime() - 1);
+  const prevStart = new Date(prevEnd.getTime() - duration);
+  
+  prevStart.setHours(0, 0, 0, 0);
+  prevEnd.setHours(23, 59, 59, 999);
+  
+  return { start: prevStart, end: prevEnd };
+}
+
 // ==================== ADMIN ANALYTICS ====================
 router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
@@ -26,6 +73,8 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
     // Get date range from query
     const { period = 'month' } = req.query;
     const dateFilter = getDateFilter(period as string);
+    const { start: periodStart, end: periodEnd } = getDateRange(period as string);
+    const previousPeriod = getPreviousPeriodRange(period as string);
 
     // Parallel queries for better performance
     const [
@@ -38,7 +87,13 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
       dailySales,
       topProducts,
       topCustomers,
-      companySettings
+      companySettings,
+      revenueByDay,
+      ordersByDay,
+      quotationTrends,
+      paymentMethodBreakdown,
+      previousPeriodRevenue,
+      categorySales
     ] = await Promise.all([
       // Orders summary
       OrderModel.aggregate([
@@ -71,7 +126,10 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
             refunded: { $sum: { $cond: [{ $eq: ['$status', 'refunded'] }, 1, 0] } },
             mpesaCount: { $sum: { $cond: [{ $eq: ['$paymentMethod', 'mpesa'] }, 1, 0] } },
             cardCount: { $sum: { $cond: [{ $eq: ['$paymentMethod', 'card'] }, 1, 0] } },
-            codCount: { $sum: { $cond: [{ $eq: ['$paymentMethod', 'cod'] }, 1, 0] } }
+            codCount: { $sum: { $cond: [{ $eq: ['$paymentMethod', 'cod'] }, 1, 0] } },
+            mpesaVolume: { $sum: { $cond: [{ $eq: ['$paymentMethod', 'mpesa'] }, '$amount', 0] } },
+            cardVolume: { $sum: { $cond: [{ $eq: ['$paymentMethod', 'card'] }, '$amount', 0] } },
+            codVolume: { $sum: { $cond: [{ $eq: ['$paymentMethod', 'cod'] }, '$amount', 0] } }
           }
         }
       ]),
@@ -139,7 +197,7 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
       OrderModel.aggregate([
         {
           $match: {
-            createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+            createdAt: { $gte: periodStart },
             paymentStatus: 'completed'
           }
         },
@@ -155,6 +213,7 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
       
       // Top 10 products by revenue
       OrderModel.aggregate([
+        { $match: { createdAt: { $gte: periodStart } } },
         { $unwind: '$items' },
         {
           $group: {
@@ -166,19 +225,12 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
           }
         },
         { $sort: { revenue: -1 } },
-        { $limit: 10 },
-        {
-          $lookup: {
-            from: 'products',
-            localField: '_id',
-            foreignField: '_id',
-            as: 'product'
-          }
-        }
+        { $limit: 10 }
       ]),
       
       // Top 10 customers by spending
       OrderModel.aggregate([
+        { $match: { createdAt: { $gte: periodStart } } },
         {
           $group: {
             _id: {
@@ -193,7 +245,122 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
         { $limit: 10 }
       ]),
       
-      CompanySettings.findOne()
+      CompanySettings.findOne(),
+      
+      // Revenue by day for line chart
+      OrderModel.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: periodStart, $lte: periodEnd },
+            paymentStatus: 'completed'
+          }
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            revenue: { $sum: '$total' },
+            orders: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      
+      // Orders by day
+      OrderModel.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: periodStart, $lte: periodEnd }
+          }
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            count: { $sum: 1 },
+            paid: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'completed'] }, 1, 0] } },
+            pending: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'pending'] }, 1, 0] } }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      
+      // Quotation trends by status over time
+      QuotationModel.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: periodStart, $lte: periodEnd }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+              status: '$status'
+            },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { '_id.date': 1 } }
+      ]),
+      
+      // Payment method breakdown
+      TransactionModel.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: periodStart, $lte: periodEnd },
+            status: 'completed'
+          }
+        },
+        {
+          $group: {
+            _id: '$paymentMethod',
+            count: { $sum: 1 },
+            volume: { $sum: '$amount' }
+          }
+        }
+      ]),
+      
+      // Previous period revenue for growth calculation
+      OrderModel.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: previousPeriod.start, $lte: previousPeriod.end },
+            paymentStatus: 'completed'
+          }
+        },
+        { $group: { _id: null, total: { $sum: '$total' } } }
+      ]),
+      
+      // Sales by category
+      OrderModel.aggregate([
+        { $match: { createdAt: { $gte: periodStart }, paymentStatus: 'completed' } },
+        { $unwind: '$items' },
+        {
+          $lookup: {
+            from: 'products',
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'product'
+          }
+        },
+        { $unwind: '$product' },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: 'product.categoryId',
+            foreignField: '_id',
+            as: 'category'
+          }
+        },
+        {
+          $group: {
+            _id: { $ifNull: [{ $arrayElemAt: ['$category.name', 0] }, 'Uncategorized'] },
+            revenue: { $sum: { $multiply: ['$items.price', '$items.qty'] } },
+            quantity: { $sum: '$items.qty' }
+          }
+        },
+        { $sort: { revenue: -1 } },
+        { $limit: 10 }
+      ])
     ]);
 
     // Format responses
@@ -205,7 +372,8 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
     const transactions = txAgg[0] || {
       totalTransactions: 0, totalVolume: 0, completed: 0,
       pending: 0, failed: 0, refunded: 0,
-      mpesaCount: 0, cardCount: 0, codCount: 0
+      mpesaCount: 0, cardCount: 0, codCount: 0,
+      mpesaVolume: 0, cardVolume: 0, codVolume: 0
     };
 
     const quotations = quotationsAgg[0] || {
@@ -229,58 +397,196 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
 
     const taxRate = companySettings?.taxRate ?? 0.16;
 
-    // Calculate growth rates (compare with previous period)
-    const previousPeriodStart = new Date();
-    previousPeriodStart.setDate(previousPeriodStart.getDate() - 60);
-    
-    const previousRevenue = await OrderModel.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: previousPeriodStart, $lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-          paymentStatus: 'completed'
-        }
-      },
-      { $group: { _id: null, total: { $sum: '$total' } } }
-    ]);
-
+    // Calculate growth rates
     const currentRevenue = orders.totalRevenue;
-    const previousRevenueTotal = previousRevenue[0]?.total || 0;
+    const previousRevenueTotal = previousPeriodRevenue[0]?.total || 0;
     const revenueGrowth = previousRevenueTotal > 0 
       ? ((currentRevenue - previousRevenueTotal) / previousRevenueTotal) * 100 
       : 0;
 
+    // Calculate order growth
+    const previousOrdersAgg = await OrderModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: previousPeriod.start, $lte: previousPeriod.end }
+        }
+      },
+      { $group: { _id: null, total: { $sum: 1 } } }
+    ]);
+    const previousOrdersTotal = previousOrdersAgg[0]?.total || 0;
+    const orderGrowth = previousOrdersTotal > 0 
+      ? ((orders.totalOrders - previousOrdersTotal) / previousOrdersTotal) * 100 
+      : 0;
+
+    // Format daily sales for all dates in range
+    const dateMap = new Map();
+    let currentDate = new Date(periodStart);
+    while (currentDate <= periodEnd) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      dateMap.set(dateStr, { revenue: 0, orders: 0 });
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    revenueByDay.forEach((day: any) => {
+      if (dateMap.has(day._id)) {
+        dateMap.set(day._id, { revenue: day.revenue, orders: day.orders });
+      }
+    });
+    
+    const dailySalesChart = Array.from(dateMap.entries()).map(([date, data]) => ({
+      date,
+      revenue: (data as any).revenue,
+      orders: (data as any).orders
+    }));
+
+    // Format quotation trends
+    const quotationTrendsMap = new Map();
+    quotationTrends.forEach((item: any) => {
+      const key = item._id.date;
+      if (!quotationTrendsMap.has(key)) {
+        quotationTrendsMap.set(key, {});
+      }
+      quotationTrendsMap.get(key)[item._id.status] = item.count;
+    });
+    
+    const quotationTrendsChart = Array.from(quotationTrendsMap.entries()).map(([date, statuses]) => ({
+      date,
+      ...statuses
+    }));
+
+    // Format payment method breakdown
+    const paymentMethodData = {
+      labels: paymentMethodBreakdown.map((p: any) => p._id.toUpperCase()),
+      datasets: [
+        {
+          label: 'Transaction Count',
+          data: paymentMethodBreakdown.map((p: any) => p.count)
+        },
+        {
+          label: 'Volume (KES)',
+          data: paymentMethodBreakdown.map((p: any) => p.volume)
+        }
+      ]
+    };
+
+    // Calculate conversion funnels
+    const conversionFunnel = {
+      quotations: quotations.totalQuotations,
+      accepted: quotations.acceptedCount,
+      converted: quotations.convertedCount,
+      ordered: orders.totalOrders,
+      paid: orders.paidOrders,
+      rates: {
+        quoteToAccepted: quotations.totalQuotations > 0 ? (quotations.acceptedCount / quotations.totalQuotations) * 100 : 0,
+        acceptedToConverted: quotations.acceptedCount > 0 ? (quotations.convertedCount / quotations.acceptedCount) * 100 : 0,
+        convertedToOrder: quotations.convertedCount > 0 ? (orders.totalOrders / quotations.convertedCount) * 100 : 0,
+        orderToPayment: orders.totalOrders > 0 ? (orders.paidOrders / orders.totalOrders) * 100 : 0,
+        overall: quotations.totalQuotations > 0 ? (orders.paidOrders / quotations.totalQuotations) * 100 : 0
+      }
+    };
+
+    // Calculate hourly sales distribution
+    const hourlyDistribution = await OrderModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: periodStart, $lte: periodEnd },
+          paymentStatus: 'completed'
+        }
+      },
+      {
+        $group: {
+          _id: { $hour: '$createdAt' },
+          orders: { $sum: 1 },
+          revenue: { $sum: '$total' }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const hourlyChart = Array.from({ length: 24 }, (_, i) => {
+      const hour = hourlyDistribution.find((h: any) => h._id === i);
+      return {
+        hour: i,
+        orders: hour?.orders || 0,
+        revenue: hour?.revenue || 0
+      };
+    });
+
+    // Get recent orders for activity feed
+    const recentOrders = await OrderModel.find({ createdAt: { $gte: periodStart } })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('orderNumber total paymentStatus status createdAt shippingAddress.fullName');
+
     return res.json({
       success: true,
       data: {
+        period: {
+          from: periodStart,
+          to: periodEnd,
+          label: period
+        },
         overview: {
           totalRevenue: orders.totalRevenue,
           totalOrders: orders.totalOrders,
           averageOrderValue: orders.avgOrderValue,
           revenueGrowth: revenueGrowth.toFixed(1),
-          orderGrowth: '+12.5%',
-          conversionRate: quotations.totalQuotations > 0 
-            ? (quotations.convertedCount / quotations.totalQuotations) * 100 
-            : 0
+          orderGrowth: orderGrowth.toFixed(1),
+           conversionRate: conversionFunnel.rates.overall.toFixed(1),
+          totalCustomers: customers.totalCustomers,
+          activeCustomers: customers.activeCustomers,
+          totalProducts: products.totalProducts
         },
-        orders,
+        orders: {
+          ...orders,
+          completionRate: orders.totalOrders > 0 ? (orders.paidOrders / orders.totalOrders) * 100 : 0
+        },
         transactions: {
           ...transactions,
           successRate: transactions.totalTransactions > 0 
             ? (transactions.completed / transactions.totalTransactions) * 100 
+            : 0,
+          averageValue: transactions.totalTransactions > 0 
+            ? transactions.totalVolume / transactions.totalTransactions 
+            : 0,
+          methodBreakdown: {
+            mpesa: { count: transactions.mpesaCount, volume: transactions.mpesaVolume },
+            card: { count: transactions.cardCount, volume: transactions.cardVolume },
+            cod: { count: transactions.codCount, volume: transactions.codVolume }
+          }
+        },
+        quotations: {
+          ...quotations,
+          conversionRate: quotations.totalQuotations > 0 
+            ? (quotations.convertedCount / quotations.totalQuotations) * 100 
             : 0
         },
-        quotations,
         customers,
         products,
         users,
-        dailySales,
+        charts: {
+          dailySales: dailySalesChart,
+          ordersByDay: ordersByDay.map((day: any) => ({
+            date: day._id,
+            total: day.count,
+            paid: day.paid,
+            pending: day.pending
+          })),
+          quotationTrends: quotationTrendsChart,
+          paymentMethods: paymentMethodData,
+          hourlyDistribution: hourlyChart,
+          categorySales: categorySales.map((cat: any) => ({
+            category: cat._id,
+            revenue: cat.revenue,
+            quantity: cat.quantity
+          }))
+        },
         topProducts: topProducts.map(p => ({
           id: p._id,
           name: p.name,
           revenue: p.revenue,
           quantity: p.quantity,
-          orders: p.orders,
-          stock: p.product[0]?.stock || 0
+          orders: p.orders
         })),
         topCustomers: topCustomers.map(c => ({
           id: c._id.customerId,
@@ -288,6 +594,10 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
           totalSpent: c.totalSpent,
           orderCount: c.orderCount
         })),
+        conversionFunnel,
+        recentActivities: {
+          orders: recentOrders
+        },
         company: { taxRate }
       }
     });
@@ -307,6 +617,11 @@ router.get('/sales/overview', authMiddleware, async (req: Request & { user?: any
     const salesUserId = req.user!.userId;
     const { period = 'month' } = req.query;
     const dateFilter = getDateFilter(period as string);
+    const { start: periodStart, end: periodEnd } = getDateRange(period as string);
+    const previousPeriod = getPreviousPeriodRange(period as string);
+
+    // Get sales rep details
+    const salesRep = await UserModel.findById(salesUserId).select('name email');
 
     // Parallel queries for sales person
     const [
@@ -314,8 +629,12 @@ router.get('/sales/overview', authMiddleware, async (req: Request & { user?: any
       ordersAgg,
       transactionsAgg,
       customersAgg,
-      monthlyTargets,
-      recentActivities
+      dailyPerformance,
+      topProducts,
+      recentActivities,
+      previousPeriodRevenue,
+      quotationTrends,
+      conversionMetrics
     ] = await Promise.all([
       // My quotations
       QuotationModel.aggregate([
@@ -336,7 +655,7 @@ router.get('/sales/overview', authMiddleware, async (req: Request & { user?: any
       
       // My orders (through customers I created)
       OrderModel.aggregate([
-        { $match: { ...dateFilter, salesCustomerId: { $ne: null } } },
+        { $match: { createdAt: { $gte: periodStart } } },
         {
           $lookup: {
             from: 'salescustomers',
@@ -380,7 +699,7 @@ router.get('/sales/overview', authMiddleware, async (req: Request & { user?: any
           }
         },
         { $unwind: '$sc' },
-        { $match: { ...dateFilter, 'sc.createdBy': salesUserId } },
+        { $match: { 'sc.createdBy': salesUserId, 'o.createdAt': { $gte: periodStart } } },
         {
           $group: {
             _id: null,
@@ -396,25 +715,67 @@ router.get('/sales/overview', authMiddleware, async (req: Request & { user?: any
       
       // My customers
       SalesCustomerModel.aggregate([
-        { $match: { ...dateFilter, createdBy: salesUserId } },
+        { $match: { createdBy: salesUserId } },
         {
           $group: {
             _id: null,
             totalCustomers: { $sum: 1 },
             activeCustomers: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
-            totalCustomerValue: { $sum: '$totalSpent' }
+            totalCustomerValue: { $sum: '$totalSpent' },
+            avgCustomerValue: { $avg: '$totalSpent' }
           }
         }
       ]),
       
-      // Monthly targets (you can store these in a Settings model)
-      Promise.resolve({
-        monthlyTarget: 500000,
-        currentProgress: 0,
-        remainingTarget: 0
-      }),
+      // Daily performance for charts
+      OrderModel.aggregate([
+        {
+          $lookup: {
+            from: 'salescustomers',
+            localField: 'salesCustomerId',
+            foreignField: '_id',
+            as: 'sc'
+          }
+        },
+        { $unwind: '$sc' },
+        { $match: { 'sc.createdBy': salesUserId, createdAt: { $gte: periodStart }, paymentStatus: 'completed' } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            revenue: { $sum: '$total' },
+            orders: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
       
-      // Recent activities (last 5 quotations and orders)
+      // My top products
+      OrderModel.aggregate([
+        {
+          $lookup: {
+            from: 'salescustomers',
+            localField: 'salesCustomerId',
+            foreignField: '_id',
+            as: 'sc'
+          }
+        },
+        { $unwind: '$sc' },
+        { $match: { 'sc.createdBy': salesUserId, createdAt: { $gte: periodStart } } },
+        { $unwind: '$items' },
+        {
+          $group: {
+            _id: '$items.productId',
+            name: { $first: '$items.name' },
+            revenue: { $sum: { $multiply: ['$items.price', '$items.qty'] } },
+            quantity: { $sum: '$items.qty' },
+            orders: { $sum: 1 }
+          }
+        },
+        { $sort: { revenue: -1 } },
+        { $limit: 5 }
+      ]),
+      
+      // Recent activities
       Promise.all([
         QuotationModel.find({ createdBy: salesUserId })
           .sort({ createdAt: -1 })
@@ -433,8 +794,79 @@ router.get('/sales/overview', authMiddleware, async (req: Request & { user?: any
           { $match: { 'sc.createdBy': salesUserId } },
           { $sort: { createdAt: -1 } },
           { $limit: 5 },
-          { $project: { orderNumber: 1, total: 1, status: 1, createdAt: 1, customerName: '$sc.name' } }
+          { $project: { orderNumber: 1, total: 1, status: 1, paymentStatus: 1, createdAt: 1, customerName: '$sc.name' } }
         ])
+      ]),
+      
+      // Previous period revenue for growth
+      OrderModel.aggregate([
+        {
+          $lookup: {
+            from: 'salescustomers',
+            localField: 'salesCustomerId',
+            foreignField: '_id',
+            as: 'sc'
+          }
+        },
+        { $unwind: '$sc' },
+        {
+          $match: {
+            'sc.createdBy': salesUserId,
+            createdAt: { $gte: previousPeriod.start, $lte: previousPeriod.end },
+            paymentStatus: 'completed'
+          }
+        },
+        { $group: { _id: null, total: { $sum: '$total' } } }
+      ]),
+      
+      // Quotation trends over time
+      QuotationModel.aggregate([
+        {
+          $match: {
+            createdBy: salesUserId,
+            createdAt: { $gte: periodStart, $lte: periodEnd }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+              status: '$status'
+            },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { '_id.date': 1 } }
+      ]),
+      
+      // Conversion metrics by customer segment
+      SalesCustomerModel.aggregate([
+        { $match: { createdBy: salesUserId } },
+        {
+          $lookup: {
+            from: 'orders',
+            localField: '_id',
+            foreignField: 'salesCustomerId',
+            as: 'orders'
+          }
+        },
+        {
+          $project: {
+            name: 1,
+            totalSpent: 1,
+            status: 1,
+            orderCount: { $size: '$orders' },
+            hasOrder: { $gt: [{ $size: '$orders' }, 0] }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalCustomers: { $sum: 1 },
+            convertedCustomers: { $sum: { $cond: ['$hasOrder', 1, 0] } },
+            avgOrderValue: { $avg: '$totalSpent' }
+          }
+        }
       ])
     ]);
 
@@ -455,7 +887,13 @@ router.get('/sales/overview', authMiddleware, async (req: Request & { user?: any
     };
     
     const customers = customersAgg[0] || {
-      totalCustomers: 0, activeCustomers: 0, totalCustomerValue: 0
+      totalCustomers: 0, activeCustomers: 0, totalCustomerValue: 0, avgCustomerValue: 0
+    };
+
+    const conversionData = conversionMetrics[0] || {
+      totalCustomers: 0,
+      convertedCustomers: 0,
+      avgOrderValue: 0
     };
 
     // Calculate conversion rate
@@ -463,23 +901,80 @@ router.get('/sales/overview', authMiddleware, async (req: Request & { user?: any
       ? (quotes.convertedCount / quotes.totalQuotations) * 100 
       : 0;
 
-    // Calculate monthly target progress
-    const monthlyTarget = 500000;
-    const currentProgress = orders.totalRevenue;
-    const remainingTarget = Math.max(0, monthlyTarget - currentProgress);
-    const targetProgress = (currentProgress / monthlyTarget) * 100;
+    // Calculate revenue growth
+    const currentRevenue = orders.totalRevenue;
+    const previousRevenueTotal = previousPeriodRevenue[0]?.total || 0;
+    const revenueGrowth = previousRevenueTotal > 0 
+      ? ((currentRevenue - previousRevenueTotal) / previousRevenueTotal) * 100 
+      : 0;
 
-    // Get recent activities
+    // Calculate customer conversion rate
+    const customerConversionRate = customers.totalCustomers > 0 
+      ? (conversionData.convertedCustomers / customers.totalCustomers) * 100 
+      : 0;
+
+    // Monthly target (you can make this configurable per sales rep)
+    const monthlyTarget = 500000;
+    const targetProgress = (currentRevenue / monthlyTarget) * 100;
+    const remainingTarget = Math.max(0, monthlyTarget - currentRevenue);
+
+    // Format daily performance chart
+    const dateMap = new Map();
+    let currentDate = new Date(periodStart);
+    while (currentDate <= periodEnd) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      dateMap.set(dateStr, { revenue: 0, orders: 0 });
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    dailyPerformance.forEach((day: any) => {
+      if (dateMap.has(day._id)) {
+        dateMap.set(day._id, { revenue: day.revenue, orders: day.orders });
+      }
+    });
+    
+    const dailyPerformanceChart = Array.from(dateMap.entries()).map(([date, data]) => ({
+      date,
+      revenue: (data as any).revenue,
+      orders: (data as any).orders
+    }));
+
+    // Format quotation trends
+    const quotationTrendsMap = new Map();
+    quotationTrends.forEach((item: any) => {
+      const key = item._id.date;
+      if (!quotationTrendsMap.has(key)) {
+        quotationTrendsMap.set(key, {});
+      }
+      quotationTrendsMap.get(key)[item._id.status] = item.count;
+    });
+    
+    const quotationTrendsChart = Array.from(quotationTrendsMap.entries()).map(([date, statuses]) => ({
+      date,
+      ...statuses
+    }));
+
     const [recentQuotations, recentOrders] = recentActivities;
 
     return res.json({
       success: true,
       data: {
+        period: {
+          from: periodStart,
+          to: periodEnd,
+          label: period
+        },
+        salesRep: {
+          name: salesRep?.name,
+          email: salesRep?.email
+        },
         overview: {
           totalRevenue: orders.totalRevenue,
           totalOrders: orders.totalOrders,
           averageOrderValue: orders.averageOrderValue,
           conversionRate: conversionRate.toFixed(1),
+          customerConversionRate: customerConversionRate.toFixed(1),
+          revenueGrowth: revenueGrowth.toFixed(1),
           totalCustomers: customers.totalCustomers,
           activeCustomers: customers.activeCustomers,
           totalQuotations: quotes.totalQuotations,
@@ -489,7 +984,10 @@ router.get('/sales/overview', authMiddleware, async (req: Request & { user?: any
         },
         quotations: {
           ...quotes,
-          conversionRate: conversionRate.toFixed(1)
+          conversionRate: conversionRate.toFixed(1),
+          acceptanceRate: quotes.totalQuotations > 0 
+            ? (quotes.acceptedCount / quotes.totalQuotations) * 100 
+            : 0
         },
         orders: {
           ...orders,
@@ -506,13 +1004,28 @@ router.get('/sales/overview', authMiddleware, async (req: Request & { user?: any
             ? transactions.totalVolume / transactions.totalTransactions 
             : 0
         },
-        customers,
+        customers: {
+          ...customers,
+          conversionRate: customerConversionRate,
+          convertedCustomers: conversionData.convertedCustomers
+        },
         monthlyTarget: {
           target: monthlyTarget,
-          current: currentProgress,
+          current: currentRevenue,
           remaining: remainingTarget,
           progress: Math.min(targetProgress, 100)
         },
+        charts: {
+          dailyPerformance: dailyPerformanceChart,
+          quotationTrends: quotationTrendsChart
+        },
+        topProducts: topProducts.map(p => ({
+          id: p._id,
+          name: p.name,
+          revenue: p.revenue,
+          quantity: p.quantity,
+          orders: p.orders
+        })),
         recentActivities: {
           quotations: recentQuotations,
           orders: recentOrders
@@ -534,27 +1047,124 @@ router.get('/performance', authMiddleware, async (req: Request & { user?: any },
 
     const isAdminUser = isAdmin(req.user);
     const salesUserId = !isAdminUser ? req.user!.userId : null;
+    const { period = 'month' } = req.query;
+    const { start: periodStart } = getDateRange(period as string);
 
     // Sales rep performance (admin only)
     let salesRepPerformance: any[] = [];
+    let teamSummary: any = null;
     
     if (isAdminUser) {
       const salesReps = await UserModel.find({ role: 'sales', isActive: true });
       
-      salesRepPerformance = await Promise.all(
+      const performanceData = await Promise.all(
         salesReps.map(async (rep) => {
-          const stats = await QuotationModel.aggregate([
-            { $match: { createdBy: rep._id } },
-            {
-              $group: {
-                _id: null,
-                totalQuotes: { $sum: 1 },
-                convertedQuotes: { $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] } },
-                totalValue: { $sum: '$total' }
+          const [quoteStats, orderStats, customerStats] = await Promise.all([
+            QuotationModel.aggregate([
+              { $match: { createdBy: rep._id, createdAt: { $gte: periodStart } } },
+              {
+                $group: {
+                  _id: null,
+                  totalQuotes: { $sum: 1 },
+                  convertedQuotes: { $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] } },
+                  acceptedQuotes: { $sum: { $cond: [{ $eq: ['$status', 'accepted'] }, 1, 0] } },
+                  totalValue: { $sum: '$total' }
+                }
               }
-            }
+            ]),
+            
+            OrderModel.aggregate([
+              {
+                $lookup: {
+                  from: 'salescustomers',
+                  localField: 'salesCustomerId',
+                  foreignField: '_id',
+                  as: 'sc'
+                }
+              },
+              { $unwind: '$sc' },
+              { $match: { 'sc.createdBy': rep._id, createdAt: { $gte: periodStart } } },
+              {
+                $group: {
+                  _id: null,
+                  totalOrders: { $sum: 1 },
+                  totalRevenue: { $sum: '$total' },
+                  paidOrders: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'completed'] }, 1, 0] } },
+                  pendingOrders: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'pending'] }, 1, 0] } }
+                }
+              }
+            ]),
+            
+            SalesCustomerModel.aggregate([
+              { $match: { createdBy: rep._id } },
+              {
+                $group: {
+                  _id: null,
+                  totalCustomers: { $sum: 1 },
+                  activeCustomers: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
+                  totalValue: { $sum: '$totalSpent' }
+                }
+              }
+            ])
           ]);
           
+          const quotes = quoteStats[0] || { totalQuotes: 0, convertedQuotes: 0, acceptedQuotes: 0, totalValue: 0 };
+          const orders = orderStats[0] || { totalOrders: 0, totalRevenue: 0, paidOrders: 0, pendingOrders: 0 };
+          const customers = customerStats[0] || { totalCustomers: 0, activeCustomers: 0, totalValue: 0 };
+          
+          return {
+            id: rep._id,
+            name: rep.name,
+            email: rep.email,
+            avatar: rep.avatar,
+            metrics: {
+              quotes: {
+                total: quotes.totalQuotes,
+                converted: quotes.convertedQuotes,
+                accepted: quotes.acceptedQuotes,
+                conversionRate: quotes.totalQuotes > 0 ? (quotes.convertedQuotes / quotes.totalQuotes) * 100 : 0,
+                acceptanceRate: quotes.totalQuotes > 0 ? (quotes.acceptedQuotes / quotes.totalQuotes) * 100 : 0,
+                totalValue: quotes.totalValue
+              },
+              orders: {
+                total: orders.totalOrders,
+                revenue: orders.totalRevenue,
+                paid: orders.paidOrders,
+                pending: orders.pendingOrders,
+                averageValue: orders.totalOrders > 0 ? orders.totalRevenue / orders.totalOrders : 0,
+                completionRate: orders.totalOrders > 0 ? (orders.paidOrders / orders.totalOrders) * 100 : 0
+              },
+              customers: {
+                total: customers.totalCustomers,
+                active: customers.activeCustomers,
+                totalValue: customers.totalValue,
+                avgValue: customers.totalCustomers > 0 ? customers.totalValue / customers.totalCustomers : 0
+              }
+            }
+          };
+        })
+      );
+      
+      salesRepPerformance = performanceData;
+      
+      // Calculate team summary
+      teamSummary = {
+        totalRevenue: salesRepPerformance.reduce((sum, rep) => sum + rep.metrics.orders.revenue, 0),
+        totalOrders: salesRepPerformance.reduce((sum, rep) => sum + rep.metrics.orders.total, 0),
+        totalQuotes: salesRepPerformance.reduce((sum, rep) => sum + rep.metrics.quotes.total, 0),
+        totalCustomers: salesRepPerformance.reduce((sum, rep) => sum + rep.metrics.customers.total, 0),
+        avgConversionRate: salesRepPerformance.reduce((sum, rep) => sum + rep.metrics.quotes.conversionRate, 0) / (salesRepPerformance.length || 1),
+        topPerformer: salesRepPerformance.length > 0 
+          ? salesRepPerformance.reduce((prev, current) => 
+              prev.metrics.orders.revenue > current.metrics.orders.revenue ? prev : current
+            )
+          : null
+      };
+    } else {
+      // For sales users, get their own ranking
+      const allSalesReps = await UserModel.find({ role: 'sales', isActive: true });
+      const allPerformance = await Promise.all(
+        allSalesReps.map(async (rep) => {
           const orderStats = await OrderModel.aggregate([
             {
               $lookup: {
@@ -565,48 +1175,33 @@ router.get('/performance', authMiddleware, async (req: Request & { user?: any },
               }
             },
             { $unwind: '$sc' },
-            { $match: { 'sc.createdBy': rep._id } },
-            {
-              $group: {
-                _id: null,
-                totalOrders: { $sum: 1 },
-                totalRevenue: { $sum: '$total' },
-                paidOrders: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'completed'] }, 1, 0] } }
-              }
-            }
+            { $match: { 'sc.createdBy': rep._id, createdAt: { $gte: periodStart }, paymentStatus: 'completed' } },
+            { $group: { _id: null, total: { $sum: '$total' } } }
           ]);
-          
-          const quoteStats = stats[0] || { totalQuotes: 0, convertedQuotes: 0, totalValue: 0 };
-          const orderStatsData = orderStats[0] || { totalOrders: 0, totalRevenue: 0, paidOrders: 0 };
-          
           return {
             id: rep._id,
             name: rep.name,
-            email: rep.email,
-            avatar: rep.avatar,
-            metrics: {
-              totalQuotes: quoteStats.totalQuotes,
-              convertedQuotes: quoteStats.convertedQuotes,
-              conversionRate: quoteStats.totalQuotes > 0 
-                ? (quoteStats.convertedQuotes / quoteStats.totalQuotes) * 100 
-                : 0,
-              totalOrders: orderStatsData.totalOrders,
-              totalRevenue: orderStatsData.totalRevenue,
-              paidOrders: orderStatsData.paidOrders,
-              averageOrderValue: orderStatsData.totalOrders > 0 
-                ? orderStatsData.totalRevenue / orderStatsData.totalOrders 
-                : 0
-            }
+            revenue: orderStats[0]?.total || 0
           };
         })
       );
+      
+      const sortedByRevenue = allPerformance.sort((a, b) => b.revenue - a.revenue);
+      const currentRepRank = sortedByRevenue.findIndex(r => r.id === salesUserId) + 1;
+      
+      salesRepPerformance = [{
+        rank: currentRepRank,
+        totalReps: allSalesReps.length,
+        topPerformers: sortedByRevenue.slice(0, 5)
+      }];
     }
 
     return res.json({
       success: true,
       data: {
-        salesRepPerformance: isAdminUser ? salesRepPerformance : null,
-        period: 'current_month'
+        salesRepPerformance,
+        teamSummary,
+        period
       }
     });
   } catch (error: any) {
@@ -615,29 +1210,59 @@ router.get('/performance', authMiddleware, async (req: Request & { user?: any },
   }
 });
 
-// ==================== HELPER FUNCTIONS ====================
-function getDateFilter(period: string): any {
-  const now = new Date();
-  let startDate: Date;
-  
-  switch (period) {
-    case 'week':
-      startDate = new Date(now.setDate(now.getDate() - 7));
-      break;
-    case 'month':
-      startDate = new Date(now.setMonth(now.getMonth() - 1));
-      break;
-    case 'quarter':
-      startDate = new Date(now.setMonth(now.getMonth() - 3));
-      break;
-    case 'year':
-      startDate = new Date(now.setFullYear(now.getFullYear() - 1));
-      break;
-    default:
-      startDate = new Date(now.setMonth(now.getMonth() - 1));
+// ==================== EXPORT ANALYTICS ====================
+router.get('/export', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    if (!isAdmin(req.user)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { period = 'month', type = 'all' } = req.query;
+    const { start: periodStart, end: periodEnd } = getDateRange(period as string);
+
+    let exportData: any = {};
+
+    if (type === 'orders' || type === 'all') {
+      const orders = await OrderModel.find({
+        createdAt: { $gte: periodStart, $lte: periodEnd }
+      }).sort({ createdAt: -1 }).lean();
+      exportData.orders = orders;
+    }
+
+    if (type === 'transactions' || type === 'all') {
+      const transactions = await TransactionModel.find({
+        createdAt: { $gte: periodStart, $lte: periodEnd }
+      }).sort({ createdAt: -1 }).lean();
+      exportData.transactions = transactions;
+    }
+
+    if (type === 'quotations' || type === 'all') {
+      const quotations = await QuotationModel.find({
+        createdAt: { $gte: periodStart, $lte: periodEnd }
+      }).sort({ createdAt: -1 }).lean();
+      exportData.quotations = quotations;
+    }
+
+    if (type === 'customers' || type === 'all') {
+      const customers = await SalesCustomerModel.find().lean();
+      exportData.customers = customers;
+    }
+
+    res.json({
+      success: true,
+      data: exportData,
+      metadata: {
+        period,
+        from: periodStart,
+        to: periodEnd,
+        exportedAt: new Date(),
+        type
+      }
+    });
+  } catch (error: any) {
+    console.error('Export analytics error:', error);
+    return res.status(500).json({ error: 'Failed to export analytics' });
   }
-  
-  return { createdAt: { $gte: startDate } };
-}
+});
 
 export default router;

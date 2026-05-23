@@ -143,13 +143,30 @@ function productRoutes(productModel: typeof ProductModel) {
       const productData = { ...req.body };
       
       // Ensure price is a number
-      if (productData.price) {
+      if (productData.price !== undefined && productData.price !== null && productData.price !== '') {
         productData.price = typeof productData.price === 'string' 
           ? parseFloat(productData.price) 
           : Number(productData.price);
       }
-      
+
+      // Normalize compareAtPrice
+      // - allow null/empty => null
+      // - coerce to number
+      // - if compareAtPrice <= price => null
+      if (productData.compareAtPrice === '' || productData.compareAtPrice === undefined || productData.compareAtPrice === null) {
+        productData.compareAtPrice = null;
+      } else {
+        productData.compareAtPrice = typeof productData.compareAtPrice === 'string'
+          ? parseFloat(productData.compareAtPrice)
+          : Number(productData.compareAtPrice);
+
+        if (productData.compareAtPrice <= productData.price) {
+          productData.compareAtPrice = null;
+        }
+      }
+
       const product = new ProductModel(productData);
+
       const savedProduct = await product.save();
       
       // 🔔 CREATE NOTIFICATION FOR NEW PRODUCT (notify admins)
@@ -210,7 +227,24 @@ function productRoutes(productModel: typeof ProductModel) {
           : Number(updateData.price);
       }
       
+      // Normalize compareAtPrice (must be > price)
+      if (updateData.compareAtPrice !== undefined) {
+        if (updateData.compareAtPrice === '' || updateData.compareAtPrice === null) {
+          updateData.compareAtPrice = null;
+        } else {
+          updateData.compareAtPrice = typeof updateData.compareAtPrice === 'string'
+            ? parseFloat(updateData.compareAtPrice)
+            : Number(updateData.compareAtPrice);
+
+          const currentPrice = updateData.price !== undefined ? updateData.price : originalProduct.price;
+          if (updateData.compareAtPrice <= currentPrice) {
+            updateData.compareAtPrice = null;
+          }
+        }
+      }
+      
       const product = await ProductModel.findByIdAndUpdate(
+
         id, 
         updateData, 
         { new: true, runValidators: true }
@@ -313,6 +347,22 @@ function productRoutes(productModel: typeof ProductModel) {
           : Number(updateData.price);
       }
       
+      // Normalize compareAtPrice (must be > price)
+      if (updateData.compareAtPrice !== undefined) {
+        if (updateData.compareAtPrice === '' || updateData.compareAtPrice === null) {
+          updateData.compareAtPrice = null;
+        } else {
+          updateData.compareAtPrice = typeof updateData.compareAtPrice === 'string'
+            ? parseFloat(updateData.compareAtPrice)
+            : Number(updateData.compareAtPrice);
+
+          const currentPrice = updateData.price !== undefined ? updateData.price : originalProduct.price;
+          if (updateData.compareAtPrice <= currentPrice) {
+            updateData.compareAtPrice = null;
+          }
+        }
+      }
+
       const product = await ProductModel.findOneAndUpdate(
         { slug }, 
         updateData, 

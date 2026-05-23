@@ -15,6 +15,7 @@ export interface IProduct extends Document {
   brand: string;
   type: string;
   price: number; 
+  compareAtPrice?: number; 
   description?: string;
   specs: any;
   stock: number;
@@ -48,7 +49,8 @@ const productSchema = new Schema<IProduct>({
   category: { type: String, required: true },
   brand: { type: String, required: true },
   type: { type: String, required: true },
-  price: { type: Number, required: true }, 
+  price: { type: Number, required: true },
+  compareAtPrice: { type: Number, default: null }, 
   description: { type: String },
   specs: { type: Schema.Types.Mixed, default: {} },
   stock: { type: Number, default: 0 },
@@ -70,7 +72,13 @@ productSchema.virtual('imageUrls').get(function() {
     return '';
   }).filter(Boolean);
 });
-
+// Virtual for discount percentage
+productSchema.virtual('discountPercent').get(function() {
+  if (this.compareAtPrice && this.compareAtPrice > this.price) {
+    return Math.round(((this.compareAtPrice - this.price) / this.compareAtPrice) * 100);
+  }
+  return 0;
+});
 // Export both the model and the model type
 const ProductModel = mongoose.model<IProduct>('Product', productSchema);
 export default ProductModel;
