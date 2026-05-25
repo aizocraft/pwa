@@ -19,7 +19,7 @@ export async function generateQuotationPDF(
   element.style.padding = '0';
   element.style.margin = '0';
 
-  // Logo paths - remain as they are in public/images
+  // Logo paths
   const finalLogoUrl = logoUrl || '/logo1.png';
   const mpesaLogoUrl = '/mpesa-logo.png';
   const kcbLogoUrl = '/kcb-logo.png';
@@ -31,6 +31,12 @@ export async function generateQuotationPDF(
   const companyEmail = settings?.email || 'info@plasmawater.com';
   const taxRate = quote.taxRate || 0.16;
 
+  // Get transport info (supports both old and new formats)
+  const transportCost = quote.transportCost || quote.transportInfo?.cost || 0;
+  const transportDescription = quote.transportDescription || quote.transportInfo?.description || '';
+  const estimatedDelivery = quote.estimatedDelivery || quote.shippingInfo?.estimatedDelivery || '';
+  const taxPerItem = quote.taxPerItem || false;
+
   function escapeHtml(str: string): string {
     if (!str) return '';
     return str
@@ -41,7 +47,6 @@ export async function generateQuotationPDF(
       .replace(/'/g, '&#39;');
   }
 
-  // Premium SVG Icons - No emojis (scaled up slightly)
   const icons = {
     location: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
     phone: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`,
@@ -81,7 +86,7 @@ export async function generateQuotationPDF(
           background: white;
         }
 
-                  /* HEADER SECTION  */
+        /* HEADER SECTION */
         .header {
           padding: 25px 0 20px 0;
           display: flex;
@@ -93,8 +98,7 @@ export async function generateQuotationPDF(
 
         .company-info {
           flex: 1;
-           margin-left: 75px;
-
+          margin-left: 75px;
         }
 
         .company-name {
@@ -105,32 +109,15 @@ export async function generateQuotationPDF(
           color: #1a1a1a;
         }
 
-        .company-address {
+        .company-address, .company-location, .company-tel, .company-email {
           font-size: 14px;
           color: #333;
           margin-bottom: 5px;
-        }
-
-        .company-location {
-          font-size: 14px;
-          color: #333;
-          margin-bottom: 8px;
-        }
-
-        .company-tel {
-          font-size: 14px;
-          color: #555;
-          margin-bottom: 5px;
-        }
-
-        .company-email {
-          font-size: 14px;
-          color: #555;
         }
 
         .logo-area {
           flex: 0 0 auto;
-         margin-right: 100px;
+          margin-right: 100px;
         }
 
         .company-logo {
@@ -141,99 +128,49 @@ export async function generateQuotationPDF(
           display: block;
         }
 
-        /* =========================================
-   DOCUMENT TITLE SECTION
-   Plasma Water Africa Style
-========================================= */
+        /* DOCUMENT TITLE SECTION */
+        .doc-title-section {
+          position: relative;
+          width: 100%;
+          margin: 18px 0 34px;
+        }
 
-.doc-title-section {
-  position: relative;
-  width: 100%;
-  margin: 18px 0 34px;
-}
+        .doc-title-container {
+          position: relative;
+          z-index: 2;
+          width: 100%;
+          display: flex;
+          justify-content: flex-end;
+          padding-right: 85px;
+        }
 
+        .doc-title-text {
+          position: relative;
+          min-width: 240px;
+          padding: 10px 42px;
+          text-align: center;
+          background: #efefef;
+          border: 2px solid #3f6f9e;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 23px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 1px 4px rgba(0,0,0,0.08);
+        }
 
-/* Container */
-.doc-title-container {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  display: flex;
-  justify-content: flex-end;
-  padding-right: 85px;
-}
+        .doc-title-text.quotation {
+          color: #505050;
+          background: #f1f1f1;
+          border-color: #4b79a6;
+        }
 
-/* Shared title style */
-.doc-title-text {
-  position: relative;
-  min-width: 240px;
-  padding: 10px 42px;
-  text-align: center;
-
-  background: #efefef;
-  border: 2px solid #3f6f9e;
-
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 23px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.75),
-    0 1px 4px rgba(0,0,0,0.08);
-}
-
-/* =========================
-   QUOTATION STYLE
-========================= */
-.doc-title-text.quotation {
-  color: #505050;
-  background: #f1f1f1;
-  border-color: #4b79a6;
-}
-
-/* =========================
-   INVOICE STYLE
-========================= */
-.doc-title-text.invoice {
-  color: #3d3d3d;
-  background: linear-gradient(to bottom, #f8f8f8, #e7e7e7);
-  border-color: #2f5f8c;
-  letter-spacing: 1.5px;
-}
-
-/* Small accent line */
-.doc-title-text.invoice::after,
-.doc-title-text.quotation::after {
-  content: "";
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background: rgba(11, 63, 115, 0.18);
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-
-  .doc-title-container {
-    padding-right: 18px;
-  }
-
-  .doc-title-text {
-    min-width: 165px;
-    padding: 8px 22px;
-    font-size: 16px;
-  }
-
-  .doc-title-section::before {
-    height: 20px;
-  }
-}
-
-
+        .doc-title-text.invoice {
+          color: #3d3d3d;
+          background: linear-gradient(to bottom, #f8f8f8, #e7e7e7);
+          border-color: #2f5f8c;
+          letter-spacing: 1.5px;
+        }
 
         /* INFO SECTION */
         .info-section {
@@ -298,19 +235,41 @@ export async function generateQuotationPDF(
           color: #2c3e4e;
         }
 
-        .status-badge {
-          display: inline-flex;
+        /* Transport Info Section */
+        .transport-info {
+          background: #f7f9fc;
+          padding: 18px 28px;
+          border-radius: 16px;
+          margin-bottom: 25px;
+          display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 6px 16px;
-          background: #e8f4ec;
-          color: #2c6e3c;
-          border-radius: 30px;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 20px;
+          border: 1px solid #e9eef3;
+        }
+
+        .transport-item {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .transport-label {
           font-size: 14px;
           font-weight: 600;
-      
+          color: #5a7a5a;
+          text-transform: uppercase;
+          letter-spacing: 0.6px;
         }
-                  /* Payment Status Badges */
+
+        .transport-value {
+          font-size: 16px;
+          font-weight: 500;
+          color: #2c5e3c;
+        }
+
+        /* Payment Status Badges */
         .payment-status-badge {
           display: inline-flex;
           align-items: center;
@@ -334,46 +293,11 @@ export async function generateQuotationPDF(
           box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
         }
 
-        /* SHIPPING INFO - Larger */
-        .shipping-info {
-          background: #f7f9fc;
-          padding: 18px 28px;
-          border-radius: 16px;
-          margin-bottom: 45px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 20px;
-          border: 1px solid #e9eef3;
-          display: none;
-        }
-
-        .shipping-item {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-        }
-
-        .shipping-label {
-          font-size: 14px;
-          font-weight: 600;
-          color: #5a7a5a;
-          text-transform: uppercase;
-          letter-spacing: 0.6px;
-        }
-
-        .shipping-value {
-          font-size: 16px;
-          font-weight: 500;
-          color: #2c5e3c;
-        }
-
-        /* ITEMS TABLE - Larger fonts and spacing */
+        /* ITEMS TABLE */
         .items-table {
           width: 100%;
           border-collapse: collapse;
-        
+          margin-bottom: 25px;
         }
 
         .items-table th {
@@ -410,6 +334,18 @@ export async function generateQuotationPDF(
           margin-top: 4px;
         }
 
+        .item-tax-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: #e8f4ec;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 10px;
+          color: #2c6e3c;
+          margin-top: 6px;
+        }
+
         .custom-badge {
           display: inline-flex;
           align-items: center;
@@ -436,7 +372,7 @@ export async function generateQuotationPDF(
           font-weight: 500;
         }
 
-        /* TOTALS - Larger */
+        /* TOTALS */
         .totals-wrapper {
           display: flex;
           justify-content: flex-end;
@@ -482,7 +418,15 @@ export async function generateQuotationPDF(
           letter-spacing: -0.5px;
         }
 
-        /* PAYMENT SECTION - Larger fonts */
+        .tax-note {
+          font-size: 11px;
+          color: #6b7280;
+          text-align: right;
+          margin-top: 8px;
+          font-style: italic;
+        }
+
+        /* PAYMENT SECTION */
         .payment-section {
           margin-bottom: 40px;
           border: 1px solid #e9eef3;
@@ -553,7 +497,6 @@ export async function generateQuotationPDF(
           gap: 16px;
           font-size: 15px;
         }
-          
 
         .payment-detail-key {
           color: #8a9aaa;
@@ -568,7 +511,7 @@ export async function generateQuotationPDF(
           font-size: 15px;
         }
 
-        /* NOTES & TERMS - Larger */
+        /* NOTES & TERMS */
         .notes-box {
           background: #fef8e7;
           padding: 18px 24px;
@@ -577,13 +520,16 @@ export async function generateQuotationPDF(
           border-left: 4px solid #e6a017;
         }
 
-        .notes-title {
+        .notes-title, .terms-title {
           font-size: 13px;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 1px;
-          color: #b46f0b;
           margin-bottom: 8px;
+        }
+
+        .notes-title {
+          color: #b46f0b;
         }
 
         .notes-text {
@@ -601,12 +547,7 @@ export async function generateQuotationPDF(
         }
 
         .terms-title {
-          font-size: 13px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 1px;
           color: #5a6e7c;
-          margin-bottom: 8px;
         }
 
         .terms-text {
@@ -615,7 +556,7 @@ export async function generateQuotationPDF(
           line-height: 1.6;
         }
 
-        /* FOOTER - Larger */
+        /* FOOTER */
         .footer {
           text-align: center;
           padding-top: 32px;
@@ -639,7 +580,7 @@ export async function generateQuotationPDF(
     </head>
     <body>
       <div class="pdf-container">
-                      <!-- HEADER SECTION -->
+        <!-- HEADER SECTION -->
         <div class="header">
           <div class="company-info">
             <div class="company-name">PLASMA WATER AFRICA</div>
@@ -653,12 +594,13 @@ export async function generateQuotationPDF(
           </div>
         </div>
 
-              <!-- Document Title Section with Blue Line -->
+        <!-- Document Title -->
         <div class="doc-title-section">
           <div class="doc-title-container">
-            <div class="doc-title-text">${quote.status === 'accepted' || quote.status === 'converted' ? 'INVOICE' : 'QUOTATION'}</div>
-        
-             
+            <div class="doc-title-text ${quote.status === 'accepted' || quote.status === 'converted' ? 'invoice' : 'quotation'}">
+              ${quote.status === 'accepted' || quote.status === 'converted' ? 'INVOICE' : 'QUOTATION'}
+            </div>
+          </div>
         </div>
 
         <!-- INFO SECTION -->
@@ -694,15 +636,6 @@ export async function generateQuotationPDF(
                 <span class="detail-label">Valid Until</span>
                 <span class="detail-value">${new Date(quote.validUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               </div>
-              <div class="detail-row"  style="display: none;>
-                <span class="detail-label"">Status</span>
-                <span class="detail-value">
-                  <span class="status-badge">
-                    ${icons.check}
-                    ${quote.status.toUpperCase()}
-                  </span>
-                </span>
-              </div>
               ${(quote.status === 'accepted' || quote.status === 'converted') ? `
                 <div class="detail-row">
                   <span class="detail-label">Payment Status</span>
@@ -715,59 +648,80 @@ export async function generateQuotationPDF(
               ` : ''}
             </div>
           </div>
-
         </div>
 
-        <!-- SHIPPING INFO -->
-        ${quote.shippingInfo ? `
-          <div class="shipping-info">
-            <div class="shipping-item">
-              ${icons.truck}
-              <div>
-                <div class="shipping-label">Shipping Area</div>
-                <div class="shipping-value">${escapeHtml(quote.shippingInfo.areaName)}</div>
+        <!-- TRANSPORT / DELIVERY INFO (New Field) -->
+        ${(transportCost > 0 || transportDescription || estimatedDelivery) ? `
+          <div class="transport-info">
+            ${transportDescription ? `
+              <div class="transport-item">
+                ${icons.truck}
+                <div>
+                  <div class="transport-label">Delivery Method</div>
+                  <div class="transport-value">${escapeHtml(transportDescription)}</div>
+                </div>
               </div>
-            </div>
-            <div class="shipping-item">
-              <div>
-                <div class="shipping-label">Cost</div>
-                <div class="shipping-value">${quote.shippingInfo.freeThreshold > 0 && quote.shippingInfo.cost === 0 ? 'FREE' : `KES ${quote.shippingInfo.cost.toLocaleString()}`}</div>
+            ` : ''}
+            ${transportCost > 0 ? `
+              <div class="transport-item">
+                <div>
+                  <div class="transport-label">Delivery Cost</div>
+                  <div class="transport-value">KES ${transportCost.toLocaleString()}</div>
+                </div>
               </div>
-            </div>
-            <div class="shipping-item">
-              <div>
-                <div class="shipping-label">Est. Delivery</div>
-                <div class="shipping-value">${escapeHtml(quote.shippingInfo.estimatedDelivery || '3-5 business days')}</div>
+            ` : ''}
+            ${estimatedDelivery ? `
+              <div class="transport-item">
+                <div>
+                  <div class="transport-label">Est. Delivery</div>
+                  <div class="transport-value">${escapeHtml(estimatedDelivery)}</div>
+                </div>
               </div>
-            </div>
+            ` : ''}
           </div>
         ` : ''}
 
-        <!-- ITEMS TABLE -->
+        <!-- ITEMS TABLE with Per-Item Tax Support -->
         <table class="items-table">
           <thead>
             <tr>
               <th style="width: 45%">Item Description</th>
-              <th style="width: 12%" class="text-center">Qty</th>
+              <th style="width: 10%" class="text-center">Qty</th>
               <th style="width: 20%" class="text-right">Unit Price (KES)</th>
-              <th style="width: 23%" class="text-right">Total (KES)</th>
+              ${taxPerItem ? `<th style="width: 10%" class="text-center">Tax</th>` : ''}
+              <th style="width: ${taxPerItem ? '15%' : '23%'}" class="text-right">Total (KES)</th>
             </tr>
           </thead>
           <tbody>
-            ${quote.items.map((item: any) => `
+            ${quote.items.map((item: any) => {
+              const itemTotal = (item.price || 0) * (item.qty || 0);
+              const itemTax = item.tax || (taxPerItem ? itemTotal * taxRate : 0);
+              const showTaxBadge = taxPerItem && item.taxable !== false;
+              return `
               <tr>
                 <td>
                   <div class="item-name">${escapeHtml(item.name)}</div>
                   ${item.description ? `<div class="item-description">${escapeHtml(item.description.substring(0, 120))}</div>` : ''}
                   ${item.customPrice ? `<div class="custom-badge">${icons.check} Custom pricing applied</div>` : ''}
-                 </td>
+                  ${showTaxBadge ? `<div class="item-tax-badge">✓ Tax: KES ${itemTax.toLocaleString()}</div>` : ''}
+                  ${(!taxPerItem && item.taxable === false) ? `<div class="item-tax-badge" style="background:#fef8e7; color:#b46f0b;">No Tax</div>` : ''}
+                </td>
                 <td class="text-center font-mono">${item.qty}</td>
-                <td class="text-right font-mono">${item.price.toLocaleString()}</td>
-                <td class="text-right font-mono" style="font-weight: 600;">${(item.price * item.qty).toLocaleString()}</td>
+                <td class="text-right font-mono">${(item.price || 0).toLocaleString()}</td>
+                ${taxPerItem ? `<td class="text-center font-mono" style="color: #2c6e3c;">${(itemTax).toLocaleString()}</td>` : ''}
+                <td class="text-right font-mono" style="font-weight: 600;">${itemTotal.toLocaleString()}</td>
               </tr>
-            `).join('')}
+              `;
+            }).join('')}
           </tbody>
         </table>
+
+        <!-- Tax Calculation Note -->
+        ${taxPerItem ? `
+          <div class="tax-note">
+            ✓ Tax calculated per item (${(taxRate * 100).toFixed(0)}% VAT applied to each taxable item)
+          </div>
+        ` : ''}
 
         <!-- TOTALS -->
         <div class="totals-wrapper">
@@ -782,14 +736,14 @@ export async function generateQuotationPDF(
                 <span class="font-mono">-KES ${(quote.discountAmount || quote.discount).toLocaleString()}</span>
               </div>
             ` : ''}
-            ${quote.shippingInfo?.cost && quote.shippingInfo.cost > 0 ? `
+            ${transportCost > 0 ? `
               <div class="total-row">
-                <span>Shipping</span>
-                <span class="font-mono">KES ${quote.shippingInfo.cost.toLocaleString()}</span>
+                <span>Delivery</span>
+                <span class="font-mono">KES ${transportCost.toLocaleString()}</span>
               </div>
             ` : ''}
             <div class="total-row">
-              <span>Tax (${(taxRate * 100).toFixed(0)}% VAT)</span>
+              <span>Tax (${(taxRate * 100).toFixed(0)}% VAT${taxPerItem ? ' - per item' : ''})</span>
               <span class="font-mono">KES ${(quote.tax || 0).toLocaleString()}</span>
             </div>
             <div class="total-row grand-total">
@@ -805,55 +759,32 @@ export async function generateQuotationPDF(
             <h4>Payment Information</h4>
           </div>
           <div class="payment-body">
-            <!-- KCB Bank -->
             <div class="payment-method">
               <div class="payment-method-header">
-                <img src="${kcbLogoUrl}" class="payment-logo" alt="KCB Bank" crossorigin="anonymous" 
-                  onerror="this.style.display='none'" />
+                <img src="${kcbLogoUrl}" class="payment-logo" alt="KCB Bank" crossorigin="anonymous" onerror="this.style.display='none'" />
                 <div>
                   <div class="payment-method-title">KCB Bank Kenya</div>
                   <div class="payment-method-sub">Bank Transfer</div>
                 </div>
               </div>
               <div class="payment-details">
-                <div class="payment-detail">
-                  <span class="payment-detail-key">Account Name</span>
-                  <span class="payment-detail-value">${escapeHtml(companyName)}</span>
-                </div>
-                <div class="payment-detail">
-                  <span class="payment-detail-key">Account Number</span>
-                  <span class="payment-detail-value">1312281278</span>
-                </div>
-                <div class="payment-detail">
-                  <span class="payment-detail-key">Branch</span>
-                  <span class="payment-detail-value">Moi Avenue, Nairobi</span>
-                </div>
+                <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">${escapeHtml(companyName)}</span></div>
+                <div class="payment-detail"><span class="payment-detail-key">Account Number</span><span class="payment-detail-value">1312281278</span></div>
+                <div class="payment-detail"><span class="payment-detail-key">Branch</span><span class="payment-detail-value">Moi Avenue, Nairobi</span></div>
               </div>
             </div>
-
-            <!-- M-PESA -->
             <div class="payment-method">
               <div class="payment-method-header">
-                <img src="${mpesaLogoUrl}" class="payment-logo" alt="M-PESA" crossorigin="anonymous"
-                  onerror="this.style.display='none'" />
+                <img src="${mpesaLogoUrl}" class="payment-logo" alt="M-PESA" crossorigin="anonymous" onerror="this.style.display='none'" />
                 <div>
                   <div class="payment-method-title">M-PESA</div>
                   <div class="payment-method-sub">Mobile Money</div>
                 </div>
               </div>
               <div class="payment-details">
-                <div class="payment-detail">
-                  <span class="payment-detail-key">Paybill Number</span>
-                  <span class="payment-detail-value">9114123</span>
-                </div>
-                <div class="payment-detail">
-                  <span class="payment-detail-key">Account No.</span>
-                  <span class="payment-detail-value">${quote.quoteNumber}</span>
-                </div>
-                <div class="payment-detail">
-                  <span class="payment-detail-key">Payment Terms</span>
-                  <span class="payment-detail-value">Full payment prior to supply</span>
-                </div>
+                <div class="payment-detail"><span class="payment-detail-key">Paybill Number</span><span class="payment-detail-value">9114123</span></div>
+                <div class="payment-detail"><span class="payment-detail-key">Account No.</span><span class="payment-detail-value">${quote.quoteNumber}</span></div>
+                <div class="payment-detail"><span class="payment-detail-key">Payment Terms</span><span class="payment-detail-value">Full payment prior to supply</span></div>
               </div>
             </div>
           </div>
@@ -879,7 +810,7 @@ export async function generateQuotationPDF(
         <div class="footer">
           <div class="footer-slogan">${escapeHtml(companySlogan)}</div>
           <div class="footer-copyright">
-            This quotation is valid until ${new Date(quote.validUntil).toLocaleDateString()}<br/>
+            This ${quote.status === 'accepted' || quote.status === 'converted' ? 'invoice' : 'quotation'} is valid until ${new Date(quote.validUntil).toLocaleDateString()}<br/>
             © ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.
           </div>
         </div>
@@ -890,7 +821,7 @@ export async function generateQuotationPDF(
 
   document.body.appendChild(element);
 
-  // Wait for images to load with increased timeout for larger logos
+  // Wait for images to load
   const images = element.querySelectorAll('img');
   await Promise.race([
     Promise.all(

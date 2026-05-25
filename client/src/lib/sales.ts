@@ -1,4 +1,4 @@
-// lib/sales.ts - Updated with correct types
+// lib/sales.ts - Updated with new fields for tax per item and transport
 import api from './api';
 import type { ApiResponse } from '@/types/api';
 import type { Order } from '@/types/order';
@@ -27,9 +27,16 @@ export interface QuotationItem {
   qty: number;
   price: number;
   total: number;
+  tax?: number;
   customPrice?: boolean;
+  taxable?: boolean;
   image?: string;
   description?: string;
+}
+
+export interface TransportInfo {
+  cost: number;
+  description: string;
 }
 
 export interface Quotation {
@@ -45,9 +52,13 @@ export interface Quotation {
   subtotal: number;
   taxRate: number;
   tax: number;
+  taxPerItem?: boolean;
   discount: number;
   discountType: 'percentage' | 'fixed';
   discountReason?: string;
+  transportInfo?: TransportInfo;
+  transportCost?: number;
+  transportDescription?: string;
   total: number;
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted';
   validUntil: string;
@@ -55,6 +66,7 @@ export interface Quotation {
   terms?: string;
   convertedAt?: string;
   convertedOrderId?: string;
+  estimatedDelivery?: string;
   shippingInfo?: {
     areaId: string;
     areaName: string;
@@ -261,10 +273,10 @@ export interface BaseAnalytics {
 // Sales analytics interface
 export interface SalesAnalytics extends BaseAnalytics {
   salesRep?: SalesRepInfo;
-  customers: CustomerMetrics; // Required for sales
+  customers: CustomerMetrics;
   topProducts: TopProduct[];
   recentActivities: RecentActivities;
-  charts: ChartsData; // Required for sales
+  charts: ChartsData;
 }
 
 // Admin analytics interface (extends sales with additional fields)
@@ -277,7 +289,7 @@ export interface AdminAnalytics extends BaseAnalytics {
   company?: {
     taxRate: number;
   };
-  customers: CustomerMetrics; // Required for admin too
+  customers: CustomerMetrics;
 }
 
 // Performance metrics types
@@ -373,15 +385,21 @@ export async function createSalesQuotation(payload: {
     qty: number;
     price?: number;
     customPrice?: number;
+    taxable?: boolean;
   }>;
   discount?: number;
   discountType?: 'percentage' | 'fixed';
   taxRate?: number;
+  taxPerItem?: boolean;
   notes?: string;
   terms?: string;
   validUntil?: string | Date;
-  shippingAreaId?: string;  
+  shippingAreaId?: string;
   estimatedDelivery?: string;
+  transport?: {
+    cost: number;
+    description: string;
+  };
 }): Promise<Quotation> {
   const res = await api.post('/sales/quotations', payload);
   return res.data.quotation;
@@ -413,13 +431,19 @@ export async function updateSalesQuotation(
       qty: number;
       price?: number;
       customPrice?: number;
+      taxable?: boolean;
     }>;
     discount?: number;
     discountType?: 'percentage' | 'fixed';
     taxRate?: number;
+    taxPerItem?: boolean;
     validUntil?: string | Date;
-    shippingAreaId?: string;  
+    shippingAreaId?: string;
     estimatedDelivery?: string;
+    transport?: {
+      cost: number;
+      description: string;
+    };
   }
 ): Promise<Quotation> {
   const res = await api.patch(`/sales/quotations/${quotationId}`, payload);
@@ -525,7 +549,7 @@ export async function listPublicShippingAreas(): Promise<any[]> {
   return res.data;
 }
 
-export async function listProducts(params?: { search?: string; page?: number; limit?: number }): Promise<any> {
+export async function listProducts(params?: { search?: string; page?: number; limit?: number; category?: string }): Promise<any> {
   const res = await api.get('/products', { params });
   return res.data;
 }
@@ -554,5 +578,11 @@ export async function acceptQuotation(
   }
 ): Promise<{ success: boolean; order: Order }> {
   const res = await api.post(`/sales/quotations/${quotationId}/accept`, payload || {});
+  return res.data;
+}
+
+// ==================== CATEGORIES API ====================
+export async function listCategories(params?: { limit?: number }): Promise<{ categories: any[] }> {
+  const res = await api.get('/categories', { params });
   return res.data;
 }

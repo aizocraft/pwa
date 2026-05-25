@@ -1,7 +1,7 @@
 // app/sales/quotations/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus,
   Search,
@@ -15,7 +15,6 @@ import {
   Clock,
   RefreshCw,
   FileText,
-  DollarSign,
   Calendar,
   User,
   Package,
@@ -24,6 +23,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Filter,
+  Tag,
+  Users,
+  Mail,
+  Phone,
+  MapPin,
+  Save,
+  SendHorizontal,
+  DollarSign,
+  Percent,
+  Shield,
+  AlertCircle,
 } from 'lucide-react';
 import {
   listSalesQuotations,
@@ -43,6 +54,34 @@ import { useCompanySettings } from '@/lib/use-company-settings';
 import { getLogoUrl, getTaxRate } from '@/lib/company';
 import { toast } from 'react-hot-toast';
 import { generateQuotationPDF } from './components/QuotationPDF';
+import api from '@/lib/api';
+
+// Types
+interface Category {
+  _id: string;
+  name: string;
+  slug: string;
+}
+
+interface ProductWithStock {
+  _id: string;
+  name: string;
+  slug: string;
+  price: number;
+  stock: number;
+  category?: string;
+  categoryId?: string;
+  images?: Array<{ url: string }>;
+  description?: string;
+  sku?: string;
+}
+
+interface QuotationItemWithTax {
+  productId: string;
+  qty: number;
+  customPrice?: number;
+  taxable: boolean;
+}
 
 export default function QuotationsPage() {
   const { user } = useAuth();
@@ -52,8 +91,8 @@ export default function QuotationsPage() {
   const [taxRate, setTaxRate] = useState<number>(0.16); 
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [customers, setCustomers] = useState<SalesCustomer[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [shippingAreas, setShippingAreas] = useState<any[]>([]);
+  const [products, setProducts] = useState<ProductWithStock[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -67,82 +106,109 @@ export default function QuotationsPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
   const itemsPerPage = 10;
 
+  // Product search/filter states
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
 
+  // Customer search state
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showAddCustomerForm, setShowAddCustomerForm] = useState(false);
+  
+  // New customer form
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    location: '',
+  });
 
   const [formData, setFormData] = useState({
     customerId: '',
-    items: [] as Array<{
-      productId: string;
-      qty: number;
-      customPrice?: number;
-    }>,
+    items: [] as QuotationItemWithTax[],
     discount: 0,
     discountType: 'fixed' as 'percentage' | 'fixed',
     notes: '',
     terms: '',
     validUntil: '',
-    shippingAreaId: '',
+    transportCost: 0,
+    transportDescription: '',
     estimatedDelivery: '',
+    taxPerItem: false,
   });
 
   const [tempItem, setTempItem] = useState({
     productId: '',
     qty: 1,
     customPrice: null as number | null,
+    taxable: true,
   });
 
   useEffect(() => {
     fetchData();
+    fetchCategories();
   }, [searchTerm, statusFilter, currentPage]);
 
   useEffect(() => {
     if (showModal) {
-      const loadShippingAreas = async () => {
-        try {
-          const shippingRes = await listPublicShippingAreas();
-          setShippingAreas(shippingRes || []);
-        } catch (error) {
-          console.error('Failed to load shipping areas:', error);
-        }
-      };
-      loadShippingAreas();
+      fetchProducts();
     }
-  }, [showModal]);
+  }, [showModal, productSearchTerm, selectedCategory]);
 
-useEffect(() => {
-  const fetchTaxRate = async () => {
+  useEffect(() => {
+    const fetchTaxRate = async () => {
+      try {
+        const rate = await getTaxRate();
+        setTaxRate(rate);
+      } catch (error) {
+        console.error('Failed to fetch tax rate:', error);
+      }
+    };
+    fetchTaxRate();
+  }, []);
+
+  const fetchCategories = async () => {
     try {
-      const rate = await getTaxRate();
-      setTaxRate(rate);
+      const response = await api.get('/categories?limit=100');
+      if (response.data.categories) {
+        setCategories(response.data.categories);
+      }
     } catch (error) {
-      console.error('Failed to fetch tax rate:', error);
+      console.error('Failed to fetch categories:', error);
     }
   };
-  fetchTaxRate();
-}, []);
 
+  const fetchProducts = async () => {
+    try {
+      const params: any = { limit: 100 };
+      if (productSearchTerm) params.search = productSearchTerm;
+      if (selectedCategory) params.category = selectedCategory;
+      const response = await listProducts(params);
+      setProducts(response.products || []);
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [quotesRes, customersRes, productsRes, shippingRes] = await Promise.all([
+      const [quotesRes, customersRes] = await Promise.all([
         listSalesQuotations({
           search: searchTerm || undefined,
           status: statusFilter || undefined,
           page: currentPage,
           limit: itemsPerPage,
         }),
-        listSalesCustomers(),
-        listProducts({ limit: 100 }),
-        listPublicShippingAreas(),
+        listSalesCustomers({ limit: 100 }),
       ]);
       setQuotations(quotesRes.quotations);
       setTotalPages(quotesRes.pagination?.pages || 1);
       setCustomers(customersRes.customers);
-      setProducts(productsRes.products || []);
-      setShippingAreas(shippingRes || []);
     } catch (error) {
       console.error('Failed to fetch data:', error);
       toast.error('Failed to load data');
@@ -151,37 +217,81 @@ useEffect(() => {
     }
   };
 
+  // Filter customers based on search
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearchTerm) return customers;
+    const term = customerSearchTerm.toLowerCase();
+    return customers.filter(c => 
+      c.name.toLowerCase().includes(term) ||
+      (c.email && c.email.toLowerCase().includes(term)) ||
+      (c.phone && c.phone.includes(term))
+    );
+  }, [customers, customerSearchTerm]);
+
+  // Filter products based on search and category
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const matchesSearch = product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+                           (product.sku && product.sku.toLowerCase().includes(productSearchTerm.toLowerCase()));
+      const matchesCategory = !selectedCategory || product.category === selectedCategory || product.categoryId === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, productSearchTerm, selectedCategory]);
+
+  // Create new customer
+  const handleCreateCustomer = async () => {
+    if (!newCustomer.name.trim()) {
+      toast.error('Customer name is required');
+      return;
+    }
+
+    setCreatingCustomer(true);
+    try {
+      const response = await api.post('/sales/customers', newCustomer);
+      const createdCustomer = response.data.customer;
+      setCustomers([createdCustomer, ...customers]);
+      setFormData({ ...formData, customerId: createdCustomer._id });
+      setCustomerSearchTerm(createdCustomer.name);
+      setShowAddCustomerForm(false);
+      setNewCustomer({ name: '', email: '', phone: '', location: '' });
+      toast.success('Customer created successfully');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to create customer');
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
+
   const calculateTotals = useCallback(() => {
-  let subtotal = 0;
-  for (const item of formData.items) {
-    const product = products.find((p) => p._id === item.productId);
-    const price = item.customPrice || product?.price || 0;
-    subtotal += price * item.qty;
-  }
+    let subtotal = 0;
+    let totalTax = 0;
+    
+    for (const item of formData.items) {
+      const product = products.find((p) => p._id === item.productId);
+      const price = item.customPrice || product?.price || 0;
+      const itemTotal = price * item.qty;
+      subtotal += itemTotal;
+      if (formData.taxPerItem && item.taxable) {
+        totalTax += itemTotal * taxRate;
+      }
+    }
 
-  const selectedArea = shippingAreas.find((a) => a._id === formData.shippingAreaId);
-  let shippingCost = 0;
-
-  // Match backend logic + avoid showing "Free" unless a freeThreshold is actually configured (> 0)
-  if (selectedArea) {
-    const freeShippingEnabled = selectedArea.freeThreshold > 0;
-    const qualifiesForFreeShipping = freeShippingEnabled && subtotal >= selectedArea.freeThreshold;
-
-    shippingCost = qualifiesForFreeShipping ? 0 : selectedArea.baseCost || 0;
-  }
-
-  const discountAmount =
-    formData.discountType === 'percentage'
+    const discountAmount = formData.discountType === 'percentage'
       ? subtotal * (formData.discount / 100)
       : formData.discount;
-  
-  const tax = (subtotal - discountAmount) * taxRate;
-  const total = subtotal - discountAmount + tax + shippingCost;
+    
+    let tax = totalTax;
+    if (!formData.taxPerItem) {
+      const taxableAfterDiscount = Math.max(0, subtotal - discountAmount);
+      tax = taxableAfterDiscount * taxRate;
+    }
+    
+    const total = subtotal - discountAmount + tax + formData.transportCost;
 
-  return { subtotal, discountAmount, tax, total, shippingCost };
-}, [formData.items, formData.discount, formData.discountType, formData.shippingAreaId, products, shippingAreas, taxRate]); // Add taxRate to dependencies
+    return { subtotal, discountAmount, tax, total };
+  }, [formData.items, formData.discount, formData.discountType, formData.transportCost, formData.taxPerItem, products, taxRate]);
 
-  const { subtotal, discountAmount, tax, total, shippingCost } = calculateTotals();
+  const { subtotal, discountAmount, tax, total } = calculateTotals();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,14 +307,23 @@ useEffect(() => {
     try {
       const payload = {
         customerId: formData.customerId,
-        items: formData.items,
+        items: formData.items.map(item => ({
+          productId: item.productId,
+          qty: item.qty,
+          customPrice: item.customPrice,
+          taxable: item.taxable,
+        })),
         discount: formData.discount,
         discountType: formData.discountType,
         notes: formData.notes,
         terms: formData.terms,
         validUntil: formData.validUntil,
-        shippingAreaId: formData.shippingAreaId || undefined,
-        estimatedDelivery: formData.estimatedDelivery || undefined,
+        taxPerItem: formData.taxPerItem,
+        transport: {
+          cost: formData.transportCost,
+          description: formData.transportDescription,
+        },
+        estimatedDelivery: formData.estimatedDelivery,
       };
 
       if (editingQuote) {
@@ -269,52 +388,17 @@ useEffect(() => {
     setShowViewModal(true);
   };
 
-// Replace the handlePrintPDF function with this improved version
-const handlePrintPDF = async (quote: Quotation) => {
-  const customer = customers.find((c) => c._id === quote.customerId);
-  if (!customer) {
-    toast.error('Customer not found');
-    return;
-  }
-
-  setIsGeneratingPDF(true);
-  const loadingToast = toast.loading('Generating professional PDF...');
-
-  try {
-    const pdfBlob = await generateQuotationPDF(quote, customer, settings, logoUrl);
-    
-    // Create download link
-    const url = URL.createObjectURL(pdfBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Quotation-${quote.quoteNumber}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    toast.success('PDF generated successfully!', { id: loadingToast });
-  } catch (error) {
-    console.error('PDF generation failed:', error);
-    toast.error('Failed to generate PDF. Please try again.', { id: loadingToast });
-  } finally {
-    setIsGeneratingPDF(false);
-  }
-};
-
-// Add a batch PDF download function (optional)
-const handleBatchPDFDownload = async () => {
-  const selectedQuotes = quotations.filter(q => q.status === 'sent' || q.status === 'accepted');
-  if (selectedQuotes.length === 0) {
-    toast.error('No quotations available for batch download');
-    return;
-  }
-
-  toast.loading(`Generating ${selectedQuotes.length} PDFs...`);
-  
-  for (const quote of selectedQuotes) {
+  const handlePrintPDF = async (quote: Quotation) => {
     const customer = customers.find((c) => c._id === quote.customerId);
-    if (customer) {
+    if (!customer) {
+      toast.error('Customer not found');
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    const loadingToast = toast.loading('Generating professional PDF...');
+
+    try {
       const pdfBlob = await generateQuotationPDF(quote, customer, settings, logoUrl);
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
@@ -324,15 +408,21 @@ const handleBatchPDFDownload = async () => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      await new Promise(resolve => setTimeout(resolve, 500)); // Delay between downloads
+      toast.success('PDF generated successfully!', { id: loadingToast });
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast.error('Failed to generate PDF. Please try again.', { id: loadingToast });
+    } finally {
+      setIsGeneratingPDF(false);
     }
-  }
-  
-  toast.success('All PDFs generated!');
-};
+  };
 
   const resetForm = () => {
     setEditingQuote(null);
+    setProductSearchTerm('');
+    setSelectedCategory('');
+    setCustomerSearchTerm('');
+    setShowAddCustomerForm(false);
     setFormData({
       customerId: '',
       items: [],
@@ -341,10 +431,13 @@ const handleBatchPDFDownload = async () => {
       notes: '',
       terms: '',
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      shippingAreaId: '',
+      transportCost: 0,
+      transportDescription: '',
       estimatedDelivery: '',
+      taxPerItem: false,
     });
-    setTempItem({ productId: '', qty: 1, customPrice: null });
+    setTempItem({ productId: '', qty: 1, customPrice: null, taxable: true });
+    setNewCustomer({ name: '', email: '', phone: '', location: '' });
   };
 
   const addItem = () => {
@@ -359,10 +452,13 @@ const handleBatchPDFDownload = async () => {
             productId: tempItem.productId,
             qty: tempItem.qty,
             customPrice: tempItem.customPrice || undefined,
+            taxable: tempItem.taxable,
           },
         ],
       }));
-      setTempItem({ productId: '', qty: 1, customPrice: null });
+      setTempItem({ productId: '', qty: 1, customPrice: null, taxable: true });
+      setProductSearchTerm('');
+      setShowProductDropdown(false);
     }
   };
 
@@ -382,6 +478,12 @@ const handleBatchPDFDownload = async () => {
   const updateItemPrice = (index: number, price: number) => {
     const newItems = [...formData.items];
     newItems[index].customPrice = price;
+    setFormData((prev) => ({ ...prev, items: newItems }));
+  };
+
+  const toggleItemTax = (index: number) => {
+    const newItems = [...formData.items];
+    newItems[index].taxable = !newItems[index].taxable;
     setFormData((prev) => ({ ...prev, items: newItems }));
   };
 
@@ -488,7 +590,7 @@ const handleBatchPDFDownload = async () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customer</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subtotal</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Shipping</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Transport</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Valid Until</th>
@@ -517,7 +619,6 @@ const handleBatchPDFDownload = async () => {
                           {quote.items.slice(0, 2).map((item: any, idx: number) => (
                             <p key={idx} className="text-xs text-gray-500 dark:text-gray-400">
                               {item.qty}x {item.name}
-                              {item.description && <span className="block text-xs text-gray-400 dark:text-gray-500 truncate">{item.description}</span>}
                             </p>
                           ))}
                           {quote.items.length > 2 && (
@@ -527,18 +628,7 @@ const handleBatchPDFDownload = async () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">KES {quote.subtotal?.toLocaleString() || 0}</td>
-                    <td className="px-6 py-4 text-sm">
-                      {quote.shippingInfo?.cost !== undefined ? (
-                        quote.shippingInfo.freeThreshold > 0 && quote.shippingInfo.cost === 0 ? (
-                          <span className="text-green-600 dark:text-green-400 font-medium">Free</span>
-                        ) : (
-                          <span className="text-amber-600 dark:text-amber-400">KES {quote.shippingInfo.cost.toLocaleString()}</span>
-                        )
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-
-                    </td>
+                    <td className="px-6 py-4 text-sm text-amber-600 dark:text-amber-400">KES {(quote as any).transportCost?.toLocaleString() || 0}</td>
                     <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">KES {quote.total?.toLocaleString() || 0}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(quote.status)}`}>
@@ -575,20 +665,21 @@ const handleBatchPDFDownload = async () => {
                             setEditingQuote(quote);
                             setFormData({
                               customerId: quote.customerId,
-                              items: quote.items.map((i) => ({
+                              items: quote.items.map((i: any) => ({
                                 productId: i.productId,
                                 qty: i.qty,
                                 customPrice: i.customPrice ? i.price : undefined,
+                                taxable: i.taxable !== false,
                               })),
-
-
                               discount: quote.discount,
                               discountType: quote.discountType,
                               notes: quote.notes || '',
                               terms: quote.terms || '',
                               validUntil: quote.validUntil.split('T')[0],
-                              shippingAreaId: quote.shippingInfo?.areaId || '',
-                              estimatedDelivery: quote.shippingInfo?.estimatedDelivery || '',
+                              transportCost: (quote as any).transportCost || 0,
+                              transportDescription: (quote as any).transportDescription || '',
+                              estimatedDelivery: (quote as any).estimatedDelivery || '',
+                              taxPerItem: (quote as any).taxPerItem || false,
                             });
                             setShowModal(true);
                           }}
@@ -648,199 +739,10 @@ const handleBatchPDFDownload = async () => {
           )}
         </div>
 
-        {/* View Quotation Modal */}
-        {showViewModal && viewingQuote && viewingCustomer && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-              <div className="p-6 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 flex justify-between items-center">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Quotation Details</h2>
-                  <p className="text-sm text-gray-500">{viewingQuote.quoteNumber}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => handlePrintPDF(viewingQuote)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" title="Download PDF">
-                    <Printer className="w-5 h-5" />
-                  </button>
-                  <button onClick={() => handleSendEmail(viewingQuote._id)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" title="Send">
-                    <Send className="w-5 h-5" />
-                  </button>
-                  <button onClick={() => setShowViewModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                    <h3 className="font-semibold flex items-center gap-2 mb-3">
-                      <User className="w-4 h-4" /> Customer Information
-                    </h3>
-                    <div className="space-y-2 text-sm">
-                      <p>
-                        <strong>Name:</strong> {viewingQuote.customerName}
-                      </p>
-                      {viewingQuote.customerEmail && (
-                        <p>
-                          <strong>Email:</strong> {viewingQuote.customerEmail}
-                        </p>
-                      )}
-                      {viewingQuote.customerPhone && (
-                        <p>
-                          <strong>Phone:</strong> {viewingQuote.customerPhone}
-                        </p>
-                      )}
-                      {viewingCustomer.location && (
-                        <p>
-                          <strong>Location:</strong> {viewingCustomer.location}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                    <h3 className="font-semibold flex items-center gap-2 mb-3">
-                      <Calendar className="w-4 h-4" /> Quote Information
-                    </h3>
-                    <div className="space-y-2 text-sm">
-                      <p>
-                        <strong>Status:</strong>{' '}
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${getStatusColor(viewingQuote.status)}`}>
-                          {viewingQuote.status}
-                        </span>
-                      </p>
-                      <p>
-                        <strong>Created:</strong> {new Date(viewingQuote.createdAt).toLocaleString()}
-                      </p>
-                      <p>
-                        <strong>Valid Until:</strong> {new Date(viewingQuote.validUntil).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {viewingQuote.shippingInfo && (
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                    <h3 className="font-semibold flex items-center gap-2 mb-3">
-                      <Truck className="w-4 h-4" /> Shipping Information
-                    </h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <p>
-                        <strong>Area:</strong> {viewingQuote.shippingInfo.areaName}
-                      </p>
-                      <p>
-                        <strong>Cost:</strong>{' '}
-                        {viewingQuote.shippingInfo.freeThreshold > 0 && viewingQuote.shippingInfo.cost === 0 ? 'Free' : `KES ${viewingQuote.shippingInfo.cost.toLocaleString()}`}
-
-                      </p>
-                      <p>
-                        <strong>Delivery:</strong> {viewingQuote.shippingInfo.estimatedDelivery}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Package className="w-4 h-4" /> Items
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 dark:bg-gray-800">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-sm">Item</th>
-                          <th className="px-4 py-2 text-left text-sm">Description</th>
-                          <th className="px-4 py-2 text-center text-sm">Qty</th>
-                          <th className="px-4 py-2 text-right text-sm">Unit Price</th>
-                          <th className="px-4 py-2 text-right text-sm">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {viewingQuote.items.map((item, idx) => (
-                          <tr key={idx} className="border-t dark:border-gray-800">
-                            <td className="px-4 py-2">
-                              {item.name}
-                              {item.customPrice && <span className="text-xs text-blue-500 ml-2">(Custom)</span>}
-                            </td>
-                            <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
-                              {item.description ? (
-                                <span className="line-clamp-2">{item.description}</span>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2 text-center">{item.qty}</td>
-                            <td className="px-4 py-2 text-right">KES {item.price.toLocaleString()}</td>
-                            <td className="px-4 py-2 text-right font-semibold">KES {(item.price * item.qty).toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Totals */}
-                <div className="border-t pt-4">
-                  <div className="space-y-2 text-right">
-                    <p className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
-                      <span className="font-semibold">KES {viewingQuote.subtotal?.toLocaleString() || 0}</span>
-                    </p>
-                    {viewingQuote.discount > 0 && (
-                      <p className="flex justify-between text-red-600">
-
-                        <span>
-                          Discount ({viewingQuote.discountType === 'percentage' ? `${viewingQuote.discount}%` : `KES ${viewingQuote.discount}`}):
-                        </span>
-                        <span>-KES {viewingQuote.discount.toLocaleString()}</span>
-                      </p>
-
-                    )}
-                    {viewingQuote.shippingInfo?.cost !== undefined && viewingQuote.shippingInfo.cost > 0 && (
-                      <p className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Shipping ({viewingQuote.shippingInfo.areaName}):</span>
-                        <span className="font-semibold text-amber-600">KES {viewingQuote.shippingInfo.cost.toLocaleString()}</span>
-                      </p>
-                    )}
-                    {typeof viewingQuote.shippingInfo?.freeThreshold === 'number' && viewingQuote.shippingInfo.freeThreshold > 0 && viewingQuote.shippingInfo?.cost === 0 && (
-                      <p className="flex justify-between text-green-600">
-                        <span>Shipping ({viewingQuote.shippingInfo.areaName}):</span>
-                        <span>Free Shipping</span>
-                      </p>
-                    )}
-                    <p className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Tax ({(viewingQuote.taxRate * 100).toFixed(0)}%):</span>
-                      <span>KES {viewingQuote.tax?.toLocaleString() || 0}</span>
-                    </p>
-                    <div className="pt-2 mt-2 border-t-2 border-gray-200 dark:border-gray-700">
-                      <p className="flex justify-between text-lg font-bold">
-                        <span>Total:</span>
-                        <span className="text-cyan-600">KES {viewingQuote.total?.toLocaleString() || 0}</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {viewingQuote.notes && (
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                    <h3 className="font-semibold mb-2">Notes</h3>
-                    <p className="text-sm">{viewingQuote.notes}</p>
-                  </div>
-                )}
-                {viewingQuote.terms && (
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                    <h3 className="font-semibold mb-2">Terms & Conditions</h3>
-                    <p className="text-sm">{viewingQuote.terms}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Create/Edit Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="bg-white dark:bg-gray-900 rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
               <div className="p-6 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 flex justify-between items-center">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   {editingQuote ? 'Edit Quotation' : 'Create Quotation'}
@@ -851,110 +753,279 @@ const handleBatchPDFDownload = async () => {
               </div>
 
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer *</label>
-                  <select
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-                    value={formData.customerId}
-                    onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                    disabled={!!editingQuote}
-                  >
-                    <option value="">Select a customer...</option>
-                    {customers.map((c) => (
-                      <option key={c._id} value={c._id}>
-                        {c.name} - {c.email || c.phone}
-                      </option>
-                    ))}
-                  </select>
+                {/* Customer Selection with Search and Add New */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 bg-gradient-to-r from-indigo-50/30 to-purple-50/30 dark:from-gray-800/30 dark:to-gray-800/30">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Users className="w-4 h-4 text-indigo-600" />
+                    Customer Information
+                    <span className="text-xs text-gray-500 ml-2">Search or add new customer</span>
+                  </h3>
+                  
+                  {!showAddCustomerForm ? (
+                    <>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search customer by name, email or phone..."
+                          value={customerSearchTerm}
+                          onChange={(e) => {
+                            setCustomerSearchTerm(e.target.value);
+                            setShowCustomerDropdown(true);
+                          }}
+                          onFocus={() => setShowCustomerDropdown(true)}
+                          className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                        
+                        {/* Customer Dropdown */}
+                        {showCustomerDropdown && customerSearchTerm && (
+                          <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            {filteredCustomers.length > 0 ? (
+                              <>
+                                {filteredCustomers.map((customer) => (
+                                  <button
+                                    key={customer._id}
+                                    type="button"
+                                    onClick={() => {
+                                      setFormData({ ...formData, customerId: customer._id });
+                                      setCustomerSearchTerm(customer.name);
+                                      setShowCustomerDropdown(false);
+                                    }}
+                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                  >
+                                    <div className="flex justify-between items-center">
+                                      <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">{customer.name}</p>
+                                        <div className="flex gap-3 text-xs text-gray-500">
+                                          {customer.email && <span>{customer.email}</span>}
+                                          {customer.phone && <span>{customer.phone}</span>}
+                                        </div>
+                                      </div>
+                                      {formData.customerId === customer._id && (
+                                        <CheckCircle className="w-4 h-4 text-green-500" />
+                                      )}
+                                    </div>
+                                  </button>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAddCustomerForm(true)}
+                                  className="w-full text-left px-4 py-2 border-t border-gray-200 dark:border-gray-700 text-indigo-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                  <Plus className="w-4 h-4 inline mr-2" /> Add New Customer
+                                </button>
+                              </>
+                            ) : (
+                              <div className="px-4 py-3 text-center">
+                                <p className="text-sm text-gray-500 mb-2">No customers found</p>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAddCustomerForm(true)}
+                                  className="text-indigo-600 text-sm font-medium"
+                                >
+                                  + Create New Customer
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {formData.customerId && (
+                        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                              Selected: {customers.find(c => c._id === formData.customerId)?.name}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
+                      <h4 className="font-medium text-gray-900 dark:text-white mb-3">New Customer</h4>
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          placeholder="Full Name *"
+                          value={newCustomer.name}
+                          onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="email"
+                            placeholder="Email"
+                            value={newCustomer.email}
+                            onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                          />
+                          <input
+                            type="tel"
+                            placeholder="Phone"
+                            value={newCustomer.phone}
+                            onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Location"
+                          value={newCustomer.location}
+                          onChange={(e) => setNewCustomer({ ...newCustomer, location: e.target.value })}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCreateCustomer}
+                            disabled={creatingCustomer || !newCustomer.name}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
+                          >
+                            {creatingCustomer ? <Loader2 className="w-4 h-4 animate-spin inline" /> : 'Create Customer'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAddCustomerForm(false);
+                              setNewCustomer({ name: '', email: '', phone: '', location: '' });
+                            }}
+                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Shipping Section */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 bg-gray-50 dark:bg-gray-800/50">
+                {/* Product Selection with Search and Category Filter */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 bg-gradient-to-r from-blue-50/30 to-cyan-50/30 dark:from-gray-800/30 dark:to-gray-800/30">
                   <h3 className="font-semibold flex items-center gap-2">
-                    <Truck className="w-4 h-4" /> Shipping Information
+                    <Package className="w-4 h-4 text-cyan-600" />
+                    Add Products
+                    <span className="text-xs text-gray-500 ml-2">Search with category filter</span>
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shipping Area</label>
+                  
+                  {/* Search and Filter Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Product Search Input */}
+                    <div className="relative md:col-span-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search products..."
+                        value={productSearchTerm}
+                        onChange={(e) => {
+                          setProductSearchTerm(e.target.value);
+                          setShowProductDropdown(true);
+                        }}
+                        onFocus={() => setShowProductDropdown(true)}
+                        className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    {/* Category Filter */}
+                    <div className="relative">
+                      <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <select
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                        value={formData.shippingAreaId}
-                        onChange={(e) => setFormData({ ...formData, shippingAreaId: e.target.value })}
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
                       >
-                        <option value="">Select shipping area...</option>
-                        {shippingAreas.map((area) => (
-                          <option key={area._id} value={area._id}>
-                            {area.name} - KES {area.baseCost.toLocaleString()}{' '}
-                            {area.freeThreshold > 0 && `(Free over KES ${area.freeThreshold.toLocaleString()})`}
+                        <option value="">All Categories</option>
+                        {categories.map((cat) => (
+                          <option key={cat._id} value={cat._id}>
+                            {cat.name}
                           </option>
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estimated Delivery</label>
-                      <input
-                        type="text"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                        placeholder="e.g., 3-5 business days"
-                        value={formData.estimatedDelivery}
-                        onChange={(e) => setFormData({ ...formData, estimatedDelivery: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  {formData.shippingAreaId && shippingCost > 0 && (
-                    <div className="text-sm text-green-600 dark:text-green-400">Shipping Cost: KES {shippingCost.toLocaleString()}</div>
-                  )}
-                  {(() => {
-                    const selectedArea = shippingAreas.find((a) => a._id === formData.shippingAreaId);
-                    const freeShippingEnabled = selectedArea?.freeThreshold > 0;
-                    const qualifiesForFree = freeShippingEnabled && shippingCost === 0;
-
-                    if (formData.shippingAreaId && qualifiesForFree) {
-                      return <div className="text-sm text-green-600 dark:text-green-400">✓ Free Shipping</div>;
-                    }
-
-                    if (formData.shippingAreaId && shippingCost > 0) {
-                      return null;
-                    }
-
-                    return null;
-                  })()}
-
-                </div>
-
-                {/* Add Items */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
-                  <h3 className="font-semibold">Add Products</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <select
-                      className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      value={tempItem.productId}
-                      onChange={(e) => setTempItem({ ...tempItem, productId: e.target.value })}
-                    >
-                      <option value="">Select product</option>
-                      {products.map((p) => (
-                        <option key={p._id} value={p._id}>
-                          {p.name} - KES {p.price.toLocaleString()} (Stock: {p.stock})
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      placeholder="Custom Price"
-                      className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      value={tempItem.customPrice || ''}
-                      onChange={(e) => setTempItem({ ...tempItem, customPrice: e.target.value ? Number(e.target.value) : null })}
-                    />
+                    
+                    {/* Quantity */}
                     <input
                       type="number"
                       placeholder="Quantity"
-                      className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
                       value={tempItem.qty}
                       onChange={(e) => setTempItem({ ...tempItem, qty: Number(e.target.value) })}
+                      min="1"
                     />
-                    <button type="button" onClick={addItem} className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors">
-                      <Plus className="w-4 h-4 inline" /> Add
+                  </div>
+                  
+                  {/* Product Dropdown */}
+                  {showProductDropdown && (productSearchTerm || selectedCategory) && (
+                    <div className="relative">
+                      <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {filteredProducts.length > 0 ? (
+                          filteredProducts.map((product) => (
+                            <button
+                              key={product._id}
+                              type="button"
+                              onClick={() => {
+                                setTempItem({ ...tempItem, productId: product._id });
+                                setProductSearchTerm(product.name);
+                                setShowProductDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex justify-between items-center"
+                            >
+                              <div>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">{product.name}</p>
+                                {product.sku && <p className="text-xs text-gray-500">SKU: {product.sku}</p>}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-semibold text-cyan-600">KES {product.price.toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">Stock: {product.stock}</p>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500 text-center">No products found</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Custom Price and Tax Toggle Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input
+                      type="number"
+                      placeholder="Custom Price (optional)"
+                      className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+                      value={tempItem.customPrice || ''}
+                      onChange={(e) => setTempItem({ ...tempItem, customPrice: e.target.value ? Number(e.target.value) : null })}
+                    />
+                    
+                    {/* Tax Toggle Switch */}
+                    <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Taxable:</span>
+                      <button
+                        type="button"
+                        onClick={() => setTempItem({ ...tempItem, taxable: !tempItem.taxable })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 ${
+                          tempItem.taxable ? 'bg-cyan-600' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            tempItem.taxable ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                      <span className={`text-xs ${tempItem.taxable ? 'text-cyan-600 font-medium' : 'text-gray-400'}`}>
+                        {tempItem.taxable ? 'VAT applies' : 'No VAT'}
+                      </span>
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      disabled={!tempItem.productId}
+                      className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:from-cyan-700 hover:to-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-4 h-4 inline mr-1" /> Add Item
                     </button>
                   </div>
                 </div>
@@ -965,11 +1036,12 @@ const handleBatchPDFDownload = async () => {
                     <table className="w-full">
                       <thead className="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                          <th className="px-4 py-2 text-left">Product</th>
-                          <th className="px-4 py-2 text-center">Qty</th>
-                          <th className="px-4 py-2 text-right">Unit Price</th>
-                          <th className="px-4 py-2 text-right">Total</th>
-                          <th></th>
+                          <th className="px-4 py-2 text-left text-sm">Product</th>
+                          <th className="px-4 py-2 text-center text-sm">Qty</th>
+                          <th className="px-4 py-2 text-right text-sm">Unit Price</th>
+                          <th className="px-4 py-2 text-center text-sm">Tax</th>
+                          <th className="px-4 py-2 text-right text-sm">Total</th>
+                          <th className="px-4 py-2 text-center text-sm"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1000,8 +1072,26 @@ const handleBatchPDFDownload = async () => {
                                   min="0"
                                 />
                               </td>
+                              <td className="px-4 py-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleItemTax(idx)}
+                                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                    item.taxable !== false ? 'bg-cyan-600' : 'bg-gray-300 dark:bg-gray-600'
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                                      item.taxable !== false ? 'translate-x-4' : 'translate-x-0.5'
+                                    }`}
+                                  />
+                                </button>
+                                <span className="text-xs ml-2 text-gray-500">
+                                  {item.taxable !== false ? 'Taxable' : 'No Tax'}
+                                </span>
+                              </td>
                               <td className="px-4 py-2 text-right font-semibold">KES {(price * item.qty).toLocaleString()}</td>
-                              <td className="px-4 py-2">
+                              <td className="px-4 py-2 text-center">
                                 <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -1014,90 +1104,195 @@ const handleBatchPDFDownload = async () => {
                   </div>
                 )}
 
-                {/* Totals */}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
-                    <span className="font-semibold">KES {subtotal.toLocaleString()}</span>
+                {/* Tax Per Item Toggle */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Shield className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">Tax Calculation Method</p>
+                        <p className="text-xs text-gray-500">Apply tax to each item individually or to the total after discount</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-600">Tax per item</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, taxPerItem: !formData.taxPerItem })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          formData.taxPerItem ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            formData.taxPerItem ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 dark:text-gray-400">Shipping:</span>
-                    {formData.shippingAreaId ? (
-                      (() => {
-                        const selectedArea = shippingAreas.find((a) => a._id === formData.shippingAreaId);
-                        const freeShippingEnabled = selectedArea?.freeThreshold > 0;
-                        const qualifiesForFree = freeShippingEnabled && shippingCost === 0;
+                </div>
 
-                        if (qualifiesForFree) {
-                          return <span className="font-semibold text-green-600">Free Shipping</span>;
-                        }
-
-                        return <span className="font-semibold text-amber-600">KES {shippingCost.toLocaleString()}</span>;
-                      })()
-                    ) : (
-                      <span className="text-gray-400">Not selected</span>
-                    )}
-
+                {/* Transport Box - Replaces Shipping Area */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 bg-gradient-to-r from-amber-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-gray-800/30">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-amber-600" />
+                    Transport & Delivery
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Transport Cost (KES)</label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="number"
+                          className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                          value={formData.transportCost}
+                          onChange={(e) => setFormData({ ...formData, transportCost: Number(e.target.value) })}
+                          min="0"
+                          step="100"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Transport Description (Optional)</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                        placeholder="e.g., Door delivery, Freight charges, Courier, etc."
+                        value={formData.transportDescription}
+                        onChange={(e) => setFormData({ ...formData, transportDescription: e.target.value })}
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 flex-wrap justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Discount:</span>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estimated Delivery Time</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                      placeholder="e.g., 3-5 business days, 1 week, etc."
+                      value={formData.estimatedDelivery}
+                      onChange={(e) => setFormData({ ...formData, estimatedDelivery: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Discount Section */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 bg-gray-50 dark:bg-gray-800/50">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-green-600" />
+                    Discount
+                  </h3>
+                  <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
                         value={formData.discount}
                         onChange={(e) => setFormData({ ...formData, discount: Number(e.target.value) })}
-                        className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
+                        className="w-32 px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                         min="0"
+                        step={formData.discountType === 'percentage' ? 1 : 100}
+                        placeholder="0"
                       />
-                      <select
-                        value={formData.discountType}
-                        onChange={(e) => setFormData({ ...formData, discountType: e.target.value as any })}
-                        className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
-                      >
-                        <option value="fixed">KES</option>
-                        <option value="percentage">%</option>
-                      </select>
-                      {formData.discount > 0 && (
-                        <span className="text-green-600 text-sm">Save: KES {discountAmount.toLocaleString()}</span>
-                      )}
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, discountType: 'percentage' })}
+                          className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                            formData.discountType === 'percentage'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <Percent className="w-4 h-4 inline mr-1" /> %
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, discountType: 'fixed' })}
+                          className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                            formData.discountType === 'fixed'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <DollarSign className="w-4 h-4 inline mr-1" /> KES
+                        </button>
+                      </div>
                     </div>
-                  </div>
-<div className="flex justify-between items-center">
-  <span className="text-gray-600 dark:text-gray-400">Tax ({Math.round(taxRate * 100)}%):</span>
-  <span>KES {tax.toLocaleString()}</span>
-</div>
-                  <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <span className="text-lg font-bold">Total:</span>
-                    <span className="text-lg font-bold text-cyan-600">KES {total.toLocaleString()}</span>
+                    {formData.discount > 0 && (
+                      <div className="bg-green-100 dark:bg-green-900/30 rounded-lg px-3 py-2">
+                        <span className="text-sm text-green-700 dark:text-green-400">
+                          Customer saves: KES {discountAmount.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
-                  <textarea
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    placeholder="Additional notes..."
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  />
+                {/* Totals Summary */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+                    <span className="font-semibold">KES {subtotal.toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-gray-600 dark:text-gray-400">Transport:</span>
+                    <span className="font-semibold text-amber-600">KES {formData.transportCost.toLocaleString()}</span>
+                    {formData.transportDescription && (
+                      <span className="text-xs text-gray-400 ml-2">({formData.transportDescription})</span>
+                    )}
+                  </div>
+                  
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between items-center py-2 text-green-600">
+                      <span>Discount ({formData.discountType === 'percentage' ? `${formData.discount}%` : `KES ${formData.discount.toLocaleString()}`}):</span>
+                      <span>- KES {discountAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-gray-600 dark:text-gray-400">Tax ({Math.round(taxRate * 100)}% VAT{formData.taxPerItem ? ' - per item' : ''}):</span>
+                    <span>KES {tax.toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-gray-200 dark:border-gray-700">
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">Total:</span>
+                    <span className="text-2xl font-bold text-cyan-600">KES {total.toLocaleString()}</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Terms & Conditions</label>
-                  <textarea
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    placeholder="Payment terms, delivery terms..."
-                    value={formData.terms}
-                    onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
-                  />
+
+                {/* Notes and Terms */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
+                    <textarea
+                      rows={3}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      placeholder="Additional notes for customer..."
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Terms & Conditions</label>
+                    <textarea
+                      rows={3}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      placeholder="Payment terms, delivery policy, warranty, etc."
+                      value={formData.terms}
+                      onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
+                    />
+                  </div>
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valid Until</label>
                   <input
                     type="date"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     value={formData.validUntil}
                     onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
                   />
@@ -1106,9 +1301,10 @@ const handleBatchPDFDownload = async () => {
                 <div className="flex gap-3 pt-4">
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:from-cyan-700 hover:to-blue-700 transition-all"
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:from-cyan-700 hover:to-blue-700 transition-all flex items-center justify-center gap-2"
                   >
-                    {editingQuote ? 'Update' : 'Create'} Quotation
+                    <Save className="w-4 h-4" />
+                    {editingQuote ? 'Update Quotation' : 'Save Draft'}
                   </button>
                   <button
                     type="button"
@@ -1120,8 +1316,120 @@ const handleBatchPDFDownload = async () => {
                 </div>
               </form>
             </div>
+          </div>
+        )}
 
-            
+        {/* View Quotation Modal */}
+        {showViewModal && viewingQuote && viewingCustomer && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Quotation Details</h2>
+                  <p className="text-sm text-gray-500">{viewingQuote.quoteNumber}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => handlePrintPDF(viewingQuote)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" title="Download PDF">
+                    <Printer className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => handleSendEmail(viewingQuote._id)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" title="Send">
+                    <Send className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => setShowViewModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                    <h3 className="font-semibold flex items-center gap-2 mb-3">
+                      <User className="w-4 h-4" /> Customer Information
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <p><strong>Name:</strong> {viewingQuote.customerName}</p>
+                      {viewingQuote.customerEmail && <p><strong>Email:</strong> {viewingQuote.customerEmail}</p>}
+                      {viewingQuote.customerPhone && <p><strong>Phone:</strong> {viewingQuote.customerPhone}</p>}
+                      {viewingCustomer.location && <p><strong>Location:</strong> {viewingCustomer.location}</p>}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                    <h3 className="font-semibold flex items-center gap-2 mb-3">
+                      <Calendar className="w-4 h-4" /> Quote Information
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <p><strong>Status:</strong> <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${getStatusColor(viewingQuote.status)}`}>{viewingQuote.status}</span></p>
+                      <p><strong>Created:</strong> {new Date(viewingQuote.createdAt).toLocaleString()}</p>
+                      <p><strong>Valid Until:</strong> {new Date(viewingQuote.validUntil).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transport Info */}
+                {(viewingQuote as any).transportCost > 0 && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
+                    <h3 className="font-semibold flex items-center gap-2 mb-3">
+                      <Truck className="w-4 h-4" /> Transport Information
+                    </h3>
+                    <div className="space-y-1 text-sm">
+                      <p><strong>Cost:</strong> KES {(viewingQuote as any).transportCost?.toLocaleString() || 0}</p>
+                      {(viewingQuote as any).transportDescription && <p><strong>Description:</strong> {(viewingQuote as any).transportDescription}</p>}
+                      {(viewingQuote as any).estimatedDelivery && <p><strong>Estimated Delivery:</strong> {(viewingQuote as any).estimatedDelivery}</p>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Items Table */}
+                <div>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Package className="w-4 h-4" /> Items
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-800">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-sm">Item</th>
+                          <th className="px-4 py-2 text-left text-sm">Description</th>
+                          <th className="px-4 py-2 text-center text-sm">Qty</th>
+                          <th className="px-4 py-2 text-right text-sm">Unit Price</th>
+                          <th className="px-4 py-2 text-center text-sm">Tax</th>
+                          <th className="px-4 py-2 text-right text-sm">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {viewingQuote.items.map((item, idx) => (
+                          <tr key={idx} className="border-t dark:border-gray-800">
+                            <td className="px-4 py-2">{item.name}</td>
+                            <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">{item.description || '-'}</td>
+                            <td className="px-4 py-2 text-center">{item.qty}</td>
+                            <td className="px-4 py-2 text-right">KES {item.price.toLocaleString()}</td>
+                            <td className="px-4 py-2 text-center">
+                              {(item as any).tax ? `${Math.round((item as any).tax / (item.price * item.qty) * 100)}%` : '✓'}
+                            </td>
+                            <td className="px-4 py-2 text-right font-semibold">KES {(item.price * item.qty).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Totals */}
+                <div className="border-t pt-4">
+                  <div className="space-y-2 text-right">
+                    <p className="flex justify-between"><span className="text-gray-600">Subtotal:</span><span className="font-semibold">KES {viewingQuote.subtotal?.toLocaleString() || 0}</span></p>
+                    {viewingQuote.discount > 0 && <p className="flex justify-between text-green-600"><span>Discount ({viewingQuote.discountType === 'percentage' ? `${viewingQuote.discount}%` : `KES ${viewingQuote.discount}`}):</span><span>-KES {viewingQuote.discount.toLocaleString()}</span></p>}
+                    {(viewingQuote as any).transportCost > 0 && <p className="flex justify-between"><span className="text-gray-600">Transport:</span><span className="font-semibold text-amber-600">KES {(viewingQuote as any).transportCost?.toLocaleString() || 0}</span></p>}
+                    <p className="flex justify-between"><span className="text-gray-600">Tax ({Math.round(viewingQuote.taxRate * 100)}%):</span><span>KES {viewingQuote.tax?.toLocaleString() || 0}</span></p>
+                    <div className="pt-2 mt-2 border-t-2 border-gray-200"><p className="flex justify-between text-lg font-bold"><span>Total:</span><span className="text-cyan-600">KES {viewingQuote.total?.toLocaleString() || 0}</span></p></div>
+                  </div>
+                </div>
+
+                {viewingQuote.notes && <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4"><h3 className="font-semibold mb-2">Notes</h3><p className="text-sm">{viewingQuote.notes}</p></div>}
+                {viewingQuote.terms && <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4"><h3 className="font-semibold mb-2">Terms & Conditions</h3><p className="text-sm">{viewingQuote.terms}</p></div>}
+              </div>
+            </div>
           </div>
         )}
       </div>
