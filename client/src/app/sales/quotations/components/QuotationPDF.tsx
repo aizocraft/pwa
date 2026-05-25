@@ -1,3 +1,4 @@
+// app/sales/quotations/components/QuotationPDF.tsx
 'use client';
 
 import jsPDF from 'jspdf';
@@ -40,17 +41,17 @@ export async function generateQuotationPDF(
       .replace(/'/g, '&#39;');
   }
 
-  // Premium SVG Icons - No emojis
+  // Premium SVG Icons - No emojis (scaled up slightly)
   const icons = {
-    location: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
-    phone: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`,
-    email: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`,
-    calendar: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
-    user: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-    package: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M12 2l-10 5.5 10 5.5 10-5.5L12 2z"/><path d="M12 12v10"/><path d="M2 7.5v9l10 5.5 10-5.5v-9"/></svg>`,
-    truck: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2c6e3c" stroke-width="2"><path d="M1 3h15v13H1z"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
-    check: `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#2c6e3c" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`,
-    creditCard: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
+    location: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+    phone: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`,
+    email: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`,
+    calendar: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+    user: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    package: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><path d="M12 2l-10 5.5 10 5.5 10-5.5L12 2z"/><path d="M12 12v10"/><path d="M2 7.5v9l10 5.5 10-5.5v-9"/></svg>`,
+    truck: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2c6e3c" stroke-width="2"><path d="M1 3h15v13H1z"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
+    check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2c6e3c" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`,
+    creditCard: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
   };
 
   element.innerHTML = `
@@ -70,7 +71,7 @@ export async function generateQuotationPDF(
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
           background: #ffffff;
           padding: 50px 45px;
-          line-height: 1.45;
+          line-height: 1.5;
           color: #1a2a3a;
         }
 
@@ -80,74 +81,166 @@ export async function generateQuotationPDF(
           background: white;
         }
 
-        /* HEADER SECTION */
+                  /* HEADER SECTION  */
         .header {
+          padding: 25px 0 20px 0;
           display: flex;
-          align-items: flex-start;
           justify-content: space-between;
-          margin-bottom: 40px;
-          padding-bottom: 28px;
-          border-bottom: 2px solid #e9eef3;
+          align-items: center;
+          gap: 20px;
+          border-bottom: 2px solid #000;
+        }
+
+        .company-info {
+          flex: 1;
+           margin-left: 75px;
+
+        }
+
+        .company-name {
+          font-size: 24px;
+          font-weight: bold;
+          letter-spacing: 1px;
+          margin-bottom: 12px;
+          color: #1a1a1a;
+        }
+
+        .company-address {
+          font-size: 14px;
+          color: #333;
+          margin-bottom: 5px;
+        }
+
+        .company-location {
+          font-size: 14px;
+          color: #333;
+          margin-bottom: 8px;
+        }
+
+        .company-tel {
+          font-size: 14px;
+          color: #555;
+          margin-bottom: 5px;
+        }
+
+        .company-email {
+          font-size: 14px;
+          color: #555;
         }
 
         .logo-area {
           flex: 0 0 auto;
+         margin-right: 100px;
         }
 
         .company-logo {
-          height: 70px;
+          height: 225px;
           width: auto;
+          max-width: 250px;
           object-fit: contain;
           display: block;
         }
 
-        .quote-info {
-          text-align: center;
-          flex: 1;
-        }
+        /* =========================================
+   DOCUMENT TITLE SECTION
+   Plasma Water Africa Style
+========================================= */
 
-        .quote-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 34px;
-          font-weight: 600;
-          color: #0a2540;
-          letter-spacing: 1px;
-          margin-bottom: 8px;
-        }
+.doc-title-section {
+  position: relative;
+  width: 100%;
+  margin: 18px 0 34px;
+}
 
-        .quote-number {
-          font-size: 13px;
-          font-weight: 500;
-          color: #8a9aaa;
-          font-family: 'Inter', monospace;
-          letter-spacing: 0.5px;
-          background: #f0f3f7;
-          display: inline-block;
-          padding: 4px 12px;
-          border-radius: 20px;
-        }
 
-        .company-contact {
-          text-align: right;
-          flex: 0 0 auto;
-        }
+/* Container */
+.doc-title-container {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 85px;
+}
 
-        .contact-line {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 6px;
-          font-size: 10px;
-          color: #8a9aaa;
-          margin-bottom: 5px;
-        }
+/* Shared title style */
+.doc-title-text {
+  position: relative;
+  min-width: 240px;
+  padding: 10px 42px;
+  text-align: center;
+
+  background: #efefef;
+  border: 2px solid #3f6f9e;
+
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.75),
+    0 1px 4px rgba(0,0,0,0.08);
+}
+
+/* =========================
+   QUOTATION STYLE
+========================= */
+.doc-title-text.quotation {
+  color: #505050;
+  background: #f1f1f1;
+  border-color: #4b79a6;
+}
+
+/* =========================
+   INVOICE STYLE
+========================= */
+.doc-title-text.invoice {
+  color: #3d3d3d;
+  background: linear-gradient(to bottom, #f8f8f8, #e7e7e7);
+  border-color: #2f5f8c;
+  letter-spacing: 1.5px;
+}
+
+/* Small accent line */
+.doc-title-text.invoice::after,
+.doc-title-text.quotation::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: rgba(11, 63, 115, 0.18);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+
+  .doc-title-container {
+    padding-right: 18px;
+  }
+
+  .doc-title-text {
+    min-width: 165px;
+    padding: 8px 22px;
+    font-size: 16px;
+  }
+
+  .doc-title-section::before {
+    height: 20px;
+  }
+}
+
+
 
         /* INFO SECTION */
         .info-section {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 28px;
-          margin-bottom: 32px;
+          gap: 40px;
+          margin-bottom: 25px;
         }
 
         .info-card {
@@ -157,14 +250,14 @@ export async function generateQuotationPDF(
         .info-card-header {
           display: flex;
           align-items: center;
-          gap: 8px;
-          margin-bottom: 14px;
-          padding-bottom: 8px;
+          gap: 10px;
+          margin-bottom: 18px;
+          padding-bottom: 10px;
           border-bottom: 2px solid #e9eef3;
         }
 
         .info-card-header h3 {
-          font-size: 11px;
+          font-size: 15px;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 1.2px;
@@ -172,137 +265,162 @@ export async function generateQuotationPDF(
         }
 
         .info-content {
-          font-size: 13px;
+          font-size: 16px;
           color: #2c3e4e;
-          line-height: 1.65;
+          line-height: 1.7;
         }
 
         .customer-name {
-          font-size: 17px;
+          font-size: 22px;
           font-weight: 700;
           color: #0a2540;
-          margin-bottom: 10px;
+          margin-bottom: 14px;
         }
 
         .detail-row {
           display: flex;
           align-items: baseline;
           gap: 12px;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
         }
 
         .detail-label {
-          font-size: 10px;
+          font-size: 14px;
           font-weight: 600;
           color: #8a9aaa;
-          min-width: 85px;
+          min-width: 100px;
           text-transform: uppercase;
-          letter-spacing: 0.4px;
+          letter-spacing: 0.5px;
         }
 
         .detail-value {
-          font-size: 12px;
+          font-size: 16px;
           color: #2c3e4e;
         }
 
         .status-badge {
           display: inline-flex;
           align-items: center;
-          gap: 6px;
-          padding: 4px 12px;
+          gap: 8px;
+          padding: 6px 16px;
           background: #e8f4ec;
           color: #2c6e3c;
-          border-radius: 20px;
-          font-size: 10px;
+          border-radius: 30px;
+          font-size: 14px;
           font-weight: 600;
+      
+        }
+                  /* Payment Status Badges */
+        .payment-status-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 5px 14px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.5px;
         }
 
-        /* SHIPPING INFO */
+        .badge-paid {
+          background: linear-gradient(135deg, #22c55e, #16a34a);
+          color: white;
+          box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+        }
+
+        .badge-unpaid {
+          background: linear-gradient(135deg, #ef4444, #dc2626);
+          color: white;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+        }
+
+        /* SHIPPING INFO - Larger */
         .shipping-info {
           background: #f7f9fc;
-          padding: 14px 22px;
-          border-radius: 12px;
-          margin-bottom: 32px;
+          padding: 18px 28px;
+          border-radius: 16px;
+          margin-bottom: 45px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           flex-wrap: wrap;
-          gap: 16px;
+          gap: 20px;
           border: 1px solid #e9eef3;
+          display: none;
         }
 
         .shipping-item {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 14px;
         }
 
         .shipping-label {
-          font-size: 10px;
+          font-size: 14px;
           font-weight: 600;
           color: #5a7a5a;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.6px;
         }
 
         .shipping-value {
-          font-size: 12px;
+          font-size: 16px;
           font-weight: 500;
           color: #2c5e3c;
         }
 
-        /* ITEMS TABLE */
+        /* ITEMS TABLE - Larger fonts and spacing */
         .items-table {
           width: 100%;
           border-collapse: collapse;
-          margin-bottom: 32px;
+        
         }
 
         .items-table th {
           text-align: left;
-          padding: 14px 10px;
+          padding: 18px 12px;
           background: #f7f9fc;
-          font-size: 10px;
+          font-size: 14px;
           font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.8px;
+          letter-spacing: 1px;
           color: #8a9aaa;
           border-bottom: 2px solid #e9eef3;
         }
 
         .items-table td {
-          padding: 14px 10px;
+          padding: 18px 12px;
           border-bottom: 1px solid #eef2f6;
-          font-size: 12px;
+          font-size: 16px;
           color: #2c3e4e;
           vertical-align: top;
         }
 
         .item-name {
-          font-weight: 600;
+          font-weight: 700;
           color: #0f2636;
-          font-size: 13px;
-          margin-bottom: 5px;
+          font-size: 18px;
+          margin-bottom: 6px;
         }
 
         .item-description {
-          font-size: 10px;
+          font-size: 14px;
           color: #8a9aaa;
-          line-height: 1.4;
-          margin-top: 3px;
+          line-height: 1.5;
+          margin-top: 4px;
         }
 
         .custom-badge {
           display: inline-flex;
           align-items: center;
-          gap: 4px;
+          gap: 6px;
           background: #eef2ff;
-          padding: 2px 8px;
-          border-radius: 10px;
-          font-size: 8px;
+          padding: 3px 10px;
+          border-radius: 14px;
+          font-size: 12px;
           color: #3b5c8a;
           font-weight: 500;
-          margin-top: 5px;
+          margin-top: 6px;
         }
 
         .text-right {
@@ -318,24 +436,24 @@ export async function generateQuotationPDF(
           font-weight: 500;
         }
 
-        /* TOTALS */
+        /* TOTALS - Larger */
         .totals-wrapper {
           display: flex;
           justify-content: flex-end;
-          margin-bottom: 32px;
-          padding-top: 8px;
+          margin-bottom: 45px;
+          padding-top: 12px;
         }
 
         .totals-box {
-          width: 340px;
+          width: 380px;
         }
 
         .total-row {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 9px 0;
-          font-size: 12px;
+          padding: 14px 0;
+          font-size: 16px;
           color: #4a5c6a;
           border-bottom: 1px solid #eef2f6;
         }
@@ -345,41 +463,41 @@ export async function generateQuotationPDF(
         }
 
         .total-row.grand-total {
-          padding-top: 14px;
-          margin-top: 8px;
+          padding-top: 20px;
+          margin-top: 12px;
           border-top: 2px solid #0a2540;
           border-bottom: none;
         }
 
         .grand-total-label {
-          font-size: 16px;
+          font-size: 20px;
           font-weight: 700;
           color: #0a2540;
         }
 
         .grand-total-amount {
-          font-size: 22px;
+          font-size: 28px;
           font-weight: 800;
           color: #0a2540;
-          letter-spacing: -0.3px;
+          letter-spacing: -0.5px;
         }
 
-        /* PAYMENT SECTION */
+        /* PAYMENT SECTION - Larger fonts */
         .payment-section {
-          margin-bottom: 28px;
+          margin-bottom: 40px;
           border: 1px solid #e9eef3;
-          border-radius: 16px;
+          border-radius: 20px;
           overflow: hidden;
         }
 
         .payment-header {
           background: #0a2540;
-          padding: 14px 24px;
+          padding: 18px 28px;
         }
 
         .payment-header h4 {
           color: #ffffff;
-          font-size: 11px;
+          font-size: 15px;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 1.5px;
@@ -392,7 +510,7 @@ export async function generateQuotationPDF(
         }
 
         .payment-method {
-          padding: 20px 24px;
+          padding: 28px 28px;
         }
 
         .payment-method:first-child {
@@ -402,138 +520,145 @@ export async function generateQuotationPDF(
         .payment-method-header {
           display: flex;
           align-items: center;
-          gap: 12px;
-          margin-bottom: 16px;
+          gap: 16px;
+          margin-bottom: 22px;
         }
 
         .payment-logo {
-          height: 36px;
+          height: 48px;
           width: auto;
           object-fit: contain;
         }
 
         .payment-method-title {
-          font-size: 14px;
+          font-size: 18px;
           font-weight: 700;
           color: #0a2540;
         }
 
         .payment-method-sub {
-          font-size: 10px;
+          font-size: 14px;
           color: #8a9aaa;
-          margin-top: 2px;
+          margin-top: 3px;
         }
 
         .payment-details {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 12px;
         }
 
         .payment-detail {
           display: flex;
-          gap: 12px;
-          font-size: 11px;
+          gap: 16px;
+          font-size: 15px;
         }
+          
 
         .payment-detail-key {
           color: #8a9aaa;
           font-weight: 500;
-          min-width: 90px;
+          min-width: 110px;
         }
 
         .payment-detail-value {
           color: #2c3e4e;
           font-weight: 500;
           font-family: 'Inter', monospace;
-          font-size: 11px;
+          font-size: 15px;
         }
 
-        /* NOTES & TERMS */
+        /* NOTES & TERMS - Larger */
         .notes-box {
           background: #fef8e7;
-          padding: 14px 20px;
-          border-radius: 12px;
-          margin-bottom: 16px;
-          border-left: 3px solid #e6a017;
+          padding: 18px 24px;
+          border-radius: 16px;
+          margin-bottom: 24px;
+          border-left: 4px solid #e6a017;
         }
 
         .notes-title {
-          font-size: 9px;
+          font-size: 13px;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 1px;
           color: #b46f0b;
-          margin-bottom: 6px;
+          margin-bottom: 8px;
         }
 
         .notes-text {
-          font-size: 11px;
+          font-size: 15px;
           color: #7a5a2a;
-          line-height: 1.5;
+          line-height: 1.6;
         }
 
         .terms-box {
           background: #f7f9fc;
-          padding: 14px 20px;
-          border-radius: 12px;
-          margin-bottom: 28px;
-          border-left: 3px solid #8a9aaa;
+          padding: 18px 24px;
+          border-radius: 16px;
+          margin-bottom: 40px;
+          border-left: 4px solid #8a9aaa;
         }
 
         .terms-title {
-          font-size: 9px;
+          font-size: 13px;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 1px;
           color: #5a6e7c;
-          margin-bottom: 6px;
+          margin-bottom: 8px;
         }
 
         .terms-text {
-          font-size: 11px;
+          font-size: 15px;
           color: #5a6e7c;
-          line-height: 1.5;
+          line-height: 1.6;
         }
 
-        /* FOOTER */
+        /* FOOTER - Larger */
         .footer {
           text-align: center;
-          padding-top: 24px;
+          padding-top: 32px;
           border-top: 1px solid #e9eef3;
         }
 
         .footer-slogan {
           font-family: 'Cormorant Garamond', serif;
           font-style: italic;
-          font-size: 12px;
+          font-size: 16px;
           color: #8a9aaa;
-          margin-bottom: 10px;
+          margin-bottom: 14px;
         }
 
         .footer-copyright {
-          font-size: 9px;
+          font-size: 12px;
           color: #a0b0be;
-          line-height: 1.6;
+          line-height: 1.7;
         }
       </style>
     </head>
     <body>
       <div class="pdf-container">
-        <!-- HEADER -->
+                      <!-- HEADER SECTION -->
         <div class="header">
+          <div class="company-info">
+            <div class="company-name">PLASMA WATER AFRICA</div>
+            <div class="company-address">P.O BOX 4996-00200</div>
+            <div class="company-location">NAIROBI, KENYA</div>
+            <div class="company-tel">TEL: 0710743793</div>
+            <div class="company-email">Email: plasmawaterafrica@gmail.com</div>
+          </div>
           <div class="logo-area">
             <img src="${finalLogoUrl}" class="company-logo" alt="Logo" crossorigin="anonymous" />
           </div>
-          <div class="quote-info">
-            <div class="quote-title">QUOTATION</div>
-            <div class="quote-number">${quote.quoteNumber}</div>
-          </div>
-          <div class="company-contact">
-            <div class="contact-line">${icons.location} ${escapeHtml(companyAddress)}</div>
-            <div class="contact-line">${icons.phone} ${escapeHtml(companyPhone)}</div>
-            <div class="contact-line">${icons.email} ${escapeHtml(companyEmail)}</div>
-          </div>
+        </div>
+
+              <!-- Document Title Section with Blue Line -->
+        <div class="doc-title-section">
+          <div class="doc-title-container">
+            <div class="doc-title-text">${quote.status === 'accepted' || quote.status === 'converted' ? 'INVOICE' : 'QUOTATION'}</div>
+        
+             
         </div>
 
         <!-- INFO SECTION -->
@@ -554,9 +679,13 @@ export async function generateQuotationPDF(
           <div class="info-card">
             <div class="info-card-header">
               ${icons.package}
-              <h3>Quote Details</h3>
+              <h3>${quote.status === 'accepted' || quote.status === 'converted' ? 'INVOICE DETAILS' : 'QUOTATION DETAILS'}</h3>
             </div>
             <div class="info-content">
+              <div class="detail-row">
+                <span class="detail-label">REF Number</span>
+                <span class="detail-value">${quote.quoteNumber}</span>
+              </div>
               <div class="detail-row">
                 <span class="detail-label">Date Issued</span>
                 <span class="detail-value">${new Date(quote.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
@@ -565,8 +694,8 @@ export async function generateQuotationPDF(
                 <span class="detail-label">Valid Until</span>
                 <span class="detail-value">${new Date(quote.validUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               </div>
-              <div class="detail-row">
-                <span class="detail-label">Status</span>
+              <div class="detail-row"  style="display: none;>
+                <span class="detail-label"">Status</span>
                 <span class="detail-value">
                   <span class="status-badge">
                     ${icons.check}
@@ -574,8 +703,19 @@ export async function generateQuotationPDF(
                   </span>
                 </span>
               </div>
+              ${(quote.status === 'accepted' || quote.status === 'converted') ? `
+                <div class="detail-row">
+                  <span class="detail-label">Payment Status</span>
+                  <span class="detail-value">
+                    <span class="payment-status-badge ${quote.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}">
+                      ${quote.paymentStatus === 'paid' ? '✓ PAID' : '⚠ UNPAID'}
+                    </span>
+                  </span>
+                </div>
+              ` : ''}
             </div>
           </div>
+
         </div>
 
         <!-- SHIPPING INFO -->
@@ -620,7 +760,7 @@ export async function generateQuotationPDF(
                   <div class="item-name">${escapeHtml(item.name)}</div>
                   ${item.description ? `<div class="item-description">${escapeHtml(item.description.substring(0, 120))}</div>` : ''}
                   ${item.customPrice ? `<div class="custom-badge">${icons.check} Custom pricing applied</div>` : ''}
-                </td>
+                 </td>
                 <td class="text-center font-mono">${item.qty}</td>
                 <td class="text-right font-mono">${item.price.toLocaleString()}</td>
                 <td class="text-right font-mono" style="font-weight: 600;">${(item.price * item.qty).toLocaleString()}</td>
@@ -750,7 +890,7 @@ export async function generateQuotationPDF(
 
   document.body.appendChild(element);
 
-  // Wait for images to load
+  // Wait for images to load with increased timeout for larger logos
   const images = element.querySelectorAll('img');
   await Promise.race([
     Promise.all(
@@ -762,15 +902,15 @@ export async function generateQuotationPDF(
             } else {
               img.onload = resolve;
               img.onerror = resolve;
-              setTimeout(resolve, 3000);
+              setTimeout(resolve, 5000);
             }
           })
       )
     ),
-    new Promise((resolve) => setTimeout(resolve, 4000)),
+    new Promise((resolve) => setTimeout(resolve, 6000)),
   ]);
 
-  await new Promise((resolve) => setTimeout(resolve, 200));
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
   const canvas = await html2canvas(element, {
     scale: 2.5,

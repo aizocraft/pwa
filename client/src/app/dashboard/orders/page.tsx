@@ -1,4 +1,3 @@
-// src/app/dashboard/orders/page.tsx
 'use client'
 
 import { useState } from 'react'
@@ -77,7 +76,7 @@ const StatusUpdateDropdown = ({
               <button
                 key={option.value}
                 onClick={() => handleSelect(option.value)}
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors Ksh.{
+                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
                   currentStatus === option.value ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'
                 }`}
               >
@@ -105,6 +104,45 @@ const PaymentMethodBadge = ({ method }: { method: Order['paymentMethod'] }) => {
       {label}
     </span>
   )
+}
+
+// Helper function to get customer name
+const getCustomerName = (order: Order): string => {
+  if (order.userId && typeof order.userId === 'object' && 'name' in order.userId) {
+    return (order.userId as any).name
+  }
+  if (order.guestInfo?.name) {
+    return order.guestInfo.name
+  }
+  if (order.shippingAddress?.fullName) {
+    return order.shippingAddress.fullName
+  }
+  return 'Guest'
+}
+
+// Helper function to get customer email
+const getCustomerEmail = (order: Order): string | null => {
+  if (order.userId && typeof order.userId === 'object' && 'email' in order.userId) {
+    return (order.userId as any).email
+  }
+  if (order.guestInfo?.email) {
+    return order.guestInfo.email
+  }
+  if (order.shippingAddress?.email) {
+    return order.shippingAddress.email
+  }
+  return null
+}
+
+// Helper function to get customer phone
+const getCustomerPhone = (order: Order): string | null => {
+  if (order.guestInfo?.phone) {
+    return order.guestInfo.phone
+  }
+  if (order.shippingAddress?.phone) {
+    return order.shippingAddress.phone
+  }
+  return null
 }
 
 export default function DashboardOrdersPage() {
@@ -148,14 +186,16 @@ export default function DashboardOrdersPage() {
   })
 
   const handleExportCSV = () => {
-    const headers = ['Order ID', 'Customer', 'Email', 'Items', 'Total', 'Status', 'Date']
+    const headers = ['Order ID', 'Customer', 'Email', 'Phone', 'Items', 'Total', 'Status', 'Payment', 'Date']
     const csvData = orders.map(order => [
       order.orderNumber || `#${order._id.slice(-8)}`,
-      order.user?.name || order.guestInfo?.name || 'Guest',
-      order.user?.email || order.guestInfo?.email || 'N/A',
+      getCustomerName(order),
+      getCustomerEmail(order) || 'N/A',
+      getCustomerPhone(order) || 'N/A',
       order.items.reduce((sum, item) => sum + item.qty, 0),
       order.total.toFixed(2),
       order.status,
+      order.paymentMethod,
       formatDate(order.createdAt)
     ])
     
@@ -232,6 +272,7 @@ export default function DashboardOrdersPage() {
           <option value="shipped">Shipped</option>
           <option value="delivered">Delivered</option>
           <option value="cancelled">Cancelled</option>
+          <option value="refunded">Refunded</option>
         </select>
 
         <select
@@ -314,7 +355,7 @@ export default function DashboardOrdersPage() {
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Status</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Date</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Actions</th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {orders.map((order) => (
@@ -323,39 +364,45 @@ export default function DashboardOrdersPage() {
                         <span className="font-mono text-xs font-medium text-gray-900 dark:text-white">
                           #{order.orderNumber?.slice(-8) || order._id.slice(-8)}
                         </span>
-                      </td>
+                       </td>
                       <td className="px-4 py-3">
                         <div>
                           <div className="font-medium text-gray-900 dark:text-white text-sm">
-                            {order.user?.name || order.guestInfo?.name || 'Guest'}
+                            {getCustomerName(order)}
                           </div>
-                          {order.user?.email && (
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                          {getCustomerEmail(order) && (
+                            <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
                               <Mail className="w-3 h-3" />
-                              {order.user?.email}
+                              {getCustomerEmail(order)}
+                            </div>
+                          )}
+                          {getCustomerPhone(order) && (
+                            <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                              <Phone className="w-3 h-3" />
+                              {getCustomerPhone(order)}
                             </div>
                           )}
                         </div>
-                      </td>
+                       </td>
                       <td className="px-4 py-3">
                         <span className="text-sm text-gray-600 dark:text-gray-400">
                           {order.items.length} item{order.items.length !== 1 ? 's' : ''}
                         </span>
-                      </td>
+                       </td>
                       <td className="px-4 py-3">
                         <span className="font-semibold text-gray-900 dark:text-white">
-                         $Ksh.{order.total.toLocaleString()}
+                          Ksh {order.total.toLocaleString()}
                         </span>
-                      </td>
+                       </td>
                       <td className="px-4 py-3">
                         <PaymentMethodBadge method={order.paymentMethod} />
-                      </td>
+                       </td>
                       <td className="px-4 py-3">
                         <OrderStatusBadge status={order.status} />
-                      </td>
+                       </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm">
                         {formatDate(order.createdAt)}
-                      </td>
+                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <StatusUpdateDropdown 
@@ -370,7 +417,7 @@ export default function DashboardOrdersPage() {
                             <Eye className="w-4 h-4" />
                           </Link>
                         </div>
-                      </td>
+                       </td>
                     </tr>
                   ))}
                 </tbody>

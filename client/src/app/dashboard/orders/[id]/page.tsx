@@ -9,7 +9,7 @@ import { Order } from "@/types/order";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, MapPin, Phone, Mail, CreditCard, Truck, Package,
-  CheckCircle, Clock, Download, Printer, Share2, RefreshCw,
+  CheckCircle, Clock, Download, Printer, Share2, RefreshCw, Loader2,
   XCircle, DollarSign, Calendar as CalendarIcon,
   ShoppingBag, User, Copy, Check, Send, Eye, Edit, Save, X, Smartphone, FileText, FileImage,
   Receipt
@@ -41,6 +41,67 @@ const OrderStatusBadge = ({ status }: { status: Order["status"] }) => {
   );
 };
 
+// Helper function to get customer name
+const getCustomerName = (order: Order): string => {
+  if (order.userId && typeof order.userId === 'object' && 'name' in order.userId) {
+    return (order.userId as any).name
+  }
+  if (order.guestInfo?.name) {
+    return order.guestInfo.name
+  }
+  if (order.shippingAddress?.fullName) {
+    return order.shippingAddress.fullName
+  }
+  return 'Guest'
+}
+
+// Helper function to get customer email
+const getCustomerEmail = (order: Order): string | null => {
+  if (order.userId && typeof order.userId === 'object' && 'email' in order.userId) {
+    return (order.userId as any).email
+  }
+  if (order.guestInfo?.email) {
+    return order.guestInfo.email
+  }
+  if (order.shippingAddress?.email) {
+    return order.shippingAddress.email
+  }
+  return null
+}
+
+// Helper function to get item image URL
+const getItemImageUrl = (item: any): string => {
+  if (!item.image) return '/placeholder-product.jpg';
+  
+  // If it's a string URL
+  if (typeof item.image === 'string') {
+    return item.image;
+  }
+  
+  // If it's an object with url property
+  if (item.image.url) {
+    return item.image.url;
+  }
+  
+  // If it's a GridFS file
+  if (item.image.fileId) {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+    return `${apiUrl}/products/image/${item.image.fileId}`;
+  }
+  
+  // If it's from populated product
+  if (item.productId?.images?.[0]) {
+    const img = item.productId.images[0];
+    if (img.url) return img.url;
+    if (img.fileId) {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+      return `${apiUrl}/products/image/${img.fileId}`;
+    }
+  }
+  
+  return '/placeholder-product.jpg';
+};
+
 const InvoiceTemplate = ({ order, settings, logoUrl, isPaid }: { order: Order; settings: any; logoUrl: string | null; isPaid: boolean }) => {
   const companyPhone = settings?.phone || "";
   const companyEmail = settings?.email || "";
@@ -49,8 +110,8 @@ const InvoiceTemplate = ({ order, settings, logoUrl, isPaid }: { order: Order; s
   const shippingCost = order.shippingCost || 0;
   const tax = order.tax || 0;
   const total = order.total || subtotal + shippingCost + tax;
-  const customerName = order.user?.name || order.guestInfo?.name || order.shippingAddress?.fullName || "Guest Customer";
-  const customerEmail = order.user?.email || order.guestInfo?.email || order.shippingAddress?.email || "";
+  const customerName = getCustomerName(order);
+  const customerEmail = getCustomerEmail(order) || "";
   const customerPhone = order.guestInfo?.phone || order.shippingAddress?.phone || "";
   const itemsPerPage = 12;
   const itemChunks = [];
@@ -164,22 +225,22 @@ const InvoiceTemplate = ({ order, settings, logoUrl, isPaid }: { order: Order; s
               <th style={{ padding: "6px 6px", textAlign: "center", fontWeight: "bold", color: "#333", width: "10%" }}>Qty</th>
               <th style={{ padding: "6px 6px", textAlign: "right", fontWeight: "bold", color: "#333", width: "20%" }}>Price</th>
               <th style={{ padding: "6px 6px", textAlign: "right", fontWeight: "bold", color: "#333", width: "25%" }}>Total</th>
-            </tr>
+             </tr>
           </thead>
           <tbody>
             {itemChunks[0]?.map((item, idx) => (
               <tr key={idx} style={{ borderBottom: "1px solid #eee" }}>
                 <td style={{ padding: "6px 6px" }}>
                   <div style={{ fontWeight: "bold" }}>{item.name}</div>
-                  <div style={{ fontSize: "7pt", color: "#888" }}>{item.slug}</div>
-                </td>
+                  <div style={{ fontSize: "7pt", color: "#888" }}>{item.slug || 'N/A'}</div>
+                 </td>
                 <td style={{ padding: "6px 6px", textAlign: "center" }}>{item.qty}</td>
                 <td style={{ padding: "6px 6px", textAlign: "right" }}>Ksh {item.price.toLocaleString()}</td>
                 <td style={{ padding: "6px 6px", textAlign: "right", fontWeight: "bold" }}>Ksh {(item.price * item.qty).toLocaleString()}</td>
-              </tr>
+               </tr>
             ))}
           </tbody>
-        </table>
+         </table>
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px", marginBottom: "15px" }}>
             <div style={{ width: "220px", fontSize: "9pt" }}>
               <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
@@ -206,7 +267,7 @@ const InvoiceTemplate = ({ order, settings, logoUrl, isPaid }: { order: Order; s
                   margin: "3px 0"
                 }}>
                   <span style={{ color: "#065f46", fontWeight: "500" }}>
-                    Discount: {(order as any).promoCode?.code || "Promo"}
+                    Discount: {(order as any).appliedPromoCode?.code || "Promo"}
                   </span>
                   <span style={{ color: "#065f46", fontWeight: "bold" }}>
                     -Ksh {order.discount.toLocaleString()}
@@ -298,22 +359,22 @@ const InvoiceTemplate = ({ order, settings, logoUrl, isPaid }: { order: Order; s
                 <th style={{ padding: "6px 6px", textAlign: "center", width: "10%" }}>Qty</th>
                 <th style={{ padding: "6px 6px", textAlign: "right", width: "20%" }}>Price</th>
                 <th style={{ padding: "6px 6px", textAlign: "right", width: "25%" }}>Total</th>
-              </tr>
+               </tr>
             </thead>
             <tbody>
               {chunk.map((item, idx) => (
                 <tr key={idx} style={{ borderBottom: "1px solid #eee" }}>
                   <td style={{ padding: "6px 6px" }}>
                     <div style={{ fontWeight: "bold" }}>{item.name}</div>
-                    <div style={{ fontSize: "7pt", color: "#888" }}>{item.slug}</div>
-                  </td>
+                    <div style={{ fontSize: "7pt", color: "#888" }}>{item.slug || 'N/A'}</div>
+                   </td>
                   <td style={{ padding: "6px 6px", textAlign: "center" }}>{item.qty}</td>
                   <td style={{ padding: "6px 6px", textAlign: "right" }}>Ksh {item.price.toLocaleString()}</td>
                   <td style={{ padding: "6px 6px", textAlign: "right", fontWeight: "bold" }}>Ksh {(item.price * item.qty).toLocaleString()}</td>
-                </tr>
+                 </tr>
               ))}
             </tbody>
-          </table>
+           </table>
           <div style={{ textAlign: "center", fontSize: "7pt", color: "#999", marginTop: "20px" }}>
             <p style={{ margin: "0" }}>Continued from previous page...</p>
           </div>
@@ -496,15 +557,7 @@ export default function AdminOrderDetails() {
       <div className="relative overflow-hidden border-b border-gray-200/50 dark:border-gray-800/50">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-blue-500/5 to-purple-500/10"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-            <Link 
-              href="/dashboard/orders"
-              className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all duration-300 mb-4 group"
-            >
-              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-300" />
-              <span className="font-medium">Back to Orders</span>
-            </Link>
-          </motion.div>
+
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
               <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -540,39 +593,23 @@ export default function AdminOrderDetails() {
               <div className="h-8 w-px bg-gray-300 dark:bg-gray-700 hidden sm:block"></div>
               <div className="flex gap-1.5 flex-wrap justify-center lg:justify-start">
                 <motion.button
+                  onClick={handleDownloadPDF}
+                  disabled={isGeneratingPDF}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="relative p-1.5 sm:p-2.5 rounded-lg bg-white/50 dark:bg-gray-800/50 hover:bg-white/80 dark:hover:bg-gray-700/50 transition-all duration-300 border border-gray-200/50 dark:border-gray-700/50 group text-xs"
+                  className="relative p-1.5 sm:p-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white transition-all duration-300 shadow-md group"
                 >
-                  <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-300" />
+                  {isGeneratingPDF ? (
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                  ) : (
+                    <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-300" />
+                  )}
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="p-1.5 sm:p-2.5 rounded-lg bg-white/50 dark:bg-gray-800/50 hover:bg-white/80 dark:hover:bg-gray-700/50 transition-all duration-300 border border-gray-200/50 dark:border-gray-700/50 group relative text-xs"
-                >
-                  <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-300" />
-                </motion.button>
-                <div className="flex gap-1">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex-1 p-1.5 sm:p-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white transition-all duration-300 shadow-md group relative text-xs"
-                  >
-                    <FileText className="w-3 h-3 sm:w-3.5 sm:h-3.5 mx-auto group-hover:scale-110 transition-transform duration-300" />
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="p-1.5 sm:p-2.5 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white transition-all duration-300 shadow-md group relative text-xs"
-                  >
-                    <FileImage className="w-3 h-3 sm:w-3.5 sm:h-3.5 mx-auto group-hover:scale-110 transition-transform duration-300" />
-                  </motion.button>
-                </div>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="p-1.5 sm:p-2.5 rounded-lg bg-white/50 dark:bg-gray-800/50 hover:bg-white/80 dark:hover:bg-gray-700/50 transition-all duration-300 border border-gray-200/50 dark:border-gray-700/50 group relative mt-1 lg:mt-0 text-xs"
+                  className="p-1.5 sm:p-2.5 rounded-lg bg-white/50 dark:bg-gray-800/50 hover:bg-white/80 dark:hover:bg-gray-700/50 transition-all duration-300 border border-gray-200/50 dark:border-gray-700/50 group"
+                  onClick={() => refetch()}
                 >
                   <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:rotate-180 transition-transform duration-500" />
                 </motion.button>
@@ -583,6 +620,7 @@ export default function AdminOrderDetails() {
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+          {/* Left Column - Order Items */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -609,31 +647,39 @@ export default function AdminOrderDetails() {
                     <div className="flex flex-col xs:flex-row gap-2.5 sm:gap-3">
                       <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-sm mx-auto sm:mx-0">
                         <Image
-                          src="/logo.png"
+                          src={getItemImageUrl(item)}
                           alt={item.name}
                           fill
                           sizes="(max-width: 640px) 80px, 80px"
                           className="object-cover transition-transform duration-300 hover:scale-110"
                           priority={index === 0}
-                          unoptimized={true}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = '/placeholder-product.jpg';
+                          }}
                         />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1.5 sm:gap-2.5">
-                          <div className="text-center sm:text-left">
+                          <div className="text-center sm:text-left flex-1">
                             <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white mb-0.5">
                               {item.name}
                             </h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 hidden sm:block">
-                              {item.slug}
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              SKU: {item.slug || 'N/A'}
                             </p>
-                            <div className="flex items-center justify-center sm:justify-start gap-2 text-xs sm:text-sm">
+                            {item.description && (
+                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-2">
+                                {item.description}
+                              </p>
+                            )}
+                            <div className="flex items-center justify-center sm:justify-start gap-2 text-xs sm:text-sm mt-1">
                               <span className="text-gray-600 dark:text-gray-300">Ksh {item.price.toLocaleString()}</span>
                               <span className="text-gray-400">×</span>
                               <span className="font-semibold text-gray-900 dark:text-white">{item.qty}</span>
                             </div>
                           </div>
-                          <div className="text-center sm:text-right mt-0.5 sm:mt-0">
+                          <div className="text-center sm:text-right mt-2 sm:mt-0">
                             <div className="text-base sm:text-lg font-black text-gray-900 dark:text-white">
                               Ksh {(item.price * item.qty).toLocaleString()}
                             </div>
@@ -673,7 +719,7 @@ export default function AdminOrderDetails() {
                     {order.discount > 0 && (
                       <div className="flex justify-between text-xs sm:text-sm bg-emerald-50 dark:bg-emerald-950/40 p-2 rounded-lg">
                         <span className="text-gray-600 dark:text-gray-400 truncate">
-                          {(order as any).promoCode?.code || "Promo"}
+                          {(order as any).appliedPromoCode?.code || "Promo"}
                         </span>
                         <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                           -Ksh {order.discount.toLocaleString()}
@@ -693,15 +739,168 @@ export default function AdminOrderDetails() {
               </div>
             </div>
           </motion.div>
+
+          {/* Right Column - Customer & Order Info */}
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4 }}
             className="space-y-6 lg:sticky lg:top-24"
           >
+            {/* Customer Information */}
+            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-white/50 shadow-xl p-4 sm:p-6">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Customer Information
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Full Name</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {getCustomerName(order)}
+                  </p>
+                </div>
+                {getCustomerEmail(order) && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 break-all">
+                      {getCustomerEmail(order)}
+                    </p>
+                  </div>
+                )}
+                {order.shippingAddress?.phone && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Phone</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {order.shippingAddress.phone}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Shipping Address */}
+            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-white/50 shadow-xl p-4 sm:p-6">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Truck className="w-4 h-4" />
+                Shipping Address
+              </h3>
+              <div className="space-y-2 text-sm">
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {order.shippingAddress.fullName}
+                </p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {order.shippingAddress.address1}
+                  {order.shippingAddress.address2 && <>, {order.shippingAddress.address2}</>}
+                </p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zip}
+                </p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {order.shippingAddress.country}
+                </p>
+                <p className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                  <Phone className="w-3 h-3" />
+                  {order.shippingAddress.phone}
+                </p>
+              </div>
+            </div>
+
+            {/* Payment Information */}
+            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-white/50 shadow-xl p-4 sm:p-6">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Payment Information
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Method</span>
+                  <span className="text-sm font-medium capitalize">
+                    {order.paymentMethod === 'cod' ? 'Cash on Delivery' : 
+                     order.paymentMethod === 'mpesa' ? 'M-PESA' : 'Card'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Status</span>
+                  <span className={`text-sm font-medium capitalize ${
+                    order.paymentStatus === 'completed' ? 'text-green-600' :
+                    order.paymentStatus === 'failed' ? 'text-red-600' : 'text-yellow-600'
+                  }`}>
+                    {order.paymentStatus || 'Pending'}
+                  </span>
+                </div>
+                {order.paymentDetails?.transactionId && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Transaction ID</p>
+                    <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
+                      {order.paymentDetails.transactionId}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Update Status */}
+            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-white/50 shadow-xl p-4 sm:p-6">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4" />
+                Update Order Status
+              </h3>
+              <div className="space-y-3">
+                <select
+                  value={order.status}
+                  onChange={(e) => handleUpdateStatus(e.target.value as Order['status'])}
+                  disabled={isUpdating}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="processing">Processing</option>
+                  <option value="paid">Paid</option>
+                  <option value="shipped">Shipped</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+                
+                {order.status === 'shipped' && !order.trackingNumber && (
+                  <button
+                    onClick={() => setShowTrackingForm(!showTrackingForm)}
+                    className="w-full px-3 py-2 text-sm text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+                  >
+                    Add Tracking Number
+                  </button>
+                )}
+                
+                {showTrackingForm && (
+                  <div className="space-y-2 pt-2">
+                    <input
+                      type="text"
+                      placeholder="Tracking Number"
+                      value={trackingNumber}
+                      onChange={(e) => setTrackingNumber(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                    />
+                    <input
+                      type="date"
+                      placeholder="Estimated Delivery"
+                      value={estimatedDelivery}
+                      onChange={(e) => setEstimatedDelivery(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                    />
+                    <button
+                      onClick={handleAddTracking}
+                      disabled={isUpdating || !trackingNumber}
+                      className="w-full px-3 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                    >
+                      {isUpdating ? 'Saving...' : 'Save Tracking Info'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </motion.div>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
