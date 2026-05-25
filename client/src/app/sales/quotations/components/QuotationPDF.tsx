@@ -156,7 +156,8 @@ export async function generateQuotationPDF(
         }
 
         .company-address, .company-location, .company-tel, .company-email {
-          font-size: 14px;
+          font-size: 18px;
+          font-weight: 500;
           color: #333;
           margin-bottom: 5px;
         }
