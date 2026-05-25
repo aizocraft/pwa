@@ -19,18 +19,13 @@ import {
   User,
   Package,
   Truck,
-  X,
+  X, Save,
   ChevronLeft,
   ChevronRight,
   Loader2,
   Filter,
   Tag,
   Users,
-  Mail,
-  Phone,
-  MapPin,
-  Save,
-  SendHorizontal,
   DollarSign,
   Percent,
   Shield,
@@ -44,7 +39,6 @@ import {
   sendQuotationEmail,
   acceptQuotation,
   listSalesCustomers,
-  listPublicShippingAreas,
   type Quotation,
   type SalesCustomer,
 } from '@/lib/sales';
@@ -1039,7 +1033,7 @@ export default function QuotationsPage() {
                           <th className="px-4 py-2 text-left text-sm">Product</th>
                           <th className="px-4 py-2 text-center text-sm">Qty</th>
                           <th className="px-4 py-2 text-right text-sm">Unit Price</th>
-                          <th className="px-4 py-2 text-center text-sm">Tax</th>
+                          {formData.taxPerItem && <th className="px-4 py-2 text-center text-sm">Tax</th>}
                           <th className="px-4 py-2 text-right text-sm">Total</th>
                           <th className="px-4 py-2 text-center text-sm"></th>
                         </tr>
@@ -1048,6 +1042,8 @@ export default function QuotationsPage() {
                         {formData.items.map((item, idx) => {
                           const product = products.find((p) => p._id === item.productId);
                           const price = item.customPrice || product?.price || 0;
+                          const itemTotal = price * item.qty;
+                          const itemTax = (formData.taxPerItem && item.taxable) ? itemTotal * taxRate : 0;
                           return (
                             <tr key={idx} className="border-t dark:border-gray-800">
                               <td className="px-4 py-2">
@@ -1063,44 +1059,58 @@ export default function QuotationsPage() {
                                   min="1"
                                 />
                               </td>
-                              <td className="px-4 py-2">
+                              <td className="px-4 py-2 text-right">
                                 <input
                                   type="number"
                                   value={price}
                                   onChange={(e) => updateItemPrice(idx, Number(e.target.value))}
                                   className="w-32 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded text-right bg-white dark:bg-gray-800"
                                   min="0"
+                                  step="any"
                                 />
-                              </td>
-                              <td className="px-4 py-2 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleItemTax(idx)}
-                                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                                    item.taxable !== false ? 'bg-cyan-600' : 'bg-gray-300 dark:bg-gray-600'
-                                  }`}
-                                >
-                                  <span
-                                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                                      item.taxable !== false ? 'translate-x-4' : 'translate-x-0.5'
-                                    }`}
-                                  />
-                                </button>
-                                <span className="text-xs ml-2 text-gray-500">
-                                  {item.taxable !== false ? 'Taxable' : 'No Tax'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2 text-right font-semibold">KES {(price * item.qty).toLocaleString()}</td>
+                               </td>
+                               {formData.taxPerItem && (
+                                 <td className="px-4 py-2 text-center">
+                                   <div className="flex items-center justify-center gap-2">
+                                     <button
+                                       type="button"
+                                       onClick={() => toggleItemTax(idx)}
+                                       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                                         item.taxable ? 'bg-cyan-600' : 'bg-gray-300 dark:bg-gray-600'
+                                       }`}
+                                     >
+                                       <span
+                                         className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                           item.taxable ? 'translate-x-5' : 'translate-x-1'
+                                         }`}
+                                       />
+                                     </button>
+                                     <span className="text-xs text-gray-600 dark:text-gray-400">
+                                       {item.taxable ? `+${Math.round(taxRate * 100)}%` : '0%'}
+                                     </span>
+                                   </div>
+                                 </td>
+                               )}
+                              <td className="px-4 py-2">
+                                <div className="text-right">
+                                  <div className="text-sm font-mono text-gray-900">KES {itemTotal.toLocaleString()}</div>
+                                  {formData.taxPerItem && item.taxable && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      VAT: +KES {itemTax.toLocaleString()}
+                                    </div>
+                                  )}
+                                </div>
+                               </td>
                               <td className="px-4 py-2 text-center">
                                 <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
-                              </td>
-                            </tr>
+                               </td>
+                             </tr>
                           );
                         })}
                       </tbody>
-                    </table>
+                     </table>
                   </div>
                 )}
 
@@ -1393,23 +1403,41 @@ export default function QuotationsPage() {
                           <th className="px-4 py-2 text-left text-sm">Description</th>
                           <th className="px-4 py-2 text-center text-sm">Qty</th>
                           <th className="px-4 py-2 text-right text-sm">Unit Price</th>
-                          <th className="px-4 py-2 text-center text-sm">Tax</th>
+                          {viewingQuote.taxPerItem && <th className="px-4 py-2 text-center text-sm">Tax</th>}
                           <th className="px-4 py-2 text-right text-sm">Total</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {viewingQuote.items.map((item, idx) => (
-                          <tr key={idx} className="border-t dark:border-gray-800">
-                            <td className="px-4 py-2">{item.name}</td>
-                            <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">{item.description || '-'}</td>
-                            <td className="px-4 py-2 text-center">{item.qty}</td>
-                            <td className="px-4 py-2 text-right">KES {item.price.toLocaleString()}</td>
-                            <td className="px-4 py-2 text-center">
-                              {(item as any).tax ? `${Math.round((item as any).tax / (item.price * item.qty) * 100)}%` : '✓'}
-                            </td>
-                            <td className="px-4 py-2 text-right font-semibold">KES {(item.price * item.qty).toLocaleString()}</td>
-                          </tr>
-                        ))}
+                        {viewingQuote.items.map((item, idx) => {
+                          const itemTotal = item.price * item.qty;
+                          const isItemTaxable = (item as any).taxable !== false;
+                          const itemTax = viewingQuote.taxPerItem && isItemTaxable ? itemTotal * viewingQuote.taxRate : 0;
+                          return (
+                            <tr key={idx} className="border-t dark:border-gray-800">
+                              <td className="px-4 py-2">{item.name}</td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">{item.description || '-'}</td>
+                              <td className="px-4 py-2 text-center">{item.qty}</td>
+                              <td className="px-4 py-2 text-right">
+                                <div>KES {item.price.toLocaleString()}</div>
+                              </td>
+                              {viewingQuote.taxPerItem && (
+                                <td className="px-4 py-2 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${isItemTaxable ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                                      {isItemTaxable ? `${Math.round(viewingQuote.taxRate * 100)}%` : '0%'}
+                                    </span>
+                                  </div>
+                                </td>
+                              )}
+                              <td className="px-4 py-2 text-right font-semibold">
+                                <div>KES {itemTotal.toLocaleString()}</div>
+                                {viewingQuote.taxPerItem && isItemTaxable && (
+                                  <div className="text-xs text-gray-500 mt-1">VAT: +KES {itemTax.toLocaleString()}</div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1421,7 +1449,7 @@ export default function QuotationsPage() {
                     <p className="flex justify-between"><span className="text-gray-600">Subtotal:</span><span className="font-semibold">KES {viewingQuote.subtotal?.toLocaleString() || 0}</span></p>
                     {viewingQuote.discount > 0 && <p className="flex justify-between text-green-600"><span>Discount ({viewingQuote.discountType === 'percentage' ? `${viewingQuote.discount}%` : `KES ${viewingQuote.discount}`}):</span><span>-KES {viewingQuote.discount.toLocaleString()}</span></p>}
                     {(viewingQuote as any).transportCost > 0 && <p className="flex justify-between"><span className="text-gray-600">Transport:</span><span className="font-semibold text-amber-600">KES {(viewingQuote as any).transportCost?.toLocaleString() || 0}</span></p>}
-                    <p className="flex justify-between"><span className="text-gray-600">Tax ({Math.round(viewingQuote.taxRate * 100)}%):</span><span>KES {viewingQuote.tax?.toLocaleString() || 0}</span></p>
+                    <p className="flex justify-between"><span className="text-gray-600">Tax ({Math.round(viewingQuote.taxRate * 100)}%{viewingQuote.taxPerItem ? ' - per item' : ''}):</span><span>KES {viewingQuote.tax?.toLocaleString() || 0}</span></p>
                     <div className="pt-2 mt-2 border-t-2 border-gray-200"><p className="flex justify-between text-lg font-bold"><span>Total:</span><span className="text-cyan-600">KES {viewingQuote.total?.toLocaleString() || 0}</span></p></div>
                   </div>
                 </div>

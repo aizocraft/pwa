@@ -31,11 +31,56 @@ export async function generateQuotationPDF(
   const companyEmail = settings?.email || 'info@plasmawater.com';
   const taxRate = quote.taxRate || 0.16;
 
-  // Get transport info (supports both old and new formats)
+  // Get transport info
   const transportCost = quote.transportCost || quote.transportInfo?.cost || 0;
   const transportDescription = quote.transportDescription || quote.transportInfo?.description || '';
   const estimatedDelivery = quote.estimatedDelivery || quote.shippingInfo?.estimatedDelivery || '';
+  
+  // Tax calculation mode
   const taxPerItem = quote.taxPerItem || false;
+  
+  // Calculate totals based on tax mode
+  const displayTaxableBadges = !!taxPerItem;
+
+  let calculatedSubtotal = 0;
+  let calculatedTax = 0;
+
+  const itemsWithCalculations = quote.items.map((item: any) => {
+    const qty = Number(item.qty || 0);
+    const unitPrice = Number(item.price || 0);
+
+    const itemTotal = unitPrice * qty;
+    calculatedSubtotal += itemTotal;
+
+    // If taxPerItem is OFF: do not apply per-item VAT.
+    const isTaxable = taxPerItem ? item.taxable !== false : false;
+    const itemTax = (taxPerItem && isTaxable) ? itemTotal * taxRate : 0;
+
+    if (itemTax > 0) calculatedTax += itemTax;
+
+    return {
+      ...item,
+      qty,
+      unitPrice,
+      itemTotal,
+      itemTax,
+      isTaxable,
+    };
+  });
+
+  // If not taxPerItem, tax is calculated on total after discount
+  const discountAmount = quote.discountType === 'percentage'
+    ? calculatedSubtotal * ((quote.discount || 0) / 100)
+    : (quote.discount || 0);
+
+  if (!taxPerItem) {
+    const taxableAmount = Math.max(0, calculatedSubtotal - discountAmount);
+    calculatedTax = taxableAmount * taxRate;
+  }
+
+  // Grand total: subtotal - discount + tax + transport (never double-apply discount)
+  const calculatedTotal = calculatedSubtotal - discountAmount + calculatedTax + transportCost;
+
 
   function escapeHtml(str: string): string {
     if (!str) return '';
@@ -57,6 +102,7 @@ export async function generateQuotationPDF(
     truck: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2c6e3c" stroke-width="2"><path d="M1 3h15v13H1z"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
     check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2c6e3c" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`,
     creditCard: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7c8a" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
+    tax: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>`,
   };
 
   element.innerHTML = `
@@ -334,16 +380,25 @@ export async function generateQuotationPDF(
           margin-top: 4px;
         }
 
-        .item-tax-badge {
+        .tax-badge {
           display: inline-flex;
           align-items: center;
           gap: 4px;
-          background: #e8f4ec;
-          padding: 2px 8px;
-          border-radius: 12px;
+          padding: 3px 10px;
+          border-radius: 20px;
           font-size: 10px;
-          color: #2c6e3c;
+          font-weight: 600;
           margin-top: 6px;
+        }
+
+        .tax-badge-taxable {
+          background: #e8f4ec;
+          color: #2c6e3c;
+        }
+
+        .tax-badge-non-taxable {
+          background: #fef8e7;
+          color: #b46f0b;
         }
 
         .custom-badge {
@@ -423,6 +478,10 @@ export async function generateQuotationPDF(
           color: #6b7280;
           text-align: right;
           margin-top: 8px;
+          margin-bottom: 20px;
+          padding: 8px 12px;
+          background: #f8fafc;
+          border-radius: 8px;
           font-style: italic;
         }
 
@@ -650,7 +709,7 @@ export async function generateQuotationPDF(
           </div>
         </div>
 
-        <!-- TRANSPORT / DELIVERY INFO (New Field) -->
+        <!-- TRANSPORT / DELIVERY INFO -->
         ${(transportCost > 0 || transportDescription || estimatedDelivery) ? `
           <div class="transport-info">
             ${transportDescription ? `
@@ -681,54 +740,71 @@ export async function generateQuotationPDF(
           </div>
         ` : ''}
 
-        <!-- ITEMS TABLE with Per-Item Tax Support -->
+        <!-- ITEMS TABLE with Individual Tax Toggle Display -->
         <table class="items-table">
           <thead>
             <tr>
               <th style="width: 45%">Item Description</th>
               <th style="width: 10%" class="text-center">Qty</th>
               <th style="width: 20%" class="text-right">Unit Price (KES)</th>
-              ${taxPerItem ? `<th style="width: 10%" class="text-center">Tax</th>` : ''}
-              <th style="width: ${taxPerItem ? '15%' : '23%'}" class="text-right">Total (KES)</th>
+              ${taxPerItem ? `<th style="width: 12%" class="text-center">Tax (${(taxRate * 100).toFixed(0)}%)</th>` : ''}
+              <th style="width: ${taxPerItem ? '13%' : '25%'}" class="text-right">Total (KES)</th>
             </tr>
           </thead>
           <tbody>
-            ${quote.items.map((item: any) => {
-              const itemTotal = (item.price || 0) * (item.qty || 0);
-              const itemTax = item.tax || (taxPerItem ? itemTotal * taxRate : 0);
-              const showTaxBadge = taxPerItem && item.taxable !== false;
-              return `
+            ${itemsWithCalculations.map((item: any) => `
               <tr>
                 <td>
                   <div class="item-name">${escapeHtml(item.name)}</div>
                   ${item.description ? `<div class="item-description">${escapeHtml(item.description.substring(0, 120))}</div>` : ''}
                   ${item.customPrice ? `<div class="custom-badge">${icons.check} Custom pricing applied</div>` : ''}
-                  ${showTaxBadge ? `<div class="item-tax-badge">✓ Tax: KES ${itemTax.toLocaleString()}</div>` : ''}
-                  ${(!taxPerItem && item.taxable === false) ? `<div class="item-tax-badge" style="background:#fef8e7; color:#b46f0b;">No Tax</div>` : ''}
+              ${displayTaxableBadges ? (
+                    item.isTaxable 
+                      ? `<div class="tax-badge tax-badge-taxable">${icons.tax} Taxable: +KES ${item.itemTax.toLocaleString()}</div>`
+                      : `<div class="tax-badge tax-badge-non-taxable">✗ No Tax (Exempt)</div>`
+                  ) : ''}
+
                 </td>
                 <td class="text-center font-mono">${item.qty}</td>
-                <td class="text-right font-mono">${(item.price || 0).toLocaleString()}</td>
-                ${taxPerItem ? `<td class="text-center font-mono" style="color: #2c6e3c;">${(itemTax).toLocaleString()}</td>` : ''}
-                <td class="text-right font-mono" style="font-weight: 600;">${itemTotal.toLocaleString()}</td>
+                <td class="text-right font-mono">
+                  ${item.unitPrice.toLocaleString()}
+                  ${displayTaxableBadges ? `
+                    <div class="item-description" style="margin-top:6px;">Tax: ${item.isTaxable ? ('+' + (item.unitPrice * taxRate).toLocaleString()) : '0'}</div>
+                  ` : ''}
+                </td>
+              ${taxPerItem ? `
+                  <td class="text-center font-mono" style="${item.isTaxable ? 'color: #2c6e3c; font-weight: 600;' : 'color: #b46f0b;'}">
+                    ${item.isTaxable ? `KES ${item.itemTax.toLocaleString()}` : 'Exempt'}
+                  </td>
+                ` : `<td></td>`}
+
+
+                <td class="text-right font-mono" style="font-weight: 600;">${(item.itemTotal + (displayTaxableBadges ? item.itemTax : 0)).toLocaleString()}</td>
+
               </tr>
-              `;
-            }).join('')}
+            `).join('')}
           </tbody>
         </table>
 
         <!-- Tax Calculation Note -->
         ${taxPerItem ? `
           <div class="tax-note">
-            ✓ Tax calculated per item (${(taxRate * 100).toFixed(0)}% VAT applied to each taxable item)
+            <strong>📊 Tax Calculation:</strong> ${(taxRate * 100).toFixed(0)}% VAT applied <strong>per item</strong> only to items marked as "Taxable". 
+            Non-taxable items are marked as "No Tax (Exempt)".
           </div>
-        ` : ''}
+        ` : `
+          <div class="tax-note">
+            <strong>📊 Tax Calculation:</strong> ${(taxRate * 100).toFixed(0)}% VAT applied to the <strong>total amount after discount</strong>.
+            ${quote.items.some((i: any) => i.taxable === false) ? ' Non-taxable items are included in the subtotal but do not affect tax calculation.' : ''}
+          </div>
+        `}
 
         <!-- TOTALS -->
         <div class="totals-wrapper">
           <div class="totals-box">
             <div class="total-row">
               <span>Subtotal</span>
-              <span class="font-mono">KES ${(quote.subtotal || 0).toLocaleString()}</span>
+              <span class="font-mono">KES ${calculatedSubtotal.toLocaleString()}</span>
             </div>
             ${quote.discount > 0 ? `
               <div class="total-row discount">
@@ -743,12 +819,12 @@ export async function generateQuotationPDF(
               </div>
             ` : ''}
             <div class="total-row">
-              <span>Tax (${(taxRate * 100).toFixed(0)}% VAT${taxPerItem ? ' - per item' : ''})</span>
-              <span class="font-mono">KES ${(quote.tax || 0).toLocaleString()}</span>
+              <span>Tax (${(taxRate * 100).toFixed(0)}% VAT${taxPerItem ? ' - Per Item' : ' - On Total'})</span>
+              <span class="font-mono">KES ${calculatedTax.toLocaleString()}</span>
             </div>
             <div class="total-row grand-total">
               <span class="grand-total-label">Total Amount</span>
-              <span class="grand-total-amount">KES ${(quote.total || 0).toLocaleString()}</span>
+              <span class="grand-total-amount">KES ${calculatedTotal.toLocaleString()}</span>
             </div>
           </div>
         </div>
