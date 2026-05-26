@@ -1,4 +1,3 @@
-// app/sales/analytics/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -44,8 +43,6 @@ import {
   ResponsiveContainer,
   Area,
   ComposedChart,
-  RadialBarChart,
-  RadialBar,
   Sector
 } from 'recharts';
 import type { 
@@ -113,6 +110,7 @@ interface CategoryDataPoint {
   revenue: number;
   quantity: number;
   percentage?: number;
+  _id?: string;
 }
 
 export default function SalesAnalytics() {
@@ -276,9 +274,32 @@ export default function SalesAnalytics() {
     if (isAdmin && (analytics as AdminAnalytics)?.charts?.categorySales) {
       categories = (analytics as AdminAnalytics).charts?.categorySales || [];
     }
+    
+    // Process categories to ensure proper naming and filter out empty/uncategorized
+    const processedCategories = categories
+      .filter(cat => {
+        // Filter out categories with no revenue or invalid names
+        const hasRevenue = (cat.revenue || 0) > 0;
+        const hasValidName = cat.category && 
+          cat.category !== 'Uncategorized' && 
+          cat.category !== 'uncategorized' &&
+          cat.category !== '' &&
+          cat.category !== 'undefined';
+        return hasRevenue && hasValidName;
+      })
+      .map(cat => ({
+        ...cat,
+        category: cat.category || 'Other',
+        revenue: cat.revenue || 0,
+        quantity: cat.quantity || 0
+      }));
+    
     // Calculate percentages
-    const total = categories.reduce((sum, cat) => sum + cat.revenue, 0);
-    return categories.map(cat => ({ ...cat, percentage: total > 0 ? (cat.revenue / total) * 100 : 0 }));
+    const total = processedCategories.reduce((sum, cat) => sum + cat.revenue, 0);
+    return processedCategories.map(cat => ({ 
+      ...cat, 
+      percentage: total > 0 ? (cat.revenue / total) * 100 : 0 
+    }));
   };
 
   const getHourlyDistributionData = (): HourlyDataPoint[] => {
@@ -329,7 +350,6 @@ export default function SalesAnalytics() {
     return null;
   };
 
-  // Custom active shape for 3D effect on pie chart
   const renderActiveShape = (props: any) => {
     const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
     return (
@@ -365,6 +385,9 @@ export default function SalesAnalytics() {
       </g>
     );
   };
+
+  // If no category data is available after filtering, show a message
+  const hasCategoryData = categorySales.length > 0;
 
   return (
     <div className="space-y-6">
@@ -509,133 +532,149 @@ export default function SalesAnalytics() {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 3D Pie Chart - Sales by Category */}
-        {categorySales.length > 0 && (
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg">
-                  <PieChart className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Sales by Category</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">Revenue distribution across product categories</p>
-                </div>
+        {/* Pie Chart - Sales by Category */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg">
+                <PieChart className="w-5 h-5 text-white" />
               </div>
-            </div>
-            <div className="p-6">
-              <ResponsiveContainer width="100%" height={350}>
-                <RePieChart>
-                <Pie  
-                  data={categorySales}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={3}
-                  dataKey="revenue"
-                  nameKey="category"
-                  onMouseEnter={(_, index) => setHoveredCategory(index)}
-                  onMouseLeave={() => setHoveredCategory(null)}
-                >
-                  {categorySales.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={CHART_COLORS_ARRAY[index % CHART_COLORS_ARRAY.length]}
-                      stroke="white"
-                      strokeWidth={2}
-                      opacity={hoveredCategory === null || hoveredCategory === index ? 1 : 0.5}
-                    />
-                  ))}
-                </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend 
-                    verticalAlign="bottom" 
-                    height={36}
-                    formatter={(value, entry: any) => (
-                      <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
-                    )}
-                  />
-                </RePieChart>
-              </ResponsiveContainer>
-              
-              {/* Category Stats Cards */}
-              <div className="grid grid-cols-2 gap-3 mt-6">
-                {categorySales.map((category, idx) => (
-                  <div key={idx} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:shadow-md transition-all">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: CHART_COLORS_ARRAY[idx % CHART_COLORS_ARRAY.length] }}
-                        />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{category.category}</span>
-                      </div>
-                      <span className="text-sm font-bold text-gray-900 dark:text-white">
-                        {category.percentage?.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="mt-2">
-                      <p className="text-xs text-gray-500">Revenue</p>
-                      <p className="text-sm font-semibold text-cyan-600">KES {category.revenue.toLocaleString()}</p>
-                    </div>
-                  </div>
-                ))}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Sales by Category</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Revenue distribution across product categories</p>
               </div>
             </div>
           </div>
-        )}
+          <div className="p-6">
+            {hasCategoryData ? (
+              <>
+                <ResponsiveContainer width="100%" height={350}>
+                  <RePieChart>
+                    <Pie  
+                      data={categorySales}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={3}
+                      dataKey="revenue"
+                      nameKey="category"
+                      onMouseEnter={(_, index) => setHoveredCategory(index)}
+                      onMouseLeave={() => setHoveredCategory(null)}
+                    >
+                      {categorySales.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={CHART_COLORS_ARRAY[index % CHART_COLORS_ARRAY.length]}
+                          stroke="white"
+                          strokeWidth={2}
+                          opacity={hoveredCategory === null || hoveredCategory === index ? 1 : 0.5}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value, entry: any) => (
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
+                      )}
+                    />
+                  </RePieChart>
+                </ResponsiveContainer>
+                
+                {/* Category Stats Cards */}
+                <div className="grid grid-cols-2 gap-3 mt-6">
+                  {categorySales.map((category, idx) => (
+                    <div key={idx} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:shadow-md transition-all">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: CHART_COLORS_ARRAY[idx % CHART_COLORS_ARRAY.length] }}
+                          />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{category.category}</span>
+                        </div>
+                        <span className="text-sm font-bold text-gray-900 dark:text-white">
+                          {category.percentage?.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-xs text-gray-500">Revenue</p>
+                        <p className="text-sm font-semibold text-cyan-600">KES {category.revenue.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <PieChart className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
+                <p className="text-gray-500 dark:text-gray-400">No category sales data available</p>
+                <p className="text-sm text-gray-400 mt-1">Sales data will appear here once orders are completed</p>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Payment Methods Chart */}
-        {paymentMethodData.length > 0 && (
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
-                  <CreditCard className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Payment Methods</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">Transaction distribution by payment type</p>
-                </div>
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
+                <CreditCard className="w-5 h-5 text-white" />
               </div>
-            </div>
-            <div className="p-6">
-              <ResponsiveContainer width="100%" height={300}>
-                <RePieChart>
-                  <Pie
-                    data={paymentMethodData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
-                    innerRadius={50}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {paymentMethodData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS_ARRAY[index % CHART_COLORS_ARRAY.length]} stroke="white" strokeWidth={2} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend verticalAlign="bottom" height={36} />
-                </RePieChart>
-              </ResponsiveContainer>
-              <div className="mt-6 grid grid-cols-3 gap-4 text-center">
-                {paymentMethodData.map((method, idx) => (
-                  <div key={idx} className="p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800">
-                    <p className="text-2xl mb-1">
-                      {method.name === 'MPESA' ? '💰' : method.name === 'CARD' ? '💳' : '📦'}
-                    </p>
-                    <p className="text-xs text-gray-500">{method.name}</p>
-                    <p className="text-sm font-bold text-cyan-600">KES {method.volume?.toLocaleString()}</p>
-                  </div>
-                ))}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Payment Methods</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Transaction distribution by payment type</p>
               </div>
             </div>
           </div>
-        )}
+          <div className="p-6">
+            {paymentMethodData.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={300}>
+                  <RePieChart>
+                    <Pie
+                      data={paymentMethodData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                      innerRadius={50}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {paymentMethodData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS_ARRAY[index % CHART_COLORS_ARRAY.length]} stroke="white" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" height={36} />
+                  </RePieChart>
+                </ResponsiveContainer>
+                <div className="mt-6 grid grid-cols-3 gap-4 text-center">
+                  {paymentMethodData.map((method, idx) => (
+                    <div key={idx} className="p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800">
+                      <p className="text-2xl mb-1">
+                        {method.name === 'MPESA' ? '💰' : method.name === 'CARD' ? '💳' : '📦'}
+                      </p>
+                      <p className="text-xs text-gray-500">{method.name}</p>
+                      <p className="text-sm font-bold text-cyan-600">KES {method.volume?.toLocaleString()}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <CreditCard className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
+                <p className="text-gray-500 dark:text-gray-400">No payment method data available</p>
+                <p className="text-sm text-gray-400 mt-1">Payment data will appear once transactions are processed</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Hourly Distribution Chart */}

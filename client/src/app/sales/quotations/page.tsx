@@ -72,6 +72,7 @@ interface ProductWithStock {
   stock: number;
   category?: string;
   categoryId?: string;
+  categoryName?: string;
   images?: Array<{ url: string }>;
   description?: string;
   sku?: string;
@@ -82,6 +83,268 @@ interface QuotationItemWithTax {
   qty: number;
   customPrice?: number;
   taxable: boolean;
+}
+
+// Product creation modal props
+interface CreateProductModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onProductCreated: (product: ProductWithStock) => void;
+  categories: Category[];
+}
+
+function CreateProductModal({ isOpen, onClose, onProductCreated, categories }: CreateProductModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    category: '',
+    price: 0,
+    description: '',
+    stock: 0,
+  });
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  };
+
+  const handleNameChange = (name: string) => {
+    setFormData(prev => ({
+      ...prev,
+      name,
+      slug: generateSlug(name)
+    }));
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setImageFiles(prev => [...prev, ...files]);
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setImagePreviews(prev => [...prev, ...newPreviews]);
+  };
+
+  const removeImage = (index: number) => {
+    URL.revokeObjectURL(imagePreviews[index]);
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.category || formData.price <= 0) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Upload images first
+      let uploadedImages = [];
+      if (imageFiles.length > 0) {
+        const formDataImg = new FormData();
+        imageFiles.forEach(file => formDataImg.append('images', file));
+        const uploadResponse = await api.post('/products/upload-images', formDataImg);
+        uploadedImages = uploadResponse.data.images || [];
+      }
+
+      // Create product
+      const productData = {
+        name: formData.name,
+        slug: formData.slug,
+        category: formData.category,
+        price: formData.price,
+        description: formData.description,
+        stock: formData.stock,
+        images: uploadedImages,
+      };
+
+      const response = await api.post('/products', productData);
+      const newProduct = response.data;
+      
+      // Format product for the quotation form
+      const formattedProduct: ProductWithStock = {
+        _id: newProduct._id,
+        name: newProduct.name,
+        slug: newProduct.slug,
+        price: newProduct.price,
+        stock: newProduct.stock,
+        category: newProduct.category,
+        categoryId: newProduct.category,
+        categoryName: categories.find(c => c._id === newProduct.category || c.name === newProduct.category)?.name || newProduct.category,
+        description: newProduct.description,
+        sku: newProduct.sku,
+        images: newProduct.images,
+      };
+      
+      onProductCreated(formattedProduct);
+      toast.success('Product created successfully');
+      onClose();
+      resetForm();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to create product');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      slug: '',
+      category: '',
+      price: 0,
+      description: '',
+      stock: 0,
+    });
+    imagePreviews.forEach(preview => URL.revokeObjectURL(preview));
+    setImageFiles([]);
+    setImagePreviews([]);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Create New Product</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Add a new product to your inventory</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Product Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+              placeholder="e.g., 500W Solar Panel"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Slug</label>
+            <input
+              type="text"
+              value={formData.slug}
+              onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 font-mono text-sm"
+              placeholder="auto-generated"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formData.category}
+              onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+              required
+            >
+              <option value="">Select a category</option>
+              {categories.map(cat => (
+                <option key={cat._id} value={cat._id}>{cat.name}</option>
+              ))}
+              <option value="Solar Panels">Solar Panels</option>
+              <option value="Inverters">Inverters</option>
+              <option value="Batteries">Batteries</option>
+              <option value="Water Pumps">Water Pumps</option>
+              <option value="Cables & Connectors">Cables & Connectors</option>
+              <option value="Solar Lights">Solar Lights</option>
+              <option value="Accessories">Accessories</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Price (KES) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.price}
+                onChange={(e) => setFormData(prev => ({ ...prev, price: Number(e.target.value) }))}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Initial Stock</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.stock}
+                onChange={(e) => setFormData(prev => ({ ...prev, stock: Number(e.target.value) }))}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+            <textarea
+              rows={3}
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+              placeholder="Product description..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Images</label>
+            <div className="flex flex-wrap gap-3">
+              {imagePreviews.map((preview, idx) => (
+                <div key={idx} className="relative">
+                  <img src={preview} alt={`Preview ${idx + 1}`} className="w-20 h-20 object-cover rounded-lg border border-gray-300 dark:border-gray-600" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(idx)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <label className="w-20 h-20 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-cyan-500 transition-colors">
+                <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+                <Plus className="w-6 h-6 text-gray-400" />
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Upload up to 5 product images</p>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button type="submit" disabled={loading} className="flex-1 py-3 bg-cyan-600 text-white rounded-lg font-medium hover:bg-cyan-700 transition-colors disabled:opacity-50">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : <Save className="w-4 h-4 inline mr-2" />}
+              Create Product
+            </button>
+            <button type="button" onClick={onClose} className="flex-1 py-3 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 export default function QuotationsPage() {
@@ -121,6 +384,7 @@ export default function QuotationsPage() {
     amountPaid: number;
     balanceDue: number;
   } | null>(null);
+  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
   const itemsPerPage = 10;
   
   // Debounced search
@@ -203,9 +467,21 @@ export default function QuotationsPage() {
       const response = await api.get('/categories?limit=100');
       if (response.data.categories) {
         setCategories(response.data.categories);
+      } else if (response.data.data) {
+        setCategories(response.data.data);
       }
     } catch (error) {
       console.error('Failed to fetch categories:', error);
+      // Set default categories if API fails
+      setCategories([
+        { _id: 'Solar Panels', name: 'Solar Panels', slug: 'solar-panels' },
+        { _id: 'Inverters', name: 'Inverters', slug: 'inverters' },
+        { _id: 'Batteries', name: 'Batteries', slug: 'batteries' },
+        { _id: 'Water Pumps', name: 'Water Pumps', slug: 'water-pumps' },
+        { _id: 'Cables & Connectors', name: 'Cables & Connectors', slug: 'cables-connectors' },
+        { _id: 'Solar Lights', name: 'Solar Lights', slug: 'solar-lights' },
+        { _id: 'Accessories', name: 'Accessories', slug: 'accessories' },
+      ]);
     }
   };
 
@@ -215,7 +491,13 @@ export default function QuotationsPage() {
       if (productSearchTerm) params.search = productSearchTerm;
       if (selectedCategory) params.category = selectedCategory;
       const response = await listProducts(params);
-      setProducts(response.products || []);
+      const productsList = response.products || [];
+      // Enhance products with category name
+      const enhancedProducts = productsList.map((p: any) => ({
+        ...p,
+        categoryName: p.category ? (categories.find(c => c._id === p.category || c.name === p.category)?.name || p.category) : 'Uncategorized'
+      }));
+      setProducts(enhancedProducts);
     } catch (error) {
       console.error('Failed to fetch products:', error);
     }
@@ -348,6 +630,15 @@ export default function QuotationsPage() {
     } finally {
       setCreatingCustomer(false);
     }
+  };
+
+  const handleProductCreated = (newProduct: ProductWithStock) => {
+    setProducts(prev => [newProduct, ...prev]);
+    // Auto-select the newly created product
+    setTempItem({ ...tempItem, productId: newProduct._id });
+    setProductSearchTerm(newProduct.name);
+    setShowProductDropdown(false);
+    toast.success('Product added to list');
   };
 
   const calculateTotals = useCallback(() => {
@@ -731,7 +1022,6 @@ export default function QuotationsPage() {
                           {getStatusIcon(quote.status)}
                           {quote.status === 'converted' ? 'Invoiced' : quote.status}
                         </span>
-                        {/* Payment status for converted quotes */}
                         {quote.status === 'converted' && (
                           <div className="text-xs mt-1">
                             {quote.paymentStatus === 'paid' ? (
@@ -771,7 +1061,6 @@ export default function QuotationsPage() {
                         >
                           <Printer className="w-4 h-4 text-gray-500" />
                         </button>
-                        {/* Edit button - available for all except converted/invoiced */}
                         {quote.status !== 'converted' && (
                           <button
                             onClick={() => {
@@ -802,7 +1091,6 @@ export default function QuotationsPage() {
                             <Edit className="w-4 h-4 text-yellow-500" />
                           </button>
                         )}
-                        {/* Record Payment button - only for converted/invoiced quotes */}
                         {quote.status === 'converted' && (
                           <button
                             onClick={async () => {
@@ -822,7 +1110,6 @@ export default function QuotationsPage() {
                             <Wallet className="w-4 h-4 text-amber-500" />
                           </button>
                         )}
-                        {/* Delete button - always available with confirmation */}
                         <button
                           onClick={() => handleDelete(quote._id)}
                           className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
@@ -913,7 +1200,7 @@ export default function QuotationsPage() {
                         className="w-full pl-9 pr-4 py-3 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       />
                       
-                      {showCustomerDropdown && customerSearchTerm && (
+                      {showCustomerDropdown && (
                         <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                           {filteredCustomers.length > 0 ? (
                             <>
@@ -1056,31 +1343,56 @@ export default function QuotationsPage() {
                         onFocus={() => setShowProductDropdown(true)}
                         className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                       />
-                      {showProductDropdown && (productSearchTerm || selectedCategory) && (
+                      {showProductDropdown && (
                         <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                           {filteredProducts.length > 0 ? (
-                            filteredProducts.slice(0, 10).map((product) => (
+                            <>
+                              {filteredProducts.slice(0, 10).map((product) => (
+                                <button
+                                  key={product._id}
+                                  type="button"
+                                  onClick={() => {
+                                    setTempItem({ ...tempItem, productId: product._id });
+                                    setProductSearchTerm(product.name);
+                                    setShowProductDropdown(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-white"
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-medium">{product.name}</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">KES {product.price.toLocaleString()}</span>
+                                  </div>
+                                  <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                                    Category: {product.categoryName || product.category || 'Uncategorized'}
+                                  </div>
+                                </button>
+                              ))}
+                              {/* Add Product Button */}
                               <button
-                                key={product._id}
                                 type="button"
                                 onClick={() => {
-                                  setTempItem({ ...tempItem, productId: product._id });
-                                  setProductSearchTerm(product.name);
                                   setShowProductDropdown(false);
+                                  setShowCreateProductModal(true);
                                 }}
-                                className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-white"
+                                className="w-full text-left px-3 py-2 border-t border-gray-200 dark:border-gray-700 text-cyan-600 dark:text-cyan-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
                               >
-                                <div className="flex justify-between items-center">
-                                  <span className="font-medium">{product.name}</span>
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">KES {product.price.toLocaleString()}</span>
-                                </div>
-                                {product.category && (
-                                  <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Category: {product.category}</div>
-                                )}
+                                <Plus className="w-4 h-4 inline mr-2" /> Create New Product
                               </button>
-                            ))
+                            </>
                           ) : (
-                            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No products found</div>
+                            <div className="px-3 py-2 text-center">
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">No products found</p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowProductDropdown(false);
+                                  setShowCreateProductModal(true);
+                                }}
+                                className="text-cyan-600 dark:text-cyan-400 text-sm font-medium"
+                              >
+                                + Create New Product
+                              </button>
+                            </div>
                           )}
                         </div>
                       )}
@@ -1169,8 +1481,8 @@ export default function QuotationsPage() {
                             <tr key={idx} className="border-t dark:border-gray-800">
                               <td className="px-3 py-2">
                                 <div className="text-gray-900 dark:text-white">{product?.name}</div>
-                                {product?.category && <div className="text-xs text-gray-400">Category: {product.category}</div>}
-                              </td>
+                                {product?.categoryName && <div className="text-xs text-gray-400">Category: {product.categoryName}</div>}
+                               </td>
                               <td className="px-3 py-2">
                                 <input
                                   type="number"
@@ -1179,7 +1491,7 @@ export default function QuotationsPage() {
                                   className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded text-center bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                                   min="1"
                                 />
-                              </td>
+                               </td>
                               <td className="px-3 py-2">
                                 <input
                                   type="number"
@@ -1188,7 +1500,7 @@ export default function QuotationsPage() {
                                   className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                                   min="0"
                                 />
-                               </td>
+                                </td>
                               {formData.taxPerItem && (
                                 <td className="px-3 py-2 text-center">
                                   <button
@@ -1198,14 +1510,14 @@ export default function QuotationsPage() {
                                   >
                                     {item.taxable ? `${Math.round(taxRate * 100)}%` : '0%'}
                                   </button>
-                                </td>
+                                 </td>
                               )}
                               <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">KES {itemTotal.toLocaleString()}</td>
                               <td className="px-3 py-2 text-center">
                                 <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
-                              </td>
+                               </td>
                             </tr>
                           );
                         })}
@@ -1239,7 +1551,7 @@ export default function QuotationsPage() {
                   </div>
                 </div>
 
-                {/* Transport Section - Hidden by default */}
+                {/* Transport Section */}
                 <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
                   <button
                     type="button"
@@ -1438,7 +1750,6 @@ export default function QuotationsPage() {
               </div>
               
               <div className="p-6 space-y-6">
-                {/* Customer & Document Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
                     <h3 className="font-semibold flex items-center gap-2 mb-3 text-gray-900 dark:text-white">
@@ -1468,23 +1779,10 @@ export default function QuotationsPage() {
                       {viewingQuote.convertedAt && (
                         <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Converted:</strong> {new Date(viewingQuote.convertedAt).toLocaleString()}</p>
                       )}
-                      {viewingQuote.status === 'converted' && (
-                        <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Payment Status:</strong>
-                          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                            viewingQuote.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
-                            viewingQuote.paymentStatus === 'partially_paid' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-                          }`}>
-                            {viewingQuote.paymentStatus === 'paid' ? '✓ Paid' :
-                             viewingQuote.paymentStatus === 'partially_paid' ? `⚠ Partially Paid (Balance: KES ${viewingQuote.balanceDue?.toLocaleString()})` :
-                             '⚠ Unpaid'}
-                          </span>
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Transport Info */}
                 {(viewingQuote as any).transportCost > 0 && (
                   <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
                     <h3 className="font-semibold flex items-center gap-2 mb-3 text-gray-900 dark:text-white">
@@ -1498,7 +1796,6 @@ export default function QuotationsPage() {
                   </div>
                 )}
 
-                {/* Items Table */}
                 <div>
                   <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
                     <Package className="w-4 h-4" /> Items
@@ -1511,35 +1808,20 @@ export default function QuotationsPage() {
                           <th className="px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300">Description</th>
                           <th className="px-4 py-2 text-center text-sm text-gray-700 dark:text-gray-300">Qty</th>
                           <th className="px-4 py-2 text-right text-sm text-gray-700 dark:text-gray-300">Unit Price</th>
-                          {viewingQuote.taxPerItem && <th className="px-4 py-2 text-center text-sm text-gray-700 dark:text-gray-300">Tax</th>}
                           <th className="px-4 py-2 text-right text-sm text-gray-700 dark:text-gray-300">Total</th>
                         </tr>
                       </thead>
                       <tbody>
                         {viewingQuote.items.map((item, idx) => {
                           const itemTotal = item.price * item.qty;
-                          const isItemTaxable = (item as any).taxable !== false;
-                          const itemTax = viewingQuote.taxPerItem && isItemTaxable ? itemTotal * viewingQuote.taxRate : 0;
                           return (
                             <tr key={idx} className="border-t dark:border-gray-800">
                               <td className="px-4 py-2 text-gray-900 dark:text-white">{item.name}</td>
                               <td className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{item.description || '-'}</td>
                               <td className="px-4 py-2 text-center text-gray-900 dark:text-white">{item.qty}</td>
                               <td className="px-4 py-2 text-right text-gray-900 dark:text-white">KES {item.price.toLocaleString()}</td>
-                              {viewingQuote.taxPerItem && (
-                                <td className="px-4 py-2 text-center">
-                                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${isItemTaxable ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
-                                    {isItemTaxable ? `${Math.round(viewingQuote.taxRate * 100)}%` : '0%'}
-                                  </span>
-                                 </td>
-                              )}
-                              <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-white">
-                                <div>KES {itemTotal.toLocaleString()}</div>
-                                {viewingQuote.taxPerItem && isItemTaxable && (
-                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">VAT: +KES {itemTax.toLocaleString()}</div>
-                                )}
-                               </td>
-                             </tr>
+                              <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-white">KES {itemTotal.toLocaleString()}</td>
+                            </tr>
                           );
                         })}
                       </tbody>
@@ -1547,7 +1829,6 @@ export default function QuotationsPage() {
                   </div>
                 </div>
 
-                {/* Totals Section */}
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                   <div className="space-y-2 text-right max-w-md ml-auto">
                     <div className="flex justify-between py-1">
@@ -1556,18 +1837,12 @@ export default function QuotationsPage() {
                     </div>
                     {viewingQuote.discount > 0 && (
                       <div className="flex justify-between py-1 text-green-600 dark:text-green-400">
-                        <span>Discount ({viewingQuote.discountType === 'percentage' ? `${viewingQuote.discount}%` : `KES ${viewingQuote.discount}`}):</span>
+                        <span>Discount:</span>
                         <span>-KES {viewingQuote.discount.toLocaleString()}</span>
                       </div>
                     )}
-                    {(viewingQuote as any).transportCost > 0 && (
-                      <div className="flex justify-between py-1">
-                        <span className="text-gray-600 dark:text-gray-400">Transport:</span>
-                        <span className="font-semibold text-amber-600 dark:text-amber-400">KES {(viewingQuote as any).transportCost?.toLocaleString() || 0}</span>
-                      </div>
-                    )}
                     <div className="flex justify-between py-1">
-                      <span className="text-gray-600 dark:text-gray-400">Tax ({Math.round(viewingQuote.taxRate * 100)}%{viewingQuote.taxPerItem ? ' - per item' : ''}):</span>
+                      <span className="text-gray-600 dark:text-gray-400">Tax ({Math.round(viewingQuote.taxRate * 100)}%):</span>
                       <span className="text-gray-900 dark:text-white">KES {viewingQuote.tax?.toLocaleString() || 0}</span>
                     </div>
                     <div className="flex justify-between pt-2 mt-2 border-t-2 border-gray-200 dark:border-gray-700">
@@ -1577,7 +1852,6 @@ export default function QuotationsPage() {
                   </div>
                 </div>
 
-                {/* Notes & Terms */}
                 {viewingQuote.notes && (
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 border-l-4 border-yellow-500">
                     <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Notes</h3>
@@ -1637,7 +1911,7 @@ export default function QuotationsPage() {
           </div>
         )}
 
-                {/*  Payment Modal */}
+        {/* Payment Modal */}
         {showPaymentModal && selectedOrderForPayment && (
           <RecordPaymentModal
             isOpen={showPaymentModal}
@@ -1657,6 +1931,13 @@ export default function QuotationsPage() {
           />
         )}
 
+        {/* Create Product Modal */}
+        <CreateProductModal
+          isOpen={showCreateProductModal}
+          onClose={() => setShowCreateProductModal(false)}
+          onProductCreated={handleProductCreated}
+          categories={categories}
+        />
       </div>
     </div>
   );
