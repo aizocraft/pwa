@@ -62,7 +62,7 @@ export default function Navbar() {
 
 
   // Check if user has sales access
-  const hasSalesAccess = isSales || isAdmin
+  const hasSalesAccess = isSales
 
   // Navigation Links
   const navLinks = [
@@ -472,37 +472,6 @@ export default function Navbar() {
                       {/* Profile Dropdown */}
                       {showProfileMenu && (
                         <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                          <div className="px-4 py-4 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-gray-800 dark:to-gray-800">
-                            <div className="flex items-center gap-3">
-                              <Avatar 
-                                size="lg"
-                                userId={user?.id || user?._id}
-                                className="ring-3 ring-white dark:ring-gray-800 shadow-lg"
-                              />
-                              <div className="flex-1">
-                                <p className="font-semibold text-gray-900 dark:text-white text-base">
-                                  {user.name}
-                                </p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                  {user.email}
-                                </p>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {isAdmin && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full text-xs font-medium text-white">
-                                      <Shield className="w-3 h-3" />
-                                      Admin
-                                    </span>
-                                  )}
-                                  {isSales && !isAdmin && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-xs font-medium text-white">
-                                      <Award className="w-3 h-3" />
-                                      Sales
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
                           
                           <div className="py-2">
                             <Link

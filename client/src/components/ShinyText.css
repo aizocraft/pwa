@@ -1,13 +1,12 @@
 /* src/components/ShinyText.css */
 .shiny-text {
-  /* Two shades of blue - Plasma Water Africa colors */
   background: linear-gradient(
     120deg,
-    rgba(37, 99, 235, 0.2) 20%,      /* Blue-600 - Darker Blue */
-    rgba(59, 130, 246, 0.7) 40%,     /* Blue-500 - Medium Blue */
-    rgba(96, 165, 250, 0.9) 50%,     /* Blue-400 - Light Blue (peak shine) */
-    rgba(59, 130, 246, 0.7) 60%,     /* Blue-500 - Medium Blue */
-    rgba(37, 99, 235, 0.2) 80%       /* Blue-600 - Darker Blue */
+    #1a1a1a 20%,
+    #4a4a4a 40%,
+    #8a8a8a 50%,
+    #4a4a4a 60%,
+    #1a1a1a 80%
   );
   background-size: 250% 100%;
   -webkit-background-clip: text;
@@ -15,18 +14,45 @@
   color: transparent;
   display: inline-block;
   animation: shine 5s linear infinite;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
-/* Alternative with deeper blue tones */
-.shiny-text.deep-blue {
+/* Light variant - for dark backgrounds */
+.shiny-text.light {
   background: linear-gradient(
     120deg,
-    rgba(30, 58, 138, 0.2) 20%,      /* Blue-900 - Deepest Blue */
-    rgba(37, 99, 235, 0.7) 40%,      /* Blue-600 - Dark Blue */
-    rgba(59, 130, 246, 0.9) 50%,     /* Blue-500 - Bright Blue (peak) */
-    rgba(37, 99, 235, 0.7) 60%,      /* Blue-600 - Dark Blue */
-    rgba(30, 58, 138, 0.2) 80%       /* Blue-900 - Deepest Blue */
+    #e0e0e0 20%,
+    #ffffff 40%,
+    #ffffff 50%,
+    #ffffff 60%,
+    #e0e0e0 80%
+  );
+  background-size: 250% 100%;
+}
+
+/* Dark variant - for light backgrounds */
+.shiny-text.dark {
+  background: linear-gradient(
+    120deg,
+    #1a1a1a 20%,
+    #4a4a4a 40%,
+    #6a6a6a 50%,
+    #4a4a4a 60%,
+    #1a1a1a 80%
+  );
+  background-size: 250% 100%;
+}
+
+/* Colorful variant */
+.shiny-text.colorful {
+  background: linear-gradient(
+    120deg,
+    #1e3a8a 20%,
+    #3b82f6 40%,
+    #60a5fa 50%,
+    #3b82f6 60%,
+    #1e3a8a 80%
   );
   background-size: 250% 100%;
 }
@@ -37,7 +63,11 @@
 }
 
 .shiny-text.slow {
-  animation-duration: 8s;
+  animation-duration: 7s;
+}
+
+.shiny-text.extra-slow {
+  animation-duration: 10s;
 }
 
 @keyframes shine {
@@ -49,14 +79,10 @@
   }
 }
 
+/* Disabled state - static gradient */
 .shiny-text.disabled {
   animation: none;
-  background: linear-gradient(
-    135deg,
-    #2563eb 0%,    /* Blue-600 */
-    #3b82f6 50%,   /* Blue-500 */
-    #60a5fa 100%   /* Blue-400 */
-  );
+  background: linear-gradient(135deg, #333333 0%, #666666 50%, #999999 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -66,4 +92,11 @@
 .shiny-text:hover {
   animation: shine 2s linear infinite;
   cursor: default;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .shiny-text {
+    background-size: 200% 100%;
+  }
 }

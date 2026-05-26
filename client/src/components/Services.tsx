@@ -1,99 +1,122 @@
 // src/components/Services.tsx
 import { Card, CardContent } from "@/components/ui/card";
-import { Droplets, Sun, Building2, CheckCircle2, X, ArrowRight, Sparkles, Shield, Zap } from "lucide-react";
+import { 
+  Droplets, 
+  Sun, 
+  Building2, 
+  CheckCircle2, 
+  X, 
+  ArrowRight, 
+  Shield, 
+  Zap,
+  Activity,
+  BarChart3,
+  Clock,
+  Award,
+  TrendingUp,
+  Users,
+  Wrench,
+  Calendar,
+  Gauge,
+  ShieldCheck,
+  Sparkles
+} from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, Variants } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
 interface Service {
+  id: number;
   Icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
   features: string[];
   longDescription: string;
   image: string;
-  gradient: string;
-  lightGradient: string;
-  iconBg: string;
-  iconColor: string;
-  hoverShadow: string;
-  stats: { value: string; label: string }[];
+  stats: { value: string; label: string; icon: React.ComponentType<{ className?: string }> }[];
+  benefits: string[];
 }
 
 const services: Service[] = [
   {
+    id: 1,
     Icon: Droplets,
     title: "Borehole Drilling",
-    description: "Reliable access to clean groundwater using advanced drilling technology, geological surveys, and sustainable extraction methods.",
-    longDescription: "Our borehole drilling service utilizes state-of-the-art technology and geological expertise to provide sustainable water solutions. We conduct comprehensive site assessments, utilize advanced drilling rigs, and implement strict quality control measures to ensure optimal water yield and purity.",
+    description: "Precision drilling solutions delivering sustainable groundwater access with advanced hydrogeological surveying and state-of-the-art equipment.",
+    longDescription: "Our comprehensive borehole drilling service combines cutting-edge technology with decades of geological expertise. We conduct detailed hydrogeological surveys, utilize advanced rotary drilling rigs, and implement strict quality control measures to ensure optimal water yield, purity, and long-term sustainability for communities and industries across Africa.",
     features: [
-      "Advanced drilling technology",
-      "Geological surveys",
-      "Water quality testing",
-      "Sustainable extraction",
-      "Pump installation",
-      "Maintenance contracts"
+      "Advanced Rotary Drilling Technology",
+      "Comprehensive Hydrogeological Surveys",
+      "Water Quality Analysis & Treatment",
+      "Sustainable Yield Assessment",
+      "Professional Pump Installation",
+      "24/7 Maintenance & Support"
     ],
-    image: "/images/borehole.jpg",
-    gradient: "from-blue-600 to-blue-800",
-    lightGradient: "from-blue-500 to-blue-700",
-    iconBg: "bg-blue-600",
-    iconColor: "text-blue-50",
-    hoverShadow: "hover:shadow-blue-500/30",
+    benefits: [
+      "100% water quality guarantee",
+      "15-year structural warranty",
+      "Free annual maintenance",
+      "Emergency response team"
+    ],
+    image: "/images/borehole-drilling5.jpg",
     stats: [
-      { value: "500+", label: "Projects" },
-      { value: "98%", label: "Success Rate" },
-      { value: "24/7", label: "Support" }
+      { value: "500+", label: "Projects Completed", icon: Activity },
+      { value: "98%", label: "Success Rate", icon: BarChart3 },
+      { value: "24/7", label: "Support Available", icon: Clock }
     ]
   },
   {
+    id: 2,
     Icon: Sun,
-    title: "Solar Installation",
-    description: "Complete solar energy solutions from design to installation. Harness Africa's sunshine for clean, reliable power.",
-    longDescription: "Transform your energy consumption with our custom solar solutions. We design, supply, and install high-efficiency solar systems tailored to your specific needs, reducing your carbon footprint while maximizing energy savings.",
+    title: "Solar Solutions",
+    description: "Custom-designed solar energy systems maximizing Africa's solar potential with premium components and expert installation.",
+    longDescription: "Transform your energy consumption with our bespoke solar solutions. We engineer, supply, and install high-efficiency photovoltaic systems tailored to your specific energy needs. From residential to industrial applications, our solutions deliver reliable power, significant cost savings, and reduced carbon footprint with intelligent monitoring and optimal performance.",
     features: [
-      "Custom system design",
-      "High-efficiency panels",
-      "Battery storage options",
-      "Professional installation",
-      "Smart monitoring",
-      "10-year warranty"
+      "Custom System Design & Engineering",
+      "Premium Tier-1 Solar Panels",
+      "Advanced Battery Storage Solutions",
+      "Smart Energy Monitoring System",
+      "Professional Installation Team",
+      "10-Year Comprehensive Warranty"
+    ],
+    benefits: [
+      "40-60% energy cost reduction",
+      "Grid independence option",
+      "Remote monitoring included",
+      "Government incentive eligible"
     ],
     image: "/images/solar.jpg",
-    gradient: "from-amber-500 to-orange-600",
-    lightGradient: "from-amber-400 to-orange-500",
-    iconBg: "bg-amber-600",
-    iconColor: "text-amber-50",
-    hoverShadow: "hover:shadow-amber-500/30",
     stats: [
-      { value: "1MW+", label: "Installed" },
-      { value: "40%", label: "Savings" },
-      { value: "25+", label: "Experts" }
+      { value: "1.2MW+", label: "Capacity Installed", icon: Activity },
+      { value: "45%", label: "Average Savings", icon: TrendingUp },
+      { value: "500+", label: "Happy Clients", icon: Users }
     ]
   },
   {
+    id: 3,
     Icon: Building2,
-    title: "Water Tower Construction",
-    description: "Expert design and construction of durable water towers for reliable storage and distribution.",
-    longDescription: "Our water tower construction service delivers robust, long-lasting structures engineered to withstand environmental challenges. We specialize in elevated storage solutions that ensure consistent water pressure and supply for communities and industries.",
+    title: "Water Towers",
+    description: "Engineered water storage solutions with robust construction, seismic resilience, and advanced corrosion protection systems.",
+    longDescription: "Our elevated water tower construction service delivers robust, long-lasting structures engineered to withstand extreme environmental conditions. We specialize in custom-designed storage solutions that ensure consistent water pressure, reliable supply, and structural integrity for communities, industries, and municipalities across Africa.",
     features: [
-      "Structural engineering",
-      "Capacity planning",
-      "Durable materials",
-      "Maintenance support",
-      "Seismic design",
-      "Corrosion protection"
+      "Structural Engineering Excellence",
+      "Custom Capacity Planning",
+      "Premium Galvanized Steel",
+      "Comprehensive Maintenance Programs",
+      "Seismic & Wind Load Design",
+      "Advanced Corrosion Protection"
+    ],
+    benefits: [
+      "50+ year structural lifespan",
+      "Seismic certified design",
+      "Corrosion-free guarantee",
+      "Free structural inspection"
     ],
     image: "/images/watertower.jpg",
-    gradient: "from-emerald-600 to-green-700",
-    lightGradient: "from-emerald-500 to-green-600",
-    iconBg: "bg-emerald-600",
-    iconColor: "text-emerald-50",
-    hoverShadow: "hover:shadow-emerald-500/30",
     stats: [
-      { value: "50+", label: "Towers" },
-      { value: "100K+", label: "People" },
-      { value: "30+", label: "Years" }
+      { value: "50+", label: "Towers Built", icon: Building2 },
+      { value: "100K+", label: "People Served", icon: Users },
+      { value: "30+", label: "Years Experience", icon: Calendar }
     ]
   },
 ];
@@ -110,11 +133,11 @@ const TiltCard3D = ({
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   
-  const mouseXSpring = useSpring(x, { stiffness: 400, damping: 30 });
-  const mouseYSpring = useSpring(y, { stiffness: 400, damping: 30 });
+  const mouseXSpring = useSpring(x, { stiffness: 300, damping: 25 });
+  const mouseYSpring = useSpring(y, { stiffness: 300, damping: 25 });
   
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["8deg", "-8deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-8deg", "8deg"]);
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["5deg", "-5deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-5deg", "5deg"]);
   
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!ref.current) return;
@@ -151,7 +174,6 @@ const TiltCard3D = ({
   );
 };
 
-// Fixed variants with correct Framer Motion types
 const modalVariants: Variants = {
   hidden: { 
     opacity: 0, 
@@ -214,7 +236,13 @@ const Services = () => {
   };
 
   return (
-    <section className="relative py-16 sm:py-20 lg:py-32 overflow-hidden bg-gradient-to-br from-slate-50 via-sky-50 to-indigo-50 dark:from-slate-950 dark:via-blue-950 dark:to-indigo-950">
+    <section className="relative py-20 sm:py-24 lg:py-32 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-950 dark:to-blue-950/20">
+      {/* Background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl" />
+      </div>
+
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-10">
         {/* Header */}
         <motion.div
@@ -222,27 +250,28 @@ const Services = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, ease: "easeOut" }}
-          className="text-center mb-12 sm:mb-16 lg:mb-24"
+          className="text-center mb-12 sm:mb-16 lg:mb-20"
         >
 
-          <h2 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-5">
-            What We{" "}
-            <span className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Offer
+          
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-5">
+            Our{" "}
+            <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 bg-clip-text text-transparent">
+              Services
             </span>
           </h2>
-          <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed font-light px-4">
-            Sustainable water and energy solutions engineered for Africa's future.
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed px-4">
+           Water and energy solutions engineered for a sustainable future
           </p>
         </motion.div>
 
         {/* Desktop: 3D Tilt Cards */}
-        <div className="hidden lg:grid lg:grid-cols-3 gap-6 lg:gap-8">
+        <div className="hidden lg:grid lg:grid-cols-3 gap-6 xl:gap-8">
           {services.map((service, index) => {
             const Icon = service.Icon;
             return (
               <motion.div
-                key={index}
+                key={service.id}
                 initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -252,47 +281,59 @@ const Services = () => {
               >
                 <TiltCard3D>
                   <div 
-                    className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 shadow-2xl transition-all duration-500 cursor-pointer"
+                    className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer border border-gray-200 dark:border-gray-800"
                     onClick={() => openModal(service)}
                   >
-                    {/* Background Image */}
-                    <div className="absolute inset-0">
+                    {/* Image Section */}
+                    <div className="relative h-56 overflow-hidden">
                       <img
                         src={service.image}
                         alt={service.title}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       />
-                      <div className={`absolute inset-0 bg-gradient-to-br ${service.gradient} opacity-85 group-hover:opacity-75 transition-opacity duration-500`} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-white/10 via-transparent to-transparent dark:from-gray-900/20" />
                     </div>
                     
                     {/* Content */}
-                    <div className="relative p-6 lg:p-8 min-h-[360px] lg:min-h-[380px] flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center gap-3 lg:gap-4 mb-4 lg:mb-6">
-                          <div className={`w-14 h-14 lg:w-16 lg:h-16 rounded-2xl ${service.iconBg} flex items-center justify-center shadow-2xl ring-4 ring-white/20 transform transition-transform duration-300 group-hover:scale-110`}>
-                            <Icon className="h-7 w-7 lg:h-8 lg:w-8 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-xl lg:text-2xl font-bold text-white leading-tight">
-                              {service.title}
-                            </h3>
-                            <div className="w-12 h-0.5 bg-white/60 rounded-full mt-2 transition-all duration-300 group-hover:w-20" />
-                          </div>
+                    <div className="p-6">
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl">
+                          <Icon className="h-6 w-6 text-white" />
                         </div>
-                        
-                        <AnimatePresence>
-                          {hoveredIndex === index && (
-                            <motion.p 
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 20 }}
-                              transition={{ duration: 0.3 }}
-                              className="text-white/90 text-sm leading-relaxed"
-                            >
-                              {service.description}
-                            </motion.p>
-                          )}
-                        </AnimatePresence>
+                        <div className="flex-1">
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
+                            {service.title}
+                          </h3>
+                          <div className="w-12 h-0.5 bg-gradient-to-r from-blue-500 to-blue-400 rounded-full mt-1.5 transition-all duration-300 group-hover:w-20" />
+                        </div>
+                      </div>
+                      
+                      <AnimatePresence>
+                        {hoveredIndex === index && (
+                          <motion.p 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            transition={{ duration: 0.2 }}
+                            className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-4"
+                          >
+                            {service.description}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Stats */}
+                      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                        {service.stats.map((stat, i) => {
+                          const StatIcon = stat.icon;
+                          return (
+                            <div key={i} className="text-center group/stat">
+                              <StatIcon className="w-4 h-4 text-blue-500 mx-auto mb-1 opacity-60 group-hover/stat:opacity-100 transition-opacity" />
+                              <div className="text-sm font-bold text-gray-900 dark:text-white">{stat.value}</div>
+                              <div className="text-[10px] text-gray-500 dark:text-gray-500">{stat.label}</div>
+                            </div>
+                          );
+                        })}
                       </div>
 
                       <Button
@@ -300,10 +341,10 @@ const Services = () => {
                           e.stopPropagation();
                           openModal(service);
                         }}
-                        className="w-full h-11 lg:h-12 bg-white/15 backdrop-blur-sm text-white font-semibold text-sm rounded-xl border border-white/30 hover:bg-white/25 hover:border-white/50 transition-all duration-300 flex items-center justify-center gap-2 mt-4"
+                        className="w-full h-11 mt-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold text-sm rounded-xl transition-all duration-300 flex items-center justify-center gap-2 group/btn shadow-md hover:shadow-lg"
                       >
-                        Explore Service
-                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        <span>Explore Service</span>
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                       </Button>
                     </div>
                   </div>
@@ -313,57 +354,60 @@ const Services = () => {
           })}
         </div>
 
-        {/* Mobile & Tablet: Clean Cards */}
-        <div className="grid gap-5 sm:gap-6 lg:hidden">
+        {/* Tablet Grid (md to lg) */}
+        <div className="hidden md:grid lg:hidden grid-cols-2 gap-5">
           {services.map((service, index) => {
             const Icon = service.Icon;
             return (
               <motion.div
-                key={index}
-                initial={{ opacity: 0, x: -30 }}
-                whileInView={{ opacity: 1, x: 0 }}
+                key={service.id}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
               >
                 <Card
-                  className={`group overflow-hidden rounded-2xl sm:rounded-3xl border-0 shadow-xl ${service.hoverShadow} transition-all duration-500 bg-white dark:bg-gray-900 hover:scale-[1.02] cursor-pointer`}
+                  className="group overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 shadow-md hover:shadow-xl transition-all duration-500 bg-white dark:bg-gray-900 hover:scale-[1.02] cursor-pointer h-full"
                   onClick={() => openModal(service)}
                 >
-                  <div className="relative h-48 sm:h-56 overflow-hidden">
+                  <div className="relative h-44 overflow-hidden">
                     <img
                       src={service.image}
                       alt={service.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
-                    <div className="absolute bottom-4 left-4 sm:bottom-5 sm:left-6 flex items-center gap-2 sm:gap-3">
-                      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl ${service.iconBg} flex items-center justify-center shadow-xl ring-4 ring-white/30 transform transition-transform duration-300 group-hover:scale-110`}>
-                        <Icon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-                      </div>
-                      <h3 className="text-xl sm:text-2xl font-bold text-white drop-shadow-xl">{service.title}</h3>
-                    </div>
                   </div>
 
-                  <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
-                    <p className="text-gray-700 dark:text-gray-300 text-sm sm:text-base leading-relaxed font-light line-clamp-2">
+                  <CardContent className="p-5 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
+                        <Icon className="h-5 w-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{service.title}</h3>
+                    </div>
+
+                    <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed line-clamp-2">
                       {service.description}
                     </p>
 
-                    {/* Stats Section for Mobile */}
                     <div className="grid grid-cols-3 gap-2 pt-2">
-                      {service.stats.map((stat, i) => (
-                        <div key={i} className="text-center">
-                          <div className={`text-base sm:text-lg font-bold ${service.iconColor.replace("50", "600")}`}>{stat.value}</div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400">{stat.label}</div>
-                        </div>
-                      ))}
+                      {service.stats.map((stat, i) => {
+                        const StatIcon = stat.icon;
+                        return (
+                          <div key={i} className="text-center">
+                            <StatIcon className="w-3 h-3 text-blue-500 mx-auto mb-1" />
+                            <div className="text-xs font-bold text-gray-900 dark:text-white">{stat.value}</div>
+                            <div className="text-[9px] text-gray-500 dark:text-gray-500">{stat.label}</div>
+                          </div>
+                        );
+                      })}
                     </div>
 
-                    <ul className="space-y-2 sm:space-y-3">
-                      {service.features.slice(0, 4).map((feature, i) => (
-                        <li key={i} className="flex items-center text-gray-800 dark:text-gray-200 text-xs sm:text-sm font-medium">
-                          <CheckCircle2 className={`h-4 w-4 sm:h-5 sm:w-5 ${service.iconColor.replace("50", "500")} mr-2 sm:mr-3 flex-shrink-0`} />
-                          <span>{feature}</span>
+                    <ul className="space-y-1.5">
+                      {service.features.slice(0, 3).map((feature, i) => (
+                        <li key={i} className="flex items-center text-gray-700 dark:text-gray-300 text-xs">
+                          <CheckCircle2 className="h-3 w-3 text-blue-500 mr-2 flex-shrink-0" />
+                          <span className="truncate">{feature}</span>
                         </li>
                       ))}
                     </ul>
@@ -373,11 +417,77 @@ const Services = () => {
                         e.stopPropagation();
                         openModal(service);
                       }}
-                      className={`w-full h-11 sm:h-12 text-sm font-semibold bg-gradient-to-r ${service.lightGradient} text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2 group`}
+                      className="w-full h-10 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg flex items-center justify-center gap-2 group/btn"
                     >
-                      Get Started
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      <span>Learn More</span>
+                      <ArrowRight className="h-3 w-3 transition-transform group-hover/btn:translate-x-1" />
                     </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* Mobile Layout (below md) */}
+        <div className="grid md:hidden gap-4">
+          {services.map((service, index) => {
+            const Icon = service.Icon;
+            return (
+              <motion.div
+                key={service.id}
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: index * 0.05 }}
+              >
+                <Card
+                  className="group overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-lg transition-all duration-500 bg-white dark:bg-gray-900 cursor-pointer"
+                  onClick={() => openModal(service)}
+                >
+                  <div className="relative h-40 overflow-hidden">
+                    <img
+                      src={service.image}
+                      alt={service.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                        <Icon className="h-4 w-4 text-white" />
+                      </div>
+                      <h3 className="text-base font-bold text-gray-900 dark:text-white">{service.title}</h3>
+                    </div>
+
+                    <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed line-clamp-2">
+                      {service.description}
+                    </p>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="flex gap-3">
+                        {service.stats.slice(0, 2).map((stat, i) => {
+                          const StatIcon = stat.icon;
+                          return (
+                            <div key={i} className="text-center">
+                              <StatIcon className="w-2.5 h-2.5 text-blue-500 mx-auto mb-0.5" />
+                              <div className="text-[10px] font-bold text-gray-900 dark:text-white">{stat.value}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openModal(service);
+                        }}
+                        className="h-8 px-3 text-xs font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg flex items-center gap-1"
+                      >
+                        Details
+                        <ArrowRight className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -394,7 +504,7 @@ const Services = () => {
               initial="hidden"
               animate="visible"
               exit="exit"
-              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
               onClick={closeModal}
             >
               <motion.div
@@ -403,32 +513,32 @@ const Services = () => {
                 initial="hidden"
                 animate="visible"
                 exit="exit"
-                className="relative bg-white dark:bg-gray-900 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-[95%] sm:max-w-[90%] md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-hidden"
+                className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-[95%] sm:max-w-[90%] md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Header with gradient */}
-                <div className={`relative bg-gradient-to-r ${selectedService.gradient} p-4 sm:p-6`}>
+                {/* Header */}
+                <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-gray-900">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl ${selectedService.iconBg} flex items-center justify-center shadow-xl flex-shrink-0`}>
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg flex-shrink-0">
                         <selectedService.Icon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-xl sm:text-2xl font-bold text-white truncate">{selectedService.title}</h3>
+                        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate">{selectedService.title}</h3>
                         <div className="flex items-center gap-2 mt-1">
-                          <Shield className="w-3 h-3 sm:w-4 sm:h-4 text-white/80" />
-                          <span className="text-white/80 text-xs sm:text-sm">Trusted Solution</span>
+                          <Shield className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 dark:text-blue-400" />
+                          <span className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">Premium Service Provider</span>
                         </div>
                       </div>
                     </div>
                     <motion.button
                       onClick={closeModal}
-                      className="p-2 rounded-xl bg-white/20 hover:bg-white/30 transition-all flex-shrink-0 ml-2"
+                      className="p-2 rounded-xl bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex-shrink-0 ml-2 shadow-sm"
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       type="button"
                     >
-                      <X className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                      <X className="h-5 w-5 sm:h-6 sm:w-6 text-gray-600 dark:text-gray-400" />
                     </motion.button>
                   </div>
                 </div>
@@ -451,13 +561,17 @@ const Services = () => {
                     </p>
 
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-3 gap-3 sm:gap-4 py-3 sm:py-4 border-y border-gray-200 dark:border-gray-700">
-                      {selectedService.stats.map((stat, i) => (
-                        <div key={i} className="text-center">
-                          <div className={`text-lg sm:text-2xl font-bold ${selectedService.iconColor.replace("50", "600")}`}>{stat.value}</div>
-                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{stat.label}</div>
-                        </div>
-                      ))}
+                    <div className="grid grid-cols-3 gap-3 sm:gap-4 py-3 sm:py-4 px-3 sm:px-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 rounded-xl sm:rounded-2xl">
+                      {selectedService.stats.map((stat, i) => {
+                        const StatIcon = stat.icon;
+                        return (
+                          <div key={i} className="text-center">
+                            <StatIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+                            <div className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</div>
+                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{stat.label}</div>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Features */}
@@ -473,11 +587,32 @@ const Services = () => {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.05 }}
-                            className="flex items-start"
+                            className="flex items-start group/feature"
                           >
-                            <CheckCircle2 className={`h-4 w-4 sm:h-5 sm:w-5 ${selectedService.iconColor.replace("50", "500")} mr-2 sm:mr-3 mt-0.5 flex-shrink-0`} />
-                            <span className="text-gray-800 dark:text-gray-200 text-xs sm:text-sm font-medium">{feature}</span>
+                            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 mr-2 sm:mr-3 mt-0.5 flex-shrink-0 transition-transform group-hover/feature:scale-110" />
+                            <span className="text-gray-700 dark:text-gray-300 text-xs sm:text-sm">{feature}</span>
                           </motion.div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Benefits */}
+                    <div className="pt-2">
+                      <h4 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
+                        <Award className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                        What You Get
+                      </h4>
+                      <div className="flex flex-wrap gap-2 sm:gap-3">
+                        {selectedService.benefits.map((benefit, i) => (
+                          <motion.span
+                            key={i}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: i * 0.05 }}
+                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 text-blue-700 dark:text-blue-400 text-xs sm:text-sm font-medium rounded-full border border-blue-200 dark:border-blue-800"
+                          >
+                            {benefit}
+                          </motion.span>
                         ))}
                       </div>
                     </div>
@@ -485,7 +620,7 @@ const Services = () => {
                     {/* CTA Button */}
                     <Button
                       size="lg"
-                      className={`w-full h-11 sm:h-14 text-sm sm:text-base font-bold bg-gradient-to-r ${selectedService.lightGradient} text-white shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 group`}
+                      className="w-full h-11 sm:h-14 text-sm sm:text-base font-bold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 group"
                       onClick={() => {
                         closeModal();
                         setTimeout(() => {
@@ -493,7 +628,7 @@ const Services = () => {
                         }, 200);
                       }}
                     >
-                      Request a Quote
+                      <span>Request a Quote</span>
                       <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:translate-x-1" />
                     </Button>
                   </div>
