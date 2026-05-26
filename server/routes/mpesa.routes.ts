@@ -70,8 +70,7 @@ router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: 
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Check if order can be paid
-    if (order.paymentStatus !== 'pending') {
+    if (order.paymentStatus !== 'unpaid') {
       return res.status(400).json({ error: `Order cannot be paid. Current status: ${order.paymentStatus}` });
     }
 
@@ -218,8 +217,7 @@ router.post('/callback', async (req: Request, res: Response) => {
       }
       await transaction.save();
 
-      // Update order
-      order.paymentStatus = 'completed';
+      order.paymentStatus = 'paid';
       order.status = 'processing'; // Order ready for fulfillment
       order.paymentDetails = {
         transactionId: CheckoutRequestID,
@@ -230,22 +228,22 @@ router.post('/callback', async (req: Request, res: Response) => {
       await order.save();
 
       // Send confirmation email (don't await)
-    const customerEmail = transaction.guestEmail || order.shippingAddress.email;
-    if (customerEmail) {
-      sendPaymentConfirmation({
-        email: customerEmail,
-        customerName: transaction.customerName,
-        orderNumber: order.orderNumber,
-        amount: transaction.amount,
-        transactionId: mpesaReceipt || CheckoutRequestID || 'N/A',
-        paymentMethod: 'M-PESA',
-        items: order.items.map(item => ({
-          name: item.name,
-          quantity: item.qty,
-          price: item.price
-        }))
-      }).catch(err => console.error('Failed to send payment confirmation:', err));
-    }
+      const customerEmail = transaction.guestEmail || order.shippingAddress.email;
+      if (customerEmail) {
+        sendPaymentConfirmation({
+          email: customerEmail,
+          customerName: transaction.customerName,
+          orderNumber: order.orderNumber,
+          amount: transaction.amount,
+          transactionId: mpesaReceipt || CheckoutRequestID || 'N/A',
+          paymentMethod: 'M-PESA',
+          items: order.items.map(item => ({
+            name: item.name,
+            quantity: item.qty,
+            price: item.price
+          }))
+        }).catch(err => console.error('Failed to send payment confirmation:', err));
+      }
 
       console.log(`Payment successful: ${mpesaReceipt || CheckoutRequestID} for order ${order.orderNumber}`); 
 
@@ -255,20 +253,21 @@ router.post('/callback', async (req: Request, res: Response) => {
       transaction.notes = `Payment failed: ${ResultDesc}`;
       await transaction.save();
 
-      order.paymentStatus = 'failed';
+      // FIXED: Use 'unpaid' instead of 'failed'
+      order.paymentStatus = 'unpaid';
       await order.save();
 
       // Send failure notification
-const customerEmail = transaction.guestEmail || order.shippingAddress.email;
-if (customerEmail) {
-  sendPaymentFailedNotification({
-    email: customerEmail,
-    customerName: transaction.customerName,
-    orderNumber: order.orderNumber,
-    amount: transaction.amount,
-    reason: ResultDesc
-  }).catch(err => console.error('Failed to send payment failure notification:', err));
-}
+      const customerEmail = transaction.guestEmail || order.shippingAddress.email;
+      if (customerEmail) {
+        sendPaymentFailedNotification({
+          email: customerEmail,
+          customerName: transaction.customerName,
+          orderNumber: order.orderNumber,
+          amount: transaction.amount,
+          reason: ResultDesc
+        }).catch(err => console.error('Failed to send payment failure notification:', err));
+      }
 
       console.error(`Payment failed for order ${order.orderNumber}: ${ResultDesc}`);
     }

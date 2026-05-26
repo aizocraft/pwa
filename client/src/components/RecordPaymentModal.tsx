@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Loader2, Smartphone, CreditCard, DollarSign, Banknote, Receipt } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '@/lib/api';
@@ -14,6 +14,7 @@ interface RecordPaymentModalProps {
   totalAmount: number;
   amountPaid: number;
   balanceDue: number;
+  isQuotation?: boolean; // Flag to indicate if this is a quotation (needs to find associated order)
 }
 
 export function RecordPaymentModal({
@@ -25,8 +26,11 @@ export function RecordPaymentModal({
   totalAmount,
   amountPaid,
   balanceDue,
+  isQuotation = false,
 }: RecordPaymentModalProps) {
   const [loading, setLoading] = useState(false);
+  const [actualOrderId, setActualOrderId] = useState<string | null>(null);
+  const [resolvingOrder, setResolvingOrder] = useState(false);
   const [formData, setFormData] = useState({
     amount: balanceDue,
     paymentMethod: 'mpesa' as 'mpesa' | 'cash' | 'bank_transfer' | 'cheque',
@@ -34,10 +38,46 @@ export function RecordPaymentModal({
     notes: '',
   });
 
+  // Resolve the actual order ID if this is a quotation
+  useEffect(() => {
+    if (isOpen && isQuotation && orderId) {
+      resolveOrderFromQuotation();
+    } else if (isOpen && !isQuotation) {
+      setActualOrderId(orderId);
+    }
+  }, [isOpen, orderId, isQuotation]);
+
+  const resolveOrderFromQuotation = async () => {
+    setResolvingOrder(true);
+    try {
+      // First try to get the quotation details
+      const quotationRes = await api.get(`/sales/quotations/${orderId}`);
+      const quotation = quotationRes.data.quotation;
+      
+      if (quotation.convertedOrderId) {
+        setActualOrderId(quotation.convertedOrderId);
+      } else {
+        toast.error('This quotation has not been converted to an order yet');
+        onClose();
+      }
+    } catch (error) {
+      console.error('Failed to resolve order from quotation:', error);
+      toast.error('Could not find associated order for this quotation');
+      onClose();
+    } finally {
+      setResolvingOrder(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!actualOrderId) {
+      toast.error('No valid order ID found');
+      return;
+    }
     
     if (formData.amount <= 0) {
       toast.error('Please enter a valid amount');
@@ -52,7 +92,7 @@ export function RecordPaymentModal({
     setLoading(true);
     try {
       await api.post('/payments/record', {
-        orderId,
+        orderId: actualOrderId,
         amount: formData.amount,
         paymentMethod: formData.paymentMethod,
         reference: formData.reference || undefined,
@@ -79,6 +119,17 @@ export function RecordPaymentModal({
     }
   };
 
+  if (resolvingOrder) {
+    return (
+      <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-gray-900 rounded-xl max-w-md w-full p-8 text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-600 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading order details...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-xl max-w-md w-full shadow-2xl">
@@ -86,7 +137,7 @@ export function RecordPaymentModal({
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Record Payment</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Order: {orderNumber}
+              {isQuotation ? 'Invoice' : 'Order'}: {orderNumber}
             </p>
           </div>
           <button 

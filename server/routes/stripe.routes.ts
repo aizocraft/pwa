@@ -30,8 +30,8 @@ router.post('/create-payment-intent', optionalAuthMiddleware, async (req: Reques
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Check if order can be paid
-    if (order.paymentStatus !== 'pending') {
+    
+    if (order.paymentStatus !== 'unpaid') {
       return res.status(400).json({ error: `Order cannot be paid. Current status: ${order.paymentStatus}` });
     }
 
@@ -219,8 +219,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     return;
   }
 
-  // Update order
-  order.paymentStatus = 'completed';
+  order.paymentStatus = 'paid';
   order.status = 'processing';
   order.paymentDetails = {
     transactionId: paymentIntent.id,
@@ -232,22 +231,22 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
   await order.save();
 
   // Send confirmation email
-const customerEmail = transaction.guestEmail || order.shippingAddress.email;
-if (customerEmail) {
-  sendPaymentConfirmation({
-    email: customerEmail,
-    customerName: transaction.customerName,
-    orderNumber: order.orderNumber,
-    amount: transaction.amount,
-    transactionId: paymentIntent.id,
-    paymentMethod: `Card (${cardBrand || 'Card'} ending in ${cardLast4 || '****'})`,
-    items: order.items.map(item => ({
-      name: item.name,
-      quantity: item.qty,
-      price: item.price
-    }))
-  }).catch(err => console.error('Failed to send payment confirmation:', err));
-}
+  const customerEmail = transaction.guestEmail || order.shippingAddress.email;
+  if (customerEmail) {
+    sendPaymentConfirmation({
+      email: customerEmail,
+      customerName: transaction.customerName,
+      orderNumber: order.orderNumber,
+      amount: transaction.amount,
+      transactionId: paymentIntent.id,
+      paymentMethod: `Card (${cardBrand || 'Card'} ending in ${cardLast4 || '****'})`,
+      items: order.items.map(item => ({
+        name: item.name,
+        quantity: item.qty,
+        price: item.price
+      }))
+    }).catch(err => console.error('Failed to send payment confirmation:', err));
+  }
 
   console.log(`Payment succeeded: ${paymentIntent.id} for order ${order.orderNumber}`);
 }
@@ -266,20 +265,21 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
 
     const order = await OrderModel.findById(orderId);
     if (order) {
-      order.paymentStatus = 'failed';
+      
+      order.paymentStatus = 'unpaid';
       await order.save();
 
-                // Send failure notification
-            const customerEmail = transaction.guestEmail || order.shippingAddress.email;
-            if (customerEmail) {
-            sendPaymentFailedNotification({
-                email: customerEmail,
-                customerName: transaction.customerName,
-                orderNumber: order.orderNumber,
-                amount: transaction.amount,
-                reason: paymentIntent.last_payment_error?.message || 'Payment failed'
-            }).catch(err => console.error('Failed to send failure notification:', err));
-            }
+      // Send failure notification
+      const customerEmail = transaction.guestEmail || order.shippingAddress.email;
+      if (customerEmail) {
+        sendPaymentFailedNotification({
+          email: customerEmail,
+          customerName: transaction.customerName,
+          orderNumber: order.orderNumber,
+          amount: transaction.amount,
+          reason: paymentIntent.last_payment_error?.message || 'Payment failed'
+        }).catch(err => console.error('Failed to send failure notification:', err));
+      }
     }
 
     console.error(`Payment failed: ${transactionId}`);
@@ -298,8 +298,8 @@ async function handlePaymentIntentCanceled(paymentIntent: Stripe.PaymentIntent) 
     await transaction.save();
 
     const order = await OrderModel.findById(transaction.orderId);
-    if (order && order.paymentStatus === 'pending') {
-      order.paymentStatus = 'failed';
+    if (order && order.paymentStatus === 'unpaid') { // FIXED: Use 'unpaid' instead of 'pending'
+      order.paymentStatus = 'unpaid';
       await order.save();
     }
 

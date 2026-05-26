@@ -738,7 +738,7 @@ export default function QuotationsPage() {
                               <span className="text-green-600 dark:text-green-400">✓ Paid</span>
                             ) : quote.paymentStatus === 'partially_paid' ? (
                               <span className="text-amber-600 dark:text-amber-400">
-                                ⚡ Partially Paid (Balance: KES {quote.balanceDue?.toLocaleString()})
+                                Partially Paid (Balance: KES {quote.balanceDue?.toLocaleString()})
                               </span>
                             ) : (
                               <span className="text-red-600 dark:text-red-400">⚠ Unpaid</span>
@@ -1637,7 +1637,7 @@ export default function QuotationsPage() {
           </div>
         )}
 
-        {/* Record Payment Modal */}
+                {/*  Payment Modal */}
         {showPaymentModal && selectedOrderForPayment && (
           <RecordPaymentModal
             isOpen={showPaymentModal}
@@ -1653,8 +1653,10 @@ export default function QuotationsPage() {
             totalAmount={selectedOrderForPayment.total}
             amountPaid={selectedOrderForPayment.amountPaid}
             balanceDue={selectedOrderForPayment.balanceDue}
+            isQuotation={true} 
           />
         )}
+
       </div>
     </div>
   );

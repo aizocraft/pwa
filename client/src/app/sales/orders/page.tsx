@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Eye,
   Truck,
@@ -12,13 +13,20 @@ import {
   XCircle,
   Clock,
   RefreshCw,
-  Plus,
   X,
-  Package as PackageIcon
+  Package as PackageIcon,
+  Mail,
+  Phone,
+  User,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
-import { getAdminOrders, getOrderPaymentSummary, recordManualPayment } from '@/lib/api';
+import { getAdminOrders, getOrderPaymentSummary, recordManualPayment, updateOrderStatus } from '@/lib/api';
 import { type Transaction } from '@/lib/sales';
 import { toast } from 'react-hot-toast';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 
 // Define local order type based on what getAdminOrders returns
 interface OrderItem {
@@ -33,6 +41,7 @@ interface OrderData {
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
+  customerLocation?: string;
   items?: OrderItem[];
   total: number;
   status: string;
@@ -40,6 +49,22 @@ interface OrderData {
   paymentMethod?: string;
   amountPaid?: number;
   balanceDue?: number;
+  shippingAddress?: {
+    fullName: string;
+    email: string;
+    phone: string;
+    city: string;
+    address1: string;
+  };
+  guestInfo?: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+  userId?: {
+    name: string;
+    email: string;
+  } | string;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,12 +73,146 @@ interface OrderWithDetails extends OrderData {
   amountPaid: number;
   balanceDue: number;
   customerName: string;
+  customerEmail: string;
+  customerPhone: string;
 }
+
+// Helper function to get customer name
+const getCustomerName = (order: OrderData): string => {
+  if (order.customerName) return order.customerName;
+  if (order.userId && typeof order.userId === 'object' && 'name' in order.userId) {
+    return (order.userId as any).name;
+  }
+  if (order.guestInfo?.name) {
+    return order.guestInfo.name;
+  }
+  if (order.shippingAddress?.fullName) {
+    return order.shippingAddress.fullName;
+  }
+  return 'Guest';
+};
+
+// Helper function to get customer email
+const getCustomerEmail = (order: OrderData): string => {
+  if (order.customerEmail) return order.customerEmail;
+  if (order.userId && typeof order.userId === 'object' && 'email' in order.userId) {
+    return (order.userId as any).email;
+  }
+  if (order.guestInfo?.email) {
+    return order.guestInfo.email;
+  }
+  if (order.shippingAddress?.email) {
+    return order.shippingAddress.email;
+  }
+  return '';
+};
+
+// Helper function to get customer phone
+const getCustomerPhone = (order: OrderData): string => {
+  if (order.customerPhone) return order.customerPhone;
+  if (order.guestInfo?.phone) {
+    return order.guestInfo.phone;
+  }
+  if (order.shippingAddress?.phone) {
+    return order.shippingAddress.phone;
+  }
+  return '';
+};
+
+// Status update component
+const StatusUpdateDropdown = ({ 
+  orderId, 
+  currentStatus, 
+  onStatusChange 
+}: { 
+  orderId: string;
+  currentStatus: string;
+  onStatusChange: (id: string, status: string) => Promise<void>;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const statusOptions = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'shipped', label: 'Shipped' },
+    { value: 'delivered', label: 'Delivered' },
+    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'refunded', label: 'Refunded' },
+  ];
+
+  const handleSelect = async (status: string) => {
+    if (status === currentStatus) {
+      setIsOpen(false);
+      return;
+    }
+    setIsUpdating(true);
+    try {
+      await onStatusChange(orderId, status);
+      toast.success(`Status updated to ${status}`);
+    } catch (error) {
+      toast.error('Failed to update status');
+    } finally {
+      setIsUpdating(false);
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={isUpdating}
+        className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-gray-800 rounded-lg transition-colors"
+      >
+        {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Update'}
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-36 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+          {statusOptions.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => handleSelect(option.value)}
+              className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                currentStatus === option.value ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Payment method badge
+const PaymentMethodBadge = ({ method }: { method: string }) => {
+  const config: Record<string, { icon: any; label: string }> = {
+    cod: { icon: Truck, label: 'Cash on Delivery' },
+    mpesa: { icon: Smartphone, label: 'M-PESA' },
+    card: { icon: CreditCard, label: 'Card' },
+    cash: { icon: DollarSign, label: 'Cash' },
+    bank_transfer: { icon: CreditCard, label: 'Bank Transfer' },
+  };
+  const { icon: Icon, label } = config[method] || config.cod;
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-lg">
+      <Icon className="w-3 h-3" />
+      {label}
+    </span>
+  );
+};
 
 export default function SalesOrders() {
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
@@ -64,28 +223,52 @@ export default function SalesOrders() {
     notes: ''
   });
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [searchTerm, statusFilter, currentPage]);
 
-  const fetchOrders = async () => {
+const fetchOrders = async () => {
+  try {
+    setLoading(true);
+    const response = await getAdminOrders({ 
+      limit: itemsPerPage,
+      page: currentPage,
+      search: searchTerm || undefined,
+      status: statusFilter || undefined
+    });
+    const ordersData = response.orders || [];
+    const ordersWithDetails: OrderWithDetails[] = ordersData.map((order: any) => ({
+      ...order,
+      customerName: getCustomerName(order),
+      customerEmail: getCustomerEmail(order),
+      customerPhone: getCustomerPhone(order),
+      amountPaid: order.amountPaid || 0,
+      balanceDue: Math.max(0, (order.balanceDue || order.total || 0) - (order.amountPaid || 0))
+    }));
+    setOrders(ordersWithDetails);
+    setTotalPages(response.pagination?.pages || 1);
+    setTotalOrders(response.pagination?.total || 0);
+  } catch (error) {
+    console.error('Failed to fetch orders:', error);
+    toast.error('Failed to load orders');
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    setUpdatingStatus(true);
     try {
-      setLoading(true);
-      const response = await getAdminOrders({ limit: 100 });
-      const ordersData = response.orders || [];
-      const ordersWithDetails: OrderWithDetails[] = ordersData.map((order: OrderData) => ({
-        ...order,
-        customerName: order.customerName || 'Guest',
-        amountPaid: order.amountPaid || 0,
-        balanceDue: Math.max(0, (order.balanceDue || order.total || 0) - (order.amountPaid || 0))
-      }));
-      setOrders(ordersWithDetails);
+      await updateOrderStatus(orderId, newStatus as any);
+      await fetchOrders();
     } catch (error) {
-      console.error('Failed to fetch orders:', error);
-      toast.error('Failed to load orders');
+      console.error('Failed to update status:', error);
+      throw error;
     } finally {
-      setLoading(false);
+      setUpdatingStatus(false);
     }
   };
 
@@ -93,7 +276,6 @@ export default function SalesOrders() {
     setSelectedOrder(order);
     try {
       const data = await getOrderPaymentSummary(order._id);
-      // Use the data from API - it's more accurate
       const apiAmountPaid = data.amountPaid || 0;
       const apiBalanceDue = Math.max(0, data.balanceDue || 0);
       const apiTotal = data.total || order.total || 0;
@@ -122,7 +304,6 @@ export default function SalesOrders() {
       return;
     }
     
-    // Use the selected order's balance due (which should be accurate from API)
     const currentBalance = selectedOrder.balanceDue;
     
     if (currentBalance <= 0) {
@@ -137,7 +318,7 @@ export default function SalesOrders() {
 
     setRecordingPayment(true);
     try {
-      const result = await recordManualPayment({
+      await recordManualPayment({
         orderId: selectedOrder._id,
         amount: amount,
         paymentMethod: transactionForm.paymentMethod,
@@ -147,7 +328,6 @@ export default function SalesOrders() {
       
       toast.success(`Payment of KES ${amount.toLocaleString()} recorded successfully`);
       
-      // Refresh data from API to get accurate state
       const updatedPaymentData = await getOrderPaymentSummary(selectedOrder._id);
       const newAmountPaid = updatedPaymentData.amountPaid || 0;
       const newBalanceDue = Math.max(0, updatedPaymentData.balanceDue || 0);
@@ -166,10 +346,8 @@ export default function SalesOrders() {
         notes: ''
       });
       
-      // Refresh orders list
       await fetchOrders();
       
-      // Close modal if fully paid
       if (newBalanceDue === 0) {
         setTimeout(() => {
           setShowTransactionModal(false);
@@ -180,6 +358,15 @@ export default function SalesOrders() {
       toast.error(errorMsg);
     } finally {
       setRecordingPayment(false);
+    }
+  };
+
+  const getPaymentIcon = (method: string) => {
+    switch (method) {
+      case 'mpesa': return <Smartphone className="w-4 h-4" />;
+      case 'card': return <CreditCard className="w-4 h-4" />;
+      case 'cash': return <DollarSign className="w-4 h-4" />;
+      default: return <CreditCard className="w-4 h-4" />;
     }
   };
 
@@ -200,24 +387,20 @@ export default function SalesOrders() {
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
-  const getPaymentIcon = (method: string) => {
-    switch (method) {
-      case 'mpesa': return <Smartphone className="w-4 h-4" />;
-      case 'card': return <CreditCard className="w-4 h-4" />;
-      case 'cash': return <DollarSign className="w-4 h-4" />;
-      default: return <CreditCard className="w-4 h-4" />;
-    }
-  };
-
-  const filteredOrders = orders.filter(order =>
-    order.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrders = orders;
 
   const calculateBalance = (order: OrderWithDetails) => {
     const total = order.total || 0;
     const paid = order.amountPaid || 0;
     return Math.max(0, total - paid);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
   };
 
   if (loading) {
@@ -234,7 +417,7 @@ export default function SalesOrders() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Orders</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Monitor and manage orders, record payments
+            {totalOrders.toLocaleString()} total orders
           </p>
         </div>
         <button
@@ -246,100 +429,176 @@ export default function SalesOrders() {
         </button>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search orders..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-        />
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by order #, customer name, email, or phone..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+        >
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="processing">Processing</option>
+          <option value="paid">Paid</option>
+          <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="refunded">Refunded</option>
+        </select>
       </div>
 
       {/* Orders Table */}
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800/50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Order #</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Customer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Items</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Paid</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Balance</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Payment</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
-              </tr>
-            </thead>
-            
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-              {filteredOrders.map((order) => {
-                const balance = calculateBalance(order);
-                return (
-                  <tr key={order._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
-                      {order.orderNumber}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                      {order.customerName}
-                      {order.customerEmail && (
-                        <div className="text-xs text-gray-400">{order.customerEmail}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                      {order.items?.length || 0} items
-                    </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">
-                      KES {(order.total || 0).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-green-600 dark:text-green-400">
-                      KES {(order.amountPaid || 0).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-amber-600 dark:text-amber-400">
-                      KES {balance.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.paymentStatus)}`}>
-                        {order.paymentStatus === 'partially_paid' ? 'Partially Paid' : order.paymentStatus}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleViewTransactions(order)}
-                          className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                          title="View Transactions & Record Payment"
-                        >
-                          <CreditCard className="w-4 h-4 text-blue-500" />
-                        </button>
-                        <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Track Order">
-                          <Truck className="w-4 h-4 text-gray-500" />
-                        </button>
-                      </div>
-                    </td>
+        {filteredOrders.length === 0 ? (
+          <div className="text-center py-16">
+            <PackageIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No orders found</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {searchTerm || statusFilter ? 'Try adjusting your filters' : 'No orders yet'}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-800/50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Order #</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Items</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Total</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Paid</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Balance</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Payment</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                  {filteredOrders.map((order) => {
+                    const balance = calculateBalance(order);
+                    return (
+                      <tr key={order._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-xs font-medium text-gray-900 dark:text-white">
+                            #{order.orderNumber || order._id.slice(-8)}
+                          </span>
+                         </td>
+                        <td className="px-6 py-4">
+                          <div className="font-medium text-gray-900 dark:text-white text-sm">
+                            {order.customerName}
+                          </div>
+                          {order.customerEmail && (
+                            <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                              <Mail className="w-3 h-3" />
+                              {order.customerEmail}
+                            </div>
+                          )}
+                          {order.customerPhone && (
+                            <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                              <Phone className="w-3 h-3" />
+                              {order.customerPhone}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                          {order.items?.length || 0} items
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">
+                          KES {(order.total || 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-green-600 dark:text-green-400">
+                          KES {(order.amountPaid || 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-amber-600 dark:text-amber-400">
+                          KES {balance.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <PaymentMethodBadge method={order.paymentMethod || 'cod'} />
+                        </td>
+                        <td className="px-6 py-4">
+                          <OrderStatusBadge status={order.status as any} />
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                          {formatDate(order.createdAt)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleViewTransactions(order)}
+                              className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                              title="View Transactions & Record Payment"
+                            >
+                              <CreditCard className="w-4 h-4 text-blue-500" />
+                            </button>
+                            <Link
+                              href={`/dashboard/orders/${order._id}`}
+                              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                              title="View Order Details"
+                            >
+                              <Eye className="w-4 h-4 text-gray-500" />
+                            </Link>
+                            <StatusUpdateDropdown 
+                              orderId={order._id}
+                              currentStatus={order.status}
+                              onStatusChange={handleStatusChange}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-      {filteredOrders.length === 0 && (
-        <div className="text-center py-12">
-          <PackageIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">No orders found</p>
-        </div>
-      )}
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                <div className="text-xs text-gray-500">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalOrders)} of {totalOrders}
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 rounded disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Transactions Modal */}
       {showTransactionModal && selectedOrder && (
@@ -443,7 +702,7 @@ export default function SalesOrders() {
                 </div>
               )}
 
-              {/* Record New Payment - Only show if not fully paid */}
+              {/* Record New Payment */}
               {selectedOrder.balanceDue > 0 && (
                 <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
                   <h3 className="font-semibold text-gray-900 dark:text-white mb-3">

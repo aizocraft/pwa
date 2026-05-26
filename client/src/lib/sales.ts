@@ -6,16 +6,15 @@ import type { Order } from '@/types/order';
 // ==================== TYPES ====================
 export interface SalesCustomer {
   _id: string;
-  user?: string;
   name: string;
   email?: string;
   phone?: string;
   location?: string;
   notes?: string;
-  totalSpent: number;
-  lastOrder?: string;
   status: 'active' | 'inactive';
-  createdBy: string;
+  totalSpent: number;
+  quotationsCount?: number;
+  lastQuotationDate?: string;
   createdAt: string;
   updatedAt: string;
 }

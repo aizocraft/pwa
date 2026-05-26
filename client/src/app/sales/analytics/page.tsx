@@ -19,15 +19,19 @@ import {
   PieChart,
   Clock,
   CreditCard,
-  Zap
+  Zap,
+  Calendar,
+  Package,
+  Star,
+  Flame
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'react-hot-toast';
 import api from '@/lib/api';
 import {
-  LineChart as ReLineChart,
+  LineChart,
   Line,
-  BarChart as ReBarChart,
+  BarChart,
   Bar,
   PieChart as RePieChart,
   Pie,
@@ -39,7 +43,10 @@ import {
   Legend,
   ResponsiveContainer,
   Area,
-  ComposedChart
+  ComposedChart,
+  RadialBarChart,
+  RadialBar,
+  Sector
 } from 'recharts';
 import type { 
   SalesAnalytics, 
@@ -53,10 +60,8 @@ import type {
   TopProduct
 } from '@/lib/sales';
 
-// Use union type for analytics data
 type AnalyticsData = SalesAnalytics | AdminAnalytics | null;
 
-// Colors for charts
 const CHART_COLORS = {
   primary: '#06b6d4',
   secondary: '#8b5cf6',
@@ -70,7 +75,10 @@ const CHART_COLORS = {
   cyan: '#06b6d4',
   teal: '#14b8a6',
   orange: '#f97316',
-  gray: '#6b7280'
+  gray: '#6b7280',
+  gold: '#fbbf24',
+  silver: '#9ca3af',
+  bronze: '#d97706'
 };
 
 const CHART_COLORS_ARRAY = [
@@ -87,11 +95,11 @@ const CHART_COLORS_ARRAY = [
   CHART_COLORS.orange,
 ];
 
-// Define chart data types
 interface ChartDataPoint {
   date: string;
   revenue: number;
   orders: number;
+  quotations?: number;
 }
 
 interface HourlyDataPoint {
@@ -104,6 +112,7 @@ interface CategoryDataPoint {
   category: string;
   revenue: number;
   quantity: number;
+  percentage?: number;
 }
 
 export default function SalesAnalytics() {
@@ -113,6 +122,7 @@ export default function SalesAnalytics() {
   const [period, setPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
   const [refreshing, setRefreshing] = useState(false);
   const [activeChart, setActiveChart] = useState<'revenue' | 'orders' | 'quotations'>('revenue');
+  const [hoveredCategory, setHoveredCategory] = useState<number | null>(null);
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
@@ -154,17 +164,17 @@ export default function SalesAnalytics() {
     
     const csvData = [
       ['Metric', 'Value'],
-      ['Total Revenue', analytics.overview.totalRevenue],
-      ['Total Orders', analytics.overview.totalOrders],
-      ['Average Order Value', analytics.overview.averageOrderValue],
-      ['Conversion Rate', `${analytics.overview.conversionRate}%`],
-      ...(analytics.customers ? [['Total Customers', analytics.customers.totalCustomers || 0]] : []),
-      ['Total Quotations', analytics.quotations.totalQuotations],
-      ['Converted Quotes', analytics.quotations.convertedCount],
-      ['Accepted Quotes', analytics.quotations.acceptedCount],
-      ['Transaction Success Rate', `${analytics.transactions.successRate.toFixed(1)}%`],
-      ['Total Transaction Volume', analytics.transactions.totalVolume],
-      ['Completed Transactions', analytics.transactions.completed]
+      ['Total Revenue', overview.totalRevenue],
+      ['Total Orders', overview.totalOrders],
+      ['Average Order Value', overview.averageOrderValue],
+      ['Conversion Rate', `${overview.conversionRate}%`],
+      ...(customers ? [['Total Customers', customers.totalCustomers || 0]] : []),
+      ['Total Quotations', quotations.totalQuotations],
+      ['Converted Quotes', quotations.convertedCount],
+      ['Accepted Quotes', quotations.acceptedCount],
+      ['Transaction Success Rate', `${transactions.successRate.toFixed(1)}%`],
+      ['Total Transaction Volume', transactions.totalVolume],
+      ['Completed Transactions', transactions.completed]
     ];
     
     const csv = csvData.map(row => row.join(',')).join('\n');
@@ -178,7 +188,6 @@ export default function SalesAnalytics() {
     toast.success('Analytics exported');
   };
 
-  // Helper to safely access properties
   const getOverview = (): OverviewMetrics => analytics?.overview || {
     totalRevenue: 0,
     totalOrders: 0,
@@ -223,9 +232,7 @@ export default function SalesAnalytics() {
   };
 
   const getCustomers = (): CustomerMetrics | undefined => analytics?.customers;
-
   const getMonthlyTarget = (): MonthlyTarget | undefined => analytics?.monthlyTarget;
-
   const getTopProducts = (): TopProduct[] => {
     if (isAdmin && (analytics as AdminAnalytics)?.topProducts) {
       return (analytics as AdminAnalytics).topProducts || [];
@@ -236,7 +243,6 @@ export default function SalesAnalytics() {
     return [];
   };
 
-  // Transform daily sales data for charts
   const getDailySalesForChart = (): ChartDataPoint[] => {
     let rawData: any[] = [];
     if (isAdmin && (analytics as AdminAnalytics)?.charts?.dailySales) {
@@ -245,15 +251,14 @@ export default function SalesAnalytics() {
       rawData = (analytics as SalesAnalytics).charts?.dailyPerformance || [];
     }
     
-    // Transform to ChartDataPoint format
     return rawData.map(item => ({
       date: (item as any)._id || (item as any).date || '',
       revenue: (item as any).revenue || 0,
-      orders: (item as any).orders || 0
+      orders: (item as any).orders || 0,
+      quotations: (item as any).quotations || 0
     }));
   };
 
-  // Get payment methods data
   const getPaymentMethodsData = () => {
     if (isAdmin && (analytics as AdminAnalytics)?.charts?.paymentMethods) {
       const pm = (analytics as AdminAnalytics).charts?.paymentMethods;
@@ -266,22 +271,21 @@ export default function SalesAnalytics() {
     return [];
   };
 
-  // Get category sales data
   const getCategorySalesData = (): CategoryDataPoint[] => {
+    let categories: CategoryDataPoint[] = [];
     if (isAdmin && (analytics as AdminAnalytics)?.charts?.categorySales) {
-      return (analytics as AdminAnalytics).charts?.categorySales || [];
+      categories = (analytics as AdminAnalytics).charts?.categorySales || [];
     }
-    return [];
+    // Calculate percentages
+    const total = categories.reduce((sum, cat) => sum + cat.revenue, 0);
+    return categories.map(cat => ({ ...cat, percentage: total > 0 ? (cat.revenue / total) * 100 : 0 }));
   };
 
-  // Get hourly distribution data
   const getHourlyDistributionData = (): HourlyDataPoint[] => {
     let rawData: any[] = [];
     if (isAdmin && (analytics as AdminAnalytics)?.charts?.hourlyDistribution) {
       rawData = (analytics as AdminAnalytics).charts?.hourlyDistribution || [];
     }
-    
-    // Ensure each item has hour property
     return rawData.map(item => ({
       hour: (item as any).hour ?? 0,
       orders: (item as any).orders || 0,
@@ -309,12 +313,11 @@ export default function SalesAnalytics() {
   const categorySales = getCategorySalesData();
   const hourlyDistribution = getHourlyDistributionData();
 
-  // Custom tooltip for charts
   const CustomTooltip = ({ active, payload, label, unit = 'KES' }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-          <p className="text-sm font-semibold text-gray-900 dark:text-white">{label}</p>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">{label}</p>
           {payload.map((p: any, idx: number) => (
             <p key={idx} className="text-sm" style={{ color: p.color }}>
               {p.name}: {unit === 'KES' ? `KES ${p.value?.toLocaleString()}` : p.value}
@@ -326,25 +329,62 @@ export default function SalesAnalytics() {
     return null;
   };
 
+  // Custom active shape for 3D effect on pie chart
+  const renderActiveShape = (props: any) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
+    return (
+      <g>
+        <text x={cx} y={cy - 10} dy={8} textAnchor="middle" fill={fill} className="text-sm font-bold">
+          {payload.name}
+        </text>
+        <text x={cx} y={cy + 10} dy={8} textAnchor="middle" fill="#666" className="text-xs">
+          {`${(percent * 100).toFixed(0)}%`}
+        </text>
+        <text x={cx} y={cy + 25} dy={8} textAnchor="middle" fill="#666" className="text-xs">
+          {`KES ${value.toLocaleString()}`}
+        </text>
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius + 10}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+          opacity={0.9}
+        />
+        <Sector
+          cx={cx}
+          cy={cy}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          innerRadius={outerRadius + 6}
+          outerRadius={outerRadius + 10}
+          fill={fill}
+        />
+      </g>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {isAdmin ? 'Admin Analytics' : 'Sales Analytics'}
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+            {isAdmin ? 'Admin Analytics Dashboard' : 'Sales Analytics Dashboard'}
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             {isAdmin 
-              ? 'Complete overview of your business performance' 
-              : 'Track your personal sales performance and metrics'}
+              ? 'Complete overview of your business performance and insights' 
+              : 'Track your personal sales performance and key metrics'}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value as any)}
-            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
           >
             <option value="week">Last 7 Days</option>
             <option value="month">Last 30 Days</option>
@@ -360,7 +400,7 @@ export default function SalesAnalytics() {
           </button>
           <button
             onClick={handleExport}
-            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+            className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg font-medium flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
           >
             <Download className="w-4 h-4" />
             Export
@@ -369,7 +409,7 @@ export default function SalesAnalytics() {
       </div>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           title="Total Revenue"
           value={`KES ${(overview.totalRevenue || 0).toLocaleString()}`}
@@ -399,41 +439,27 @@ export default function SalesAnalytics() {
       </div>
 
       {/* Main Chart Section */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Performance Trends</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Performance Trends</h2>
+              <p className="text-sm text-gray-500 mt-1">Daily revenue, orders, and quotation performance</p>
+            </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setActiveChart('revenue')}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  activeChart === 'revenue'
-                    ? 'bg-cyan-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                Revenue
-              </button>
-              <button
-                onClick={() => setActiveChart('orders')}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  activeChart === 'orders'
-                    ? 'bg-cyan-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                Orders
-              </button>
-              <button
-                onClick={() => setActiveChart('quotations')}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  activeChart === 'quotations'
-                    ? 'bg-cyan-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                Quotations
-              </button>
+              {['revenue', 'orders', 'quotations'].map((chartType) => (
+                <button
+                  key={chartType}
+                  onClick={() => setActiveChart(chartType as any)}
+                  className={`px-4 py-2 text-sm rounded-lg transition-all duration-200 font-medium ${
+                    activeChart === chartType
+                      ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {chartType.charAt(0).toUpperCase() + chartType.slice(1)}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -448,29 +474,29 @@ export default function SalesAnalytics() {
                   <YAxis yAxisId="right" orientation="right" stroke="#6b7280" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Area yAxisId="left" type="monotone" dataKey="revenue" name="Revenue (KES)" fill={CHART_COLORS.primary} fillOpacity={0.3} stroke={CHART_COLORS.primary} />
-                  <Line yAxisId="right" type="monotone" dataKey="orders" name="Orders" stroke={CHART_COLORS.secondary} strokeWidth={2} />
+                  <Area yAxisId="left" type="monotone" dataKey="revenue" name="Revenue (KES)" fill={CHART_COLORS.primary} fillOpacity={0.3} stroke={CHART_COLORS.primary} strokeWidth={2} />
+                  <Line yAxisId="right" type="monotone" dataKey="orders" name="Orders" stroke={CHART_COLORS.secondary} strokeWidth={2} dot={{ r: 4 }} />
                 </ComposedChart>
               )}
               {activeChart === 'orders' && (
-                <ReBarChart data={dailySales}>
+                <BarChart data={dailySales}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="date" stroke="#6b7280" />
                   <YAxis stroke="#6b7280" />
                   <Tooltip content={<CustomTooltip unit="count" />} />
                   <Legend />
-                  <Bar dataKey="orders" name="Orders" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} />
-                </ReBarChart>
+                  <Bar dataKey="orders" name="Orders" fill={CHART_COLORS.primary} radius={[8, 8, 0, 0]} />
+                </BarChart>
               )}
               {activeChart === 'quotations' && (
-                <ReLineChart data={dailySales}>
+                <LineChart data={dailySales}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="date" stroke="#6b7280" />
                   <YAxis stroke="#6b7280" />
                   <Tooltip content={<CustomTooltip unit="count" />} />
                   <Legend />
-                  <Line type="monotone" dataKey="orders" name="Orders" stroke={CHART_COLORS.warning} strokeWidth={2} dot={{ r: 4 }} />
-                </ReLineChart>
+                  <Line type="monotone" dataKey="quotations" name="Quotations" stroke={CHART_COLORS.warning} strokeWidth={3} dot={{ r: 5, strokeWidth: 2 }} />
+                </LineChart>
               )}
             </ResponsiveContainer>
           ) : (
@@ -483,47 +509,76 @@ export default function SalesAnalytics() {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Payment Methods Chart */}
-        {paymentMethodData.length > 0 && (
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+        {/* 3D Pie Chart - Sales by Category */}
+        {categorySales.length > 0 && (
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
               <div className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-cyan-600" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Payment Methods</h2>
+                <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg">
+                  <PieChart className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Sales by Category</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">Revenue distribution across product categories</p>
+                </div>
               </div>
             </div>
             <div className="p-6">
-              <ResponsiveContainer width="100%" height={300}>
-<RePieChart>
-  <Pie
-    data={paymentMethodData}
-    cx="50%"
-    cy="50%"
-    labelLine={false}
-    label={({ name, percent }) => {
-      const percentage = percent || 0;
-      return `${name}: ${(percentage * 100).toFixed(0)}%`;
-    }}
-    outerRadius={80}
-    fill="#8884d8"
-    dataKey="value"
-  >
-    {paymentMethodData.map((entry, index) => (
-      <Cell key={`cell-${index}`} fill={CHART_COLORS_ARRAY[index % CHART_COLORS_ARRAY.length]} />
-    ))}
-  </Pie>
-  <Tooltip />
-  <Legend />
-</RePieChart>
+              <ResponsiveContainer width="100%" height={350}>
+                <RePieChart>
+                <Pie  
+                  data={categorySales}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={3}
+                  dataKey="revenue"
+                  nameKey="category"
+                  onMouseEnter={(_, index) => setHoveredCategory(index)}
+                  onMouseLeave={() => setHoveredCategory(null)}
+                >
+                  {categorySales.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={CHART_COLORS_ARRAY[index % CHART_COLORS_ARRAY.length]}
+                      stroke="white"
+                      strokeWidth={2}
+                      opacity={hoveredCategory === null || hoveredCategory === index ? 1 : 0.5}
+                    />
+                  ))}
+                </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36}
+                    formatter={(value, entry: any) => (
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
+                    )}
+                  />
+                </RePieChart>
               </ResponsiveContainer>
-              <div className="mt-4 grid grid-cols-3 gap-4 text-center">
-                {paymentMethodData.map((method, idx) => (
-                  <div key={idx} className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
-                    <p className="text-xs text-gray-500">{method.name}</p>
-                    <p className="text-lg font-bold" style={{ color: CHART_COLORS_ARRAY[idx % CHART_COLORS_ARRAY.length] }}>
-                      {method.name === 'MPESA' ? '💰' : method.name === 'CARD' ? '💳' : '📦'}
-                    </p>
-                    <p className="text-sm font-semibold">KES {method.volume?.toLocaleString()}</p>
+              
+              {/* Category Stats Cards */}
+              <div className="grid grid-cols-2 gap-3 mt-6">
+                {categorySales.map((category, idx) => (
+                  <div key={idx} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: CHART_COLORS_ARRAY[idx % CHART_COLORS_ARRAY.length] }}
+                        />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{category.category}</span>
+                      </div>
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">
+                        {category.percentage?.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500">Revenue</p>
+                      <p className="text-sm font-semibold text-cyan-600">KES {category.revenue.toLocaleString()}</p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -531,25 +586,53 @@ export default function SalesAnalytics() {
           </div>
         )}
 
-        {/* Category Sales Chart */}
-        {categorySales.length > 0 && (
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+        {/* Payment Methods Chart */}
+        {paymentMethodData.length > 0 && (
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
               <div className="flex items-center gap-2">
-                <PieChart className="w-5 h-5 text-cyan-600" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Sales by Category</h2>
+                <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
+                  <CreditCard className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Payment Methods</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">Transaction distribution by payment type</p>
+                </div>
               </div>
             </div>
             <div className="p-6">
               <ResponsiveContainer width="100%" height={300}>
-                <ReBarChart data={categorySales} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" tickFormatter={(value) => `KES ${value/1000}K`} />
-                  <YAxis type="category" dataKey="category" width={100} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="revenue" name="Revenue" fill={CHART_COLORS.primary} radius={[0, 4, 4, 0]} />
-                </ReBarChart>
+                <RePieChart>
+                  <Pie
+                    data={paymentMethodData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                    innerRadius={50}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {paymentMethodData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS_ARRAY[index % CHART_COLORS_ARRAY.length]} stroke="white" strokeWidth={2} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend verticalAlign="bottom" height={36} />
+                </RePieChart>
               </ResponsiveContainer>
+              <div className="mt-6 grid grid-cols-3 gap-4 text-center">
+                {paymentMethodData.map((method, idx) => (
+                  <div key={idx} className="p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800">
+                    <p className="text-2xl mb-1">
+                      {method.name === 'MPESA' ? '💰' : method.name === 'CARD' ? '💳' : '📦'}
+                    </p>
+                    <p className="text-xs text-gray-500">{method.name}</p>
+                    <p className="text-sm font-bold text-cyan-600">KES {method.volume?.toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -557,58 +640,60 @@ export default function SalesAnalytics() {
 
       {/* Hourly Distribution Chart */}
       {hourlyDistribution.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
             <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-cyan-600" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Hourly Sales Distribution</h2>
+              <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg">
+                <Clock className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Hourly Sales Distribution</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Peak hours and order patterns throughout the day</p>
+              </div>
             </div>
-            <p className="text-sm text-gray-500 mt-1">Peak hours and order patterns throughout the day</p>
           </div>
           <div className="p-6">
             <ResponsiveContainer width="100%" height={300}>
               <ComposedChart data={hourlyDistribution}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="hour" tickFormatter={(hour) => `${hour}:00`} />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `KES ${value/1000}K`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="hour" tickFormatter={(hour) => `${hour}:00`} stroke="#6b7280" />
+                <YAxis yAxisId="left" stroke="#6b7280" />
+                <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `KES ${value/1000}K`} stroke="#6b7280" />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Bar yAxisId="left" dataKey="orders" name="Orders" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} />
-                <Line yAxisId="right" type="monotone" dataKey="revenue" name="Revenue" stroke={CHART_COLORS.secondary} strokeWidth={2} />
+                <Bar yAxisId="left" dataKey="orders" name="Orders" fill={CHART_COLORS.primary} radius={[8, 8, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="revenue" name="Revenue" stroke={CHART_COLORS.secondary} strokeWidth={3} dot={{ r: 5, fill: CHART_COLORS.secondary }} />
               </ComposedChart>
             </ResponsiveContainer>
-            <div className="mt-4 grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
               {(() => {
                 const peakHour = hourlyDistribution.reduce((max, curr) => curr.orders > max.orders ? curr : max, hourlyDistribution[0] || { hour: 0, orders: 0 });
                 const peakRevenue = hourlyDistribution.reduce((max, curr) => curr.revenue > max.revenue ? curr : max, hourlyDistribution[0] || { hour: 0, revenue: 0 });
+                const avgOrders = (hourlyDistribution.reduce((sum, h) => sum + h.orders, 0) / 24).toFixed(1);
+                const avgRevenue = Math.round(hourlyDistribution.reduce((sum, h) => sum + h.revenue, 0) / 24);
                 return (
                   <>
-                    <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <Zap className="w-4 h-4 text-green-600 mx-auto mb-1" />
+                    <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/20 rounded-xl">
+                      <Flame className="w-5 h-5 text-green-600 mx-auto mb-2" />
                       <p className="text-xs text-gray-500">Peak Order Hour</p>
-                      <p className="text-lg font-bold text-green-600">{peakHour.hour}:00</p>
+                      <p className="text-2xl font-bold text-green-600">{peakHour.hour}:00</p>
                       <p className="text-xs">{peakHour.orders} orders</p>
                     </div>
-                    <div className="text-center p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg">
-                      <TrendingUp className="w-4 h-4 text-cyan-600 mx-auto mb-1" />
+                    <div className="text-center p-4 bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900/20 dark:to-cyan-900/20 rounded-xl">
+                      <TrendingUp className="w-5 h-5 text-cyan-600 mx-auto mb-2" />
                       <p className="text-xs text-gray-500">Peak Revenue Hour</p>
-                      <p className="text-lg font-bold text-cyan-600">{peakRevenue.hour}:00</p>
+                      <p className="text-2xl font-bold text-cyan-600">{peakRevenue.hour}:00</p>
                       <p className="text-xs">KES {peakRevenue.revenue?.toLocaleString()}</p>
                     </div>
-                    <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                      <Activity className="w-4 h-4 text-purple-600 mx-auto mb-1" />
+                    <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/20 rounded-xl">
+                      <Activity className="w-5 h-5 text-purple-600 mx-auto mb-2" />
                       <p className="text-xs text-gray-500">Avg Orders/Hour</p>
-                      <p className="text-lg font-bold text-purple-600">
-                        {(hourlyDistribution.reduce((sum, h) => sum + h.orders, 0) / 24).toFixed(1)}
-                      </p>
+                      <p className="text-2xl font-bold text-purple-600">{avgOrders}</p>
                     </div>
-                    <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                      <DollarSign className="w-4 h-4 text-orange-600 mx-auto mb-1" />
+                    <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-900/20 rounded-xl">
+                      <DollarSign className="w-5 h-5 text-orange-600 mx-auto mb-2" />
                       <p className="text-xs text-gray-500">Avg Revenue/Hour</p>
-                      <p className="text-lg font-bold text-orange-600">
-                        KES {Math.round(hourlyDistribution.reduce((sum, h) => sum + h.revenue, 0) / 24).toLocaleString()}
-                      </p>
+                      <p className="text-2xl font-bold text-orange-600">KES {avgRevenue.toLocaleString()}</p>
                     </div>
                   </>
                 );
@@ -621,28 +706,13 @@ export default function SalesAnalytics() {
       {/* Admin Additional Metrics */}
       {isAdmin && customers && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <MetricCard
-            title="Total Customers"
-            value={customers.totalCustomers || 0}
-            icon={Users}
-            color="cyan"
-          />
-          <MetricCard
-            title="Active Customers"
-            value={customers.activeCustomers || 0}
-            icon={CheckCircle}
-            color="green"
-          />
-          <MetricCard
-            title="Avg Customer Value"
-            value={`KES ${((customers.totalCustomerValue || 0) / (customers.totalCustomers || 1)).toLocaleString()}`}
-            icon={Award}
-            color="purple"
-          />
+          <MetricCard title="Total Customers" value={customers.totalCustomers || 0} icon={Users} color="cyan" />
+          <MetricCard title="Active Customers" value={customers.activeCustomers || 0} icon={CheckCircle} color="green" />
+          <MetricCard title="Avg Customer Value" value={`KES ${((customers.totalCustomerValue || 0) / (customers.totalCustomers || 1)).toLocaleString()}`} icon={Award} color="purple" />
         </div>
       )}
 
-      {/* Quotation Performance */}
+      {/* Quotation & Order Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <PerformanceCard
           title="Quotation Performance"
@@ -653,31 +723,26 @@ export default function SalesAnalytics() {
             { label: 'Converted', value: quotations.convertedCount || 0, color: 'text-blue-600' },
             { label: 'Conversion Rate', value: `${quotations.conversionRate || 0}%`, color: 'text-cyan-600' }
           ]}
-          progress={{
-            value: typeof quotations.conversionRate === 'string' ? parseFloat(quotations.conversionRate) : (quotations.conversionRate || 0),
-            label: 'Conversion Rate'
-          }}
+          progress={{ value: typeof quotations.conversionRate === 'string' ? parseFloat(quotations.conversionRate) : (quotations.conversionRate || 0), label: 'Conversion Rate' }}
         />
 
         <PerformanceCard
           title="Order Status"
-          icon={PieChart}
+          icon={ShoppingBag}
           metrics={[
             { label: 'Paid Orders', value: orders.paidOrders || 0, color: 'text-green-600' },
             { label: 'Pending', value: orders.pendingOrders || 0, color: 'text-yellow-600' },
             { label: 'Cancelled', value: orders.cancelledOrders || 0, color: 'text-red-600' }
           ]}
-          progress={{
-            value: orders.completionRate || 0,
-            label: 'Completion Rate'
-          }}
+          progress={{ value: orders.completionRate || 0, label: 'Completion Rate' }}
         />
       </div>
 
       {/* Transaction Analysis */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Transaction Analysis</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Payment status breakdown and volume analysis</p>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -689,15 +754,11 @@ export default function SalesAnalytics() {
           <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400">Total Volume</span>
-              <span className="font-bold text-xl text-gray-900 dark:text-white">
-                KES {(transactions.totalVolume || 0).toLocaleString()}
-              </span>
+              <span className="font-bold text-2xl text-gray-900 dark:text-white">KES {(transactions.totalVolume || 0).toLocaleString()}</span>
             </div>
-            <div className="flex justify-between items-center mt-2">
-              <span className="text-sm text-gray-500">Average Transaction</span>
-              <span className="font-semibold text-gray-700 dark:text-gray-300">
-                KES {Math.round(transactions.averageValue || 0).toLocaleString()}
-              </span>
+            <div className="flex justify-between items-center mt-3">
+              <span className="text-sm text-gray-500">Average Transaction Value</span>
+              <span className="font-semibold text-lg text-cyan-600">KES {Math.round(transactions.averageValue || 0).toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -705,24 +766,39 @@ export default function SalesAnalytics() {
 
       {/* Top Products */}
       {topProducts.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Top Products</h2>
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg">
+                <Star className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Top Performing Products</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Best sellers by revenue and quantity</p>
+              </div>
+            </div>
           </div>
           <div className="p-6">
             <div className="space-y-4">
               {topProducts.map((product, idx) => (
-                <div key={product.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-500 w-6">{idx + 1}</span>
+                <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:shadow-md transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
+                      idx === 0 ? 'bg-gradient-to-br from-yellow-500 to-yellow-600' :
+                      idx === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-500' :
+                      'bg-gradient-to-br from-amber-600 to-amber-700'
+                    }`}>
+                      {idx + 1}
+                    </div>
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">{product.name}</p>
-                      <p className="text-sm text-gray-500">{product.quantity} units • {product.orders} orders</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">{product.name}</p>
+                      <p className="text-xs text-gray-500">{product.quantity} units • {product.orders} orders</p>
                     </div>
                   </div>
-                  <span className="font-semibold text-gray-900 dark:text-white">
-                    KES {product.revenue.toLocaleString()}
-                  </span>
+                  <div className="text-right">
+                    <p className="font-bold text-lg text-cyan-600">KES {product.revenue.toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">Revenue</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -732,34 +808,59 @@ export default function SalesAnalytics() {
 
       {/* Monthly Target (Sales Only) */}
       {!isAdmin && monthlyTarget && (
-        <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Target className="w-6 h-6" />
-              <h3 className="text-lg font-semibold">Monthly Target</h3>
+        <div className="bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 rounded-xl p-8 text-white shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <Target className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Monthly Sales Target</h3>
+                <p className="text-sm opacity-90">Track your progress towards monthly goals</p>
+              </div>
             </div>
-            <span className="text-sm opacity-90">{monthlyTarget.progress.toFixed(0)}% Complete</span>
+            <div className="text-right">
+              <p className="text-2xl font-bold">{monthlyTarget.progress.toFixed(0)}%</p>
+              <p className="text-xs opacity-80">Complete</p>
+            </div>
           </div>
-          <div className="mb-4">
-            <div className="w-full bg-white/20 rounded-full h-3">
+          
+          <div className="mb-6">
+            <div className="w-full bg-white/20 rounded-full h-4 overflow-hidden">
               <div 
-                className="bg-white h-3 rounded-full transition-all"
+                className="bg-white h-4 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(monthlyTarget.progress, 100)}%` }}
               />
             </div>
           </div>
+          
           <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
+            <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
               <p className="text-2xl font-bold">KES {(monthlyTarget.current / 1000).toFixed(0)}K</p>
-              <p className="text-xs opacity-80">Achieved</p>
+              <p className="text-xs opacity-80 mt-1">Achieved</p>
             </div>
-            <div>
+            <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
               <p className="text-2xl font-bold">KES {(monthlyTarget.remaining / 1000).toFixed(0)}K</p>
-              <p className="text-xs opacity-80">Remaining</p>
+              <p className="text-xs opacity-80 mt-1">Remaining</p>
             </div>
-            <div>
+            <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
               <p className="text-2xl font-bold">KES {(monthlyTarget.target / 1000).toFixed(0)}K</p>
-              <p className="text-xs opacity-80">Target</p>
+              <p className="text-xs opacity-80 mt-1">Target</p>
+            </div>
+          </div>
+          
+          <div className="mt-6 pt-4 border-t border-white/20">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Days remaining in month</span>
+              <span className="font-semibold">
+                {Math.max(0, new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate())} days
+              </span>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <span className="text-sm">Daily target to meet goal</span>
+              <span className="font-semibold">
+                KES {Math.round(monthlyTarget.remaining / Math.max(1, new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate())).toLocaleString()}
+              </span>
             </div>
           </div>
         </div>
@@ -768,14 +869,8 @@ export default function SalesAnalytics() {
   );
 }
 
-// ==================== HELPER COMPONENTS ====================
-type MetricCardProps = {
-  title: string;
-  value: string | number;
-  icon: any;
-  color: 'green' | 'blue' | 'purple' | 'orange' | 'cyan';
-  change?: string;
-};
+// Helper Components
+type MetricCardProps = { title: string; value: string | number; icon: any; color: 'green' | 'blue' | 'purple' | 'orange' | 'cyan'; change?: string };
 
 function MetricCard({ title, value, icon: Icon, color, change }: MetricCardProps) {
   const colors = {
@@ -787,9 +882,9 @@ function MetricCard({ title, value, icon: Icon, color, change }: MetricCardProps
   };
   
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 p-6 hover:shadow-xl transition-all duration-300">
       <div className="flex items-center justify-between mb-4">
-        <div className={`p-2 rounded-lg ${colors[color]}`}>
+        <div className={`p-3 rounded-xl ${colors[color]}`}>
           <Icon className="w-5 h-5" />
         </div>
         {change && (
@@ -799,19 +894,21 @@ function MetricCard({ title, value, icon: Icon, color, change }: MetricCardProps
           </span>
         )}
       </div>
-      <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{value}</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{title}</p>
+      <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{value}</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{title}</p>
     </div>
   );
 }
 
 function PerformanceCard({ title, icon: Icon, metrics, progress }: any) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
-      <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
-          <Icon className="w-5 h-5 text-gray-400" />
+          <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <Icon className="w-5 h-5 text-gray-500" />
+          </div>
         </div>
       </div>
       <div className="p-6 space-y-4">
@@ -824,12 +921,12 @@ function PerformanceCard({ title, icon: Icon, metrics, progress }: any) {
           ))}
         </div>
         <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex justify-between items-center mb-3">
             <span className="text-sm text-gray-600 dark:text-gray-400">{progress.label}</span>
             <span className="text-sm font-semibold text-cyan-600">{progress.value.toFixed(1)}%</span>
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div className="bg-cyan-600 h-2 rounded-full" style={{ width: `${Math.min(progress.value, 100)}%` }} />
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+            <div className="bg-gradient-to-r from-cyan-500 to-blue-600 h-3 rounded-full transition-all duration-500" style={{ width: `${Math.min(progress.value, 100)}%` }} />
           </div>
         </div>
       </div>
@@ -839,16 +936,16 @@ function PerformanceCard({ title, icon: Icon, metrics, progress }: any) {
 
 function StatBox({ label, value, color }: { label: string; value: string | number; color: 'green' | 'yellow' | 'red' | 'orange' }) {
   const colors = {
-    green: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
-    yellow: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400',
-    red: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400',
-    orange: 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+    green: 'bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/20 text-green-600 dark:text-green-400',
+    yellow: 'bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-900/20 text-yellow-600 dark:text-yellow-400',
+    red: 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-900/20 text-red-600 dark:text-red-400',
+    orange: 'bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-900/20 text-orange-600 dark:text-orange-400'
   };
   
   return (
-    <div className={`text-center p-4 rounded-lg ${colors[color]}`}>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-xs mt-1">{label}</p>
+    <div className={`text-center p-5 rounded-xl ${colors[color]}`}>
+      <p className="text-3xl font-bold">{value}</p>
+      <p className="text-xs mt-2 font-medium">{label}</p>
     </div>
   );
 }
