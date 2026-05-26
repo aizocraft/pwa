@@ -41,7 +41,8 @@ export interface TransportInfo {
 
 export interface Quotation {
   _id: string;
-  quoteNumber: string;
+  quoteNumber: string;        // Format: 0001-MM-PSMA/Q
+  invoiceNumber?: string;      // Format: 0001-MM-PSMA/I (when converted)
   customerId: string;
   customerName: string;
   customerEmail?: string;
@@ -77,6 +78,13 @@ export interface Quotation {
   };
   createdAt: string;
   updatedAt: string;
+}
+
+// Extended interface for order with quotation info
+export interface OrderWithQuotation extends Order {
+  invoiceNumber?: string;      // Invoice number from converted quotation
+  quotationId?: string;         // Reference to original quotation
+  quotationNumber?: string;     // Original quotation number (e.g., 0001-MM-PSMA/Q)
 }
 
 export interface Transaction {
@@ -576,7 +584,7 @@ export async function acceptQuotation(
     paymentMethod?: 'cod' | 'mpesa' | 'card';
     promoCode?: string;
   }
-): Promise<{ success: boolean; order: Order }> {
+): Promise<{ success: boolean; order: OrderWithQuotation; invoiceNumber?: string }> {
   const res = await api.post(`/sales/quotations/${quotationId}/accept`, payload || {});
   return res.data;
 }
@@ -585,4 +593,55 @@ export async function acceptQuotation(
 export async function listCategories(params?: { limit?: number }): Promise<{ categories: any[] }> {
   const res = await api.get('/categories', { params });
   return res.data;
+}
+
+// ==================== HELPER FUNCTIONS FOR NUMBER FORMATTING ====================
+
+/**
+ * Parse a quotation number to extract components
+ * Example: "0001-01-PSMA/Q" -> { sequence: 1, month: 1, year: current, company: "PSMA", type: "Q" }
+ */
+export function parseQuotationNumber(quoteNumber: string): {
+  sequence: number;
+  month: number;
+  year?: number;
+  company: string;
+  type: 'Q' | 'I';
+} | null {
+  const match = quoteNumber.match(/^(\d{4})-(\d{2})-([A-Z]+)\/([QI])$/);
+  if (!match) return null;
+  
+  return {
+    sequence: parseInt(match[1], 10),
+    month: parseInt(match[2], 10),
+    company: match[3],
+    type: match[4] as 'Q' | 'I',
+  };
+}
+
+/**
+ * Check if a quotation has been converted to an invoice
+ */
+export function isConvertedToInvoice(quotation: Quotation): boolean {
+  return quotation.status === 'converted' && !!quotation.invoiceNumber;
+}
+
+/**
+ * Get the appropriate display number based on document type
+ */
+export function getDisplayNumber(quotation: Quotation): string {
+  if (quotation.status === 'converted' && quotation.invoiceNumber) {
+    return quotation.invoiceNumber;
+  }
+  return quotation.quoteNumber;
+}
+
+/**
+ * Get document type label
+ */
+export function getDocumentType(quotation: Quotation): 'Quotation' | 'Invoice' {
+  if (quotation.status === 'converted' && quotation.invoiceNumber) {
+    return 'Invoice';
+  }
+  return 'Quotation';
 }

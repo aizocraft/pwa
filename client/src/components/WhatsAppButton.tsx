@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect, useState } from "react";
-import { MessageCircle, X, Send, Minimize2 } from "lucide-react";
+import { X, Send, Minimize2 } from "lucide-react";
 
 interface WhatsAppButtonProps {
   phoneNumber?: string;
@@ -14,7 +14,7 @@ interface WhatsAppButtonProps {
 const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
   phoneNumber = "254728749722",
   accountName = "Plasma Water Africa",
-  welcomeMessage = "Hi there! 👋 How can we assist you today?",
+  welcomeMessage = "Hi there! 👋 Welcome to Plasma Water Africa. How can we assist you today?",
   avatar = "/logo.png",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -69,6 +69,13 @@ const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
     setMessage("");
   };
 
+  const handleQuickReply = (replyText: string) => {
+    const fullMessage = `${replyText}`;
+    const encodedMessage = encodeURIComponent(fullMessage);
+    window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
+    setIsOpen(false);
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -86,13 +93,19 @@ const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
       >
         <button
           onClick={() => setIsOpen(true)}
-          className="group relative bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-full p-4 shadow-2xl hover:shadow-xl transition-all duration-300 transform hover:scale-110 animate-pulse-slow"
+         // Remove the gradient classes from this line:
+className="group relative bg-transparent text-white rounded-full p-3 shadow-2xl hover:shadow-xl transition-all duration-300 transform hover:scale-110 animate-pulse-slow"
         >
           {/* Ripple Effect */}
           <span className="absolute inset-0 rounded-full bg-green-400 opacity-75 animate-ripple"></span>
           <span className="absolute inset-0 rounded-full bg-green-400 opacity-75 animate-ripple-delay"></span>
           
-          <MessageCircle className="w-7 h-7 relative z-10" />
+          {/* Real WhatsApp Icon from local file */}
+          <img 
+            src="/whatsapp-logo.png" 
+            alt="WhatsApp"
+            className="w-8 h-8 relative z-10 object-contain"
+          />
           
           {/* Notification Badge */}
           <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-ping"></span>
@@ -104,7 +117,7 @@ const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
       {isOpen && (
         <div 
           className={`fixed bottom-6 right-6 z-50 w-[90vw] sm:w-[380px] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl transition-all duration-500 transform ${
-            isMinimized ? 'h-14' : 'h-[520px]'
+            isMinimized ? 'h-14' : 'h-[560px]'
           } ${isVisible ? 'translate-y-0' : 'translate-y-24'} animate-slideUp`}
         >
           {/* Header */}
@@ -147,7 +160,7 @@ const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
           {!isMinimized && (
             <>
               {/* Chat Body */}
-              <div className="flex-1 p-4 overflow-y-auto h-[380px] bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+              <div className="flex-1 p-4 overflow-y-auto h-[420px] bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
                 {/* Welcome Message */}
                 <div className="flex items-start gap-2 mb-4 animate-fadeIn">
                   <img 
@@ -171,23 +184,66 @@ const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
                 </div>
                 
                 {/* Quick Reply Buttons */}
-                <div className="mt-4 space-y-2">
+                <div className="mt-6 space-y-3">
                   <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Quick replies:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      "Product pricing 💰",
-                      "Technical support 🔧",
-                      "Shipping info 🚚",
-                      "Warranty details 📋"
-                    ].map((reply, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setMessage(reply)}
-                        className="text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-full transition-colors"
-                      >
-                        {reply}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleQuickReply("I'm interested in Borehole Drilling services. Can you share pricing and process?")}
+                      className="text-xs bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-400 px-3 py-2 rounded-xl transition-all duration-200 text-left border border-green-200 dark:border-green-800"
+                    >
+                      🚰 Borehole Drilling
+                    </button>
+                    <button
+                      onClick={() => handleQuickReply("I need Water Pumps for my project. What options do you have?")}
+                      className="text-xs bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-400 px-3 py-2 rounded-xl transition-all duration-200 text-left border border-blue-200 dark:border-blue-800"
+                    >
+                      💧 Water Pumps
+                    </button>
+                    <button
+                      onClick={() => handleQuickReply("I'm interested in Solar Water Pumping solutions. Tell me more.")}
+                      className="text-xs bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 px-3 py-2 rounded-xl transition-all duration-200 text-left border border-yellow-200 dark:border-yellow-800"
+                    >
+                      ☀️ Solar Solutions
+                    </button>
+                    <button
+                      onClick={() => handleQuickReply("I need Water Treatment systems for my home/business.")}
+                      className="text-xs bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 text-cyan-700 dark:text-cyan-400 px-3 py-2 rounded-xl transition-all duration-200 text-left border border-cyan-200 dark:border-cyan-800"
+                    >
+                      💧 Water Treatment
+                    </button>
+                    <button
+                      onClick={() => handleQuickReply("I need a Generator. What sizes and prices do you offer?")}
+                      className="text-xs bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40 text-orange-700 dark:text-orange-400 px-3 py-2 rounded-xl transition-all duration-200 text-left border border-orange-200 dark:border-orange-800"
+                    >
+                      ⚡ Generators
+                    </button>
+                    <button
+                      onClick={() => handleQuickReply("I need Irrigation System for my farm. Can you help?")}
+                      className="text-xs bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-3 py-2 rounded-xl transition-all duration-200 text-left border border-emerald-200 dark:border-emerald-800"
+                    >
+                      🌾 Irrigation
+                    </button>
+                    <button
+                      onClick={() => handleQuickReply("I'm interested in Swimming Pool construction and maintenance.")}
+                      className="text-xs bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-700 dark:text-sky-400 px-3 py-2 rounded-xl transition-all duration-200 text-left border border-sky-200 dark:border-sky-800"
+                    >
+                      🏊 Swimming Pools
+                    </button>
+                    <button
+                      onClick={() => handleQuickReply("I need a quotation for multiple products. Can you help?")}
+                      className="text-xs bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-400 px-3 py-2 rounded-xl transition-all duration-200 text-left border border-purple-200 dark:border-purple-800"
+                    >
+                      📋 Request Quotation
+                    </button>
+                  </div>
+                </div>
+
+                {/* Trust Badges */}
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex justify-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <span>✓ 24/7 Support</span>
+                    <span>✓ Free Consultation</span>
+                    <span>✓ Quality Guaranteed</span>
                   </div>
                 </div>
               </div>

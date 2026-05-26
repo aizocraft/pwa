@@ -1,4 +1,3 @@
-// models/Quotation.ts
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import QuoteNumberCounterModel from './QuoteNumberCounter';
 
@@ -67,6 +66,7 @@ export interface IQuotation extends Document {
   total: number;
 
   quoteNumber: string;
+  invoiceNumber?: string; // ADDED: for converted quotations
 
   status: QuotationStatus;
   validUntil: Date;
@@ -156,6 +156,7 @@ const quotationSchema = new Schema<IQuotation>(
     total: { type: Number, required: true, min: 0 },
 
     quoteNumber: { type: String, required: true, unique: true, index: true },
+    invoiceNumber: { type: String, unique: true, sparse: true }, // ADDED
 
     status: {
       type: String,
@@ -183,6 +184,7 @@ const quotationSchema = new Schema<IQuotation>(
 // Indexes for better query performance
 quotationSchema.index({ createdBy: 1, status: 1, createdAt: -1 });
 quotationSchema.index({ quoteNumber: 1 });
+quotationSchema.index({ invoiceNumber: 1 }); // ADDED
 quotationSchema.index({ customerId: 1, status: 1 });
 quotationSchema.index({ validUntil: 1 });
 quotationSchema.index({ status: 1, createdAt: -1 });
@@ -240,21 +242,36 @@ quotationSchema.virtual('effectiveTransportInfo').get(function() {
 
 const QuotationModel = mongoose.model<IQuotation>('Quotation', quotationSchema);
 
-// Standalone function to generate quote number
+// Generate quote number in format: 0001-MM-PSMA/Q
 export async function generateQuoteNumber(date: Date = new Date()): Promise<string> {
   const year = date.getFullYear();
   const monthNumber = date.getMonth() + 1; // 1-12
   const month = String(monthNumber).padStart(2, '0');
 
-  // Atomic increment per year/month to avoid duplicate quote numbers under concurrency.
   const counter = await QuoteNumberCounterModel.findOneAndUpdate(
-    { year, month: monthNumber },
+    { year, month: monthNumber, type: 'quotation' },
     { $inc: { sequence: 1 } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  const sequence = String(counter!.sequence).padStart(5, '0');
-  return `QT-${year}${month}-${sequence}`;
+  const sequence = String(counter!.sequence).padStart(4, '0');
+  return `${sequence}-${month}-PSMA/Q`;
+}
+
+// Generate invoice number in format: 0001-MM-PSMA/I
+export async function generateInvoiceNumber(date: Date = new Date()): Promise<string> {
+  const year = date.getFullYear();
+  const monthNumber = date.getMonth() + 1; // 1-12
+  const month = String(monthNumber).padStart(2, '0');
+
+  const counter = await QuoteNumberCounterModel.findOneAndUpdate(
+    { year, month: monthNumber, type: 'invoice' },
+    { $inc: { sequence: 1 } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  const sequence = String(counter!.sequence).padStart(4, '0');
+  return `${sequence}-${month}-PSMA/I`;
 }
 
 export default QuotationModel;

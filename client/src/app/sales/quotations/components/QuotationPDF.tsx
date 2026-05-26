@@ -10,25 +10,14 @@ export async function generateQuotationPDF(
   settings: any,
   logoUrl: string | null
 ): Promise<Blob> {
-  const element = document.createElement('div');
-  element.style.position = 'absolute';
-  element.style.top = '-9999px';
-  element.style.left = '-9999px';
-  element.style.width = '1100px';
-  element.style.backgroundColor = '#ffffff';
-  element.style.padding = '0';
-  element.style.margin = '0';
-
   // Logo paths
   const finalLogoUrl = logoUrl || '/logo1.png';
   const mpesaLogoUrl = '/mpesa-logo.png';
   const kcbLogoUrl = '/kcb-logo.png';
+  const footerLogoUrl = '/logo.png';
   
   const companyName = settings?.companyName || 'PLASMA WATER AFRICA';
   const companySlogan = settings?.slogan || 'Quality Water Solutions';
-  const companyAddress = settings?.address || 'P.O BOX 4996-00200, NAIROBI, KENYA';
-  const companyPhone = settings?.phone || '0710743793';
-  const companyEmail = settings?.email || 'info@plasmawater.com';
   const taxRate = quote.taxRate || 0.16;
 
   // Get transport info
@@ -38,8 +27,6 @@ export async function generateQuotationPDF(
   
   // Tax calculation mode
   const taxPerItem = quote.taxPerItem || false;
-  
-  // Calculate totals based on tax mode
   const displayTaxableBadges = !!taxPerItem;
 
   let calculatedSubtotal = 0;
@@ -52,7 +39,6 @@ export async function generateQuotationPDF(
     const itemTotal = unitPrice * qty;
     calculatedSubtotal += itemTotal;
 
-    // If taxPerItem is OFF: do not apply per-item VAT.
     const isTaxable = taxPerItem ? item.taxable !== false : false;
     const itemTax = (taxPerItem && isTaxable) ? itemTotal * taxRate : 0;
 
@@ -68,7 +54,6 @@ export async function generateQuotationPDF(
     };
   });
 
-  // If not taxPerItem, tax is calculated on total after discount
   const discountAmount = quote.discountType === 'percentage'
     ? calculatedSubtotal * ((quote.discount || 0) / 100)
     : (quote.discount || 0);
@@ -78,9 +63,7 @@ export async function generateQuotationPDF(
     calculatedTax = taxableAmount * taxRate;
   }
 
-  // Grand total: subtotal - discount + tax + transport (never double-apply discount)
   const calculatedTotal = calculatedSubtotal - discountAmount + calculatedTax + transportCost;
-
 
   function escapeHtml(str: string): string {
     if (!str) return '';
@@ -105,612 +88,203 @@ export async function generateQuotationPDF(
     tax: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>`,
   };
 
-  element.innerHTML = `
+  // Shared header and top sections (appears on all pages)
+  const getHeaderHTML = () => `
+    <div class="header">
+      <div class="company-info">
+        <div class="company-name">PLASMA WATER AFRICA</div>
+        <div class="company-address">P.O BOX 4996-00200</div>
+        <div class="company-location">NAIROBI, KENYA</div>
+        <div class="company-tel">TEL: 0710743793</div>
+        <div class="company-email">Email: plasmawaterafrica@gmail.com</div>
+      </div>
+      <div class="logo-area">
+        <img src="${finalLogoUrl}" class="company-logo" alt="Logo" crossorigin="anonymous" />
+      </div>
+    </div>
+
+<div class="doc-title-section ${quote.status === 'accepted' || quote.status === 'converted' ? 'doc-title-invoice' : 'doc-title-quotation'}">
+  <div class="doc-title-container">
+    <div class="doc-title-text ${quote.status === 'accepted' || quote.status === 'converted' ? 'text-invoice' : 'text-quotation'}">
+      ${quote.status === 'accepted' || quote.status === 'converted' ? 'INVOICE' : 'QUOTATION'}
+    </div>
+  </div>
+</div>
+
+    <div class="info-section">
+      <div class="info-card">
+        <div class="info-card-header">
+          ${icons.user}
+          <h3>Bill To</h3>
+        </div>
+        <div class="info-content">
+          <div class="customer-name">${escapeHtml(customer.name)}</div>
+          ${customer.email ? `<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${escapeHtml(customer.email)}</span></div>` : ''}
+          ${customer.phone ?  `<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escapeHtml(customer.phone)}</span></div>` : ''}
+          ${customer.location ? `<div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${escapeHtml(customer.location)}</span></div>` : ''}
+        </div>
+      </div>
+
+        <div class="info-card">
+          <div class="info-card-header">
+            ${icons.package}
+            <h3>${quote.status === 'accepted' || quote.status === 'converted' ? 'INVOICE DETAILS' : 'QUOTATION DETAILS'}</h3>
+          </div>
+          <div class="info-content">
+            <div class="detail-row">
+              <span class="detail-label">REF Number</span>
+              <span class="detail-value">${quote.status === 'converted' && quote.invoiceNumber ? quote.invoiceNumber : quote.quoteNumber}</span>
+            </div>
+            ${quote.status === 'converted' && quote.invoiceNumber && quote.quoteNumber ? `
+              <div class="detail-row">
+                <span class="detail-label">Quote REF</span>
+                <span class="detail-value">${quote.quoteNumber}</span>
+              </div>
+            ` : ''}
+          <div class="detail-row">
+            <span class="detail-label">Date Issued</span>
+            <span class="detail-value">${new Date(quote.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Valid Until</span>
+            <span class="detail-value">${new Date(quote.validUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          </div>
+          ${(quote.status === 'accepted' || quote.status === 'converted') ? `
+            <div class="detail-row">
+              <span class="detail-label">Payment Status</span>
+              <span class="detail-value">
+                <span class="payment-status-badge ${quote.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}">
+                  ${quote.paymentStatus === 'paid' ? '✓ PAID' : '⚠ UNPAID'}
+                </span>
+              </span>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Conditional Routing Logic based on item count
+  const hasPageBreak = itemsWithCalculations.length > 6;
+  const page1Items = hasPageBreak ? itemsWithCalculations.slice(0, 6) : itemsWithCalculations;
+  const page2Items = hasPageBreak ? itemsWithCalculations.slice(6) : [];
+
+  // Determine exactly where the totals panel lands
+  const showTotalsOnPage1 = !hasPageBreak;
+  const showTotalsOnPage2 = hasPageBreak;
+
+  // Items Table Markup Engine
+  const getItemsTableHTML = (itemsList: any[]) => `
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width: 45%">Item Description</th>
+          <th style="width: 10%" class="text-center">Qty</th>
+          <th style="width: 20%" class="text-right">Unit Price (KES)</th>
+          ${taxPerItem ? `<th style="width: 12%" class="text-center">Tax (${(taxRate * 100).toFixed(0)}%)</th>` : ''}
+          <th style="width: ${taxPerItem ? '13%' : '25%'}" class="text-right">Total (KES)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsList.map((item: any) => `
+          <tr>
+            <td>
+              <div class="item-name">${escapeHtml(item.name)}</div>
+              ${item.description ? `<div class="item-description">${escapeHtml(item.description.substring(0, 120))}</div>` : ''}
+            </td>
+            <td class="text-center font-mono">${item.qty}</td>
+            <td class="text-right font-mono">
+              ${item.unitPrice.toLocaleString()}
+              ${displayTaxableBadges ? `
+                <div class="item-description" style="margin-top:6px;">Tax: ${item.isTaxable ? ('+' + (item.unitPrice * taxRate).toLocaleString()) : '0'}</div>
+              ` : ''}
+            </td>
+            ${taxPerItem ? `
+              <td class="text-center font-mono" style="${item.isTaxable ? 'color: #2c6e3c; font-weight: 600;' : 'color: #b46f0b;'}">
+                ${item.isTaxable ? `KES ${item.itemTax.toLocaleString()}` : 'Exempt'}
+              </td>
+            ` : `<td class="text-center"></td>`}
+            <td class="text-right font-mono" style="font-weight: 600;">${(item.itemTotal + (displayTaxableBadges ? item.itemTax : 0)).toLocaleString()}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  // Extracted Totals Box Component
+  const totalsBoxHTML = `
+    <div class="totals-wrapper">
+      <div class="totals-box">
+        <div class="total-row">
+          <span>Subtotal</span>
+          <span class="font-mono">KES ${calculatedSubtotal.toLocaleString()}</span>
+        </div>
+        ${quote.discount > 0 ? `
+          <div class="total-row discount">
+            <span>Discount (${quote.discountType === 'percentage' ? `${quote.discount}%` : `KES ${quote.discount.toLocaleString()}`})</span>
+            <span class="font-mono">-KES ${discountAmount.toLocaleString()}</span>
+          </div>
+        ` : ''}
+        ${transportCost > 0 ? `
+          <div class="total-row">
+            <span>Transport</span>
+            <span class="font-mono">KES ${transportCost.toLocaleString()}</span>
+          </div>
+        ` : ''}
+        <div class="total-row">
+          <span>Tax (${(taxRate * 100).toFixed(0)}% VAT${taxPerItem ? ' - Per Item' : ' - On Total'})</span>
+          <span class="font-mono">KES ${calculatedTax.toLocaleString()}</span>
+        </div>
+        <div class="total-row grand-total">
+          <span class="grand-total-label">Total Amount</span>
+          <span class="grand-total-amount">KES ${calculatedTotal.toLocaleString()}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Footer HTML (appears on every page)
+  const getFooterHTML = () => `
+    <div class="footer">
+      <div class="footer-main">
+        <div class="footer-logo-section">
+          <img src="${footerLogoUrl}" class="footer-logo" alt="Plasma Water Africa" crossorigin="anonymous" onerror="this.style.display='none'" />
+        </div>
+        <div class="footer-services">
+         
+          <div class="services-list">
+            <span class="service-item">Borehole Services</span>
+            <span class="service-item">Water Pumps</span>
+            <span class="service-item">Solar Solutions</span>
+            <span class="service-item">Water Treatment</span>
+            <span class="service-item">Generators</span>
+            <span class="service-item">Irrigation Systems</span>
+            <span class="service-item">Swimming Pools</span>
+          </div>
+          <div class="footer-slogan">${escapeHtml(companySlogan)}  |  © ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.</div>
+           <div class="footer-copyright">
+                 
+        </div>
+        </div>
+      </div>
+    
+      </div>
+    </div>
+  `;
+
+  // Page 1: Header + Items + Tax Note + Totals (up to Total Amount)
+  const page1HTML = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
       <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-
-        body {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-          background: #ffffff;
-          padding: 50px 45px;
-          line-height: 1.5;
-          color: #1a2a3a;
-        }
-
-        .pdf-container {
-          max-width: 1000px;
-          margin: 0 auto;
-          background: white;
-        }
-
-        /* HEADER SECTION */
-        .header {
-          padding: 25px 0 20px 0;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 20px;
-          border-bottom: 2px solid #000;
-        }
-
-        .company-info {
-          flex: 1;
-          margin-left: 75px;
-        }
-
-        .company-name {
-          font-size: 24px;
-          font-weight: bold;
-          letter-spacing: 1px;
-          margin-bottom: 12px;
-          color: #1a1a1a;
-        }
-
-        .company-address, .company-location, .company-tel, .company-email {
-          font-size: 18px;
-          font-weight: 500;
-          color: #333;
-          margin-bottom: 5px;
-        }
-
-        .logo-area {
-          flex: 0 0 auto;
-          margin-right: 100px;
-        }
-
-        .company-logo {
-          height: 225px;
-          width: auto;
-          max-width: 250px;
-          object-fit: contain;
-          display: block;
-        }
-
-        /* DOCUMENT TITLE SECTION */
-        .doc-title-section {
-          position: relative;
-          width: 100%;
-          margin: 18px 0 34px;
-        }
-
-        .doc-title-container {
-          position: relative;
-          z-index: 2;
-          width: 100%;
-          display: flex;
-          justify-content: flex-end;
-          padding-right: 85px;
-        }
-
-        .doc-title-text {
-          position: relative;
-          min-width: 240px;
-          padding: 10px 42px;
-          text-align: center;
-          background: #efefef;
-          border: 2px solid #3f6f9e;
-          font-family: Arial, Helvetica, sans-serif;
-          font-size: 23px;
-          font-weight: 700;
-          letter-spacing: 1px;
-          text-transform: uppercase;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 1px 4px rgba(0,0,0,0.08);
-        }
-
-        .doc-title-text.quotation {
-          color: #505050;
-          background: #f1f1f1;
-          border-color: #4b79a6;
-        }
-
-        .doc-title-text.invoice {
-          color: #3d3d3d;
-          background: linear-gradient(to bottom, #f8f8f8, #e7e7e7);
-          border-color: #2f5f8c;
-          letter-spacing: 1.5px;
-        }
-
-        /* INFO SECTION */
-        .info-section {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 40px;
-          margin-bottom: 25px;
-        }
-
-        .info-card {
-          padding: 0;
-        }
-
-        .info-card-header {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 18px;
-          padding-bottom: 10px;
-          border-bottom: 2px solid #e9eef3;
-        }
-
-        .info-card-header h3 {
-          font-size: 15px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 1.2px;
-          color: #8a9aaa;
-        }
-
-        .info-content {
-          font-size: 16px;
-          color: #2c3e4e;
-          line-height: 1.7;
-        }
-
-        .customer-name {
-          font-size: 22px;
-          font-weight: 700;
-          color: #0a2540;
-          margin-bottom: 14px;
-        }
-
-        .detail-row {
-          display: flex;
-          align-items: baseline;
-          gap: 12px;
-          margin-bottom: 10px;
-        }
-
-        .detail-label {
-          font-size: 14px;
-          font-weight: 600;
-          color: #8a9aaa;
-          min-width: 100px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        .detail-value {
-          font-size: 16px;
-          color: #2c3e4e;
-        }
-
-        /* Transport Info Section */
-        .transport-info {
-          background: #f7f9fc;
-          padding: 18px 28px;
-          border-radius: 16px;
-          margin-bottom: 25px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 20px;
-          border: 1px solid #e9eef3;
-        }
-
-        .transport-item {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-        }
-
-        .transport-label {
-          font-size: 14px;
-          font-weight: 600;
-          color: #5a7a5a;
-          text-transform: uppercase;
-          letter-spacing: 0.6px;
-        }
-
-        .transport-value {
-          font-size: 16px;
-          font-weight: 500;
-          color: #2c5e3c;
-        }
-
-        /* Payment Status Badges */
-        .payment-status-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 5px 14px;
-          border-radius: 20px;
-          font-size: 12px;
-          font-weight: 700;
-          letter-spacing: 0.5px;
-        }
-
-        .badge-paid {
-          background: linear-gradient(135deg, #22c55e, #16a34a);
-          color: white;
-          box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
-        }
-
-        .badge-unpaid {
-          background: linear-gradient(135deg, #ef4444, #dc2626);
-          color: white;
-          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
-        }
-
-        /* ITEMS TABLE */
-        .items-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 25px;
-        }
-
-        .items-table th {
-          text-align: left;
-          padding: 18px 12px;
-          background: #f7f9fc;
-          font-size: 14px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          color: #8a9aaa;
-          border-bottom: 2px solid #e9eef3;
-        }
-
-        .items-table td {
-          padding: 18px 12px;
-          border-bottom: 1px solid #eef2f6;
-          font-size: 16px;
-          color: #2c3e4e;
-          vertical-align: top;
-        }
-
-        .item-name {
-          font-weight: 700;
-          color: #0f2636;
-          font-size: 18px;
-          margin-bottom: 6px;
-        }
-
-        .item-description {
-          font-size: 14px;
-          color: #8a9aaa;
-          line-height: 1.5;
-          margin-top: 4px;
-        }
-
-        .tax-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 3px 10px;
-          border-radius: 20px;
-          font-size: 10px;
-          font-weight: 600;
-          margin-top: 6px;
-        }
-
-        .tax-badge-taxable {
-          background: #e8f4ec;
-          color: #2c6e3c;
-        }
-
-        .tax-badge-non-taxable {
-          background: #fef8e7;
-          color: #b46f0b;
-        }
-
-        .custom-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          background: #eef2ff;
-          padding: 3px 10px;
-          border-radius: 14px;
-          font-size: 12px;
-          color: #3b5c8a;
-          font-weight: 500;
-          margin-top: 6px;
-        }
-
-        .text-right {
-          text-align: right;
-        }
-
-        .text-center {
-          text-align: center;
-        }
-
-        .font-mono {
-          font-family: 'Inter', monospace;
-          font-weight: 500;
-        }
-
-        /* TOTALS */
-        .totals-wrapper {
-          display: flex;
-          justify-content: flex-end;
-          margin-bottom: 45px;
-          padding-top: 12px;
-        }
-
-        .totals-box {
-          width: 380px;
-        }
-
-        .total-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 14px 0;
-          font-size: 16px;
-          color: #4a5c6a;
-          border-bottom: 1px solid #eef2f6;
-        }
-
-        .total-row.discount {
-          color: #c75c3c;
-        }
-
-        .total-row.grand-total {
-          padding-top: 20px;
-          margin-top: 12px;
-          border-top: 2px solid #0a2540;
-          border-bottom: none;
-        }
-
-        .grand-total-label {
-          font-size: 20px;
-          font-weight: 700;
-          color: #0a2540;
-        }
-
-        .grand-total-amount {
-          font-size: 28px;
-          font-weight: 800;
-          color: #0a2540;
-          letter-spacing: -0.5px;
-        }
-
-        .tax-note {
-          font-size: 11px;
-          color: #6b7280;
-          text-align: right;
-          margin-top: 8px;
-          margin-bottom: 20px;
-          padding: 8px 12px;
-          background: #f8fafc;
-          border-radius: 8px;
-          font-style: italic;
-        }
-
-        /* PAYMENT SECTION */
-        .payment-section {
-          margin-bottom: 40px;
-          border: 1px solid #e9eef3;
-          border-radius: 20px;
-          overflow: hidden;
-        }
-
-        .payment-header {
-          background: #0a2540;
-          padding: 18px 28px;
-        }
-
-        .payment-header h4 {
-          color: #ffffff;
-          font-size: 15px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 1.5px;
-        }
-
-        .payment-body {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 0;
-        }
-
-        .payment-method {
-          padding: 28px 28px;
-        }
-
-        .payment-method:first-child {
-          border-right: 1px solid #e9eef3;
-        }
-
-        .payment-method-header {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          margin-bottom: 22px;
-        }
-
-        .payment-logo {
-          height: 48px;
-          width: auto;
-          object-fit: contain;
-        }
-
-        .payment-method-title {
-          font-size: 18px;
-          font-weight: 700;
-          color: #0a2540;
-        }
-
-        .payment-method-sub {
-          font-size: 14px;
-          color: #8a9aaa;
-          margin-top: 3px;
-        }
-
-        .payment-details {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .payment-detail {
-          display: flex;
-          gap: 16px;
-          font-size: 15px;
-        }
-
-        .payment-detail-key {
-          color: #8a9aaa;
-          font-weight: 500;
-          min-width: 110px;
-        }
-
-        .payment-detail-value {
-          color: #2c3e4e;
-          font-weight: 500;
-          font-family: 'Inter', monospace;
-          font-size: 15px;
-        }
-
-        /* NOTES & TERMS */
-        .notes-box {
-          background: #fef8e7;
-          padding: 18px 24px;
-          border-radius: 16px;
-          margin-bottom: 24px;
-          border-left: 4px solid #e6a017;
-        }
-
-        .notes-title, .terms-title {
-          font-size: 13px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          margin-bottom: 8px;
-        }
-
-        .notes-title {
-          color: #b46f0b;
-        }
-
-        .notes-text {
-          font-size: 15px;
-          color: #7a5a2a;
-          line-height: 1.6;
-        }
-
-        .terms-box {
-          background: #f7f9fc;
-          padding: 18px 24px;
-          border-radius: 16px;
-          margin-bottom: 40px;
-          border-left: 4px solid #8a9aaa;
-        }
-
-        .terms-title {
-          color: #5a6e7c;
-        }
-
-        .terms-text {
-          font-size: 15px;
-          color: #5a6e7c;
-          line-height: 1.6;
-        }
-
-        /* FOOTER */
-        .footer {
-          text-align: center;
-          padding-top: 32px;
-          border-top: 1px solid #e9eef3;
-        }
-
-        .footer-slogan {
-          font-family: 'Cormorant Garamond', serif;
-          font-style: italic;
-          font-size: 16px;
-          color: #8a9aaa;
-          margin-bottom: 14px;
-        }
-
-        .footer-copyright {
-          font-size: 12px;
-          color: #a0b0be;
-          line-height: 1.7;
-        }
-      </style>
+      <style>${getStyles()}</style>
     </head>
     <body>
       <div class="pdf-container">
-        <!-- HEADER SECTION -->
-        <div class="header">
-          <div class="company-info">
-            <div class="company-name">PLASMA WATER AFRICA</div>
-            <div class="company-address">P.O BOX 4996-00200</div>
-            <div class="company-location">NAIROBI, KENYA</div>
-            <div class="company-tel">TEL: 0710743793</div>
-            <div class="company-email">Email: plasmawaterafrica@gmail.com</div>
-          </div>
-          <div class="logo-area">
-            <img src="${finalLogoUrl}" class="company-logo" alt="Logo" crossorigin="anonymous" />
-          </div>
-        </div>
-
-        <!-- Document Title -->
-        <div class="doc-title-section">
-          <div class="doc-title-container">
-            <div class="doc-title-text ${quote.status === 'accepted' || quote.status === 'converted' ? 'invoice' : 'quotation'}">
-              ${quote.status === 'accepted' || quote.status === 'converted' ? 'INVOICE' : 'QUOTATION'}
-            </div>
-          </div>
-        </div>
-
-        <!-- INFO SECTION -->
-        <div class="info-section">
-          <div class="info-card">
-            <div class="info-card-header">
-              ${icons.user}
-              <h3>Bill To</h3>
-            </div>
-            <div class="info-content">
-              <div class="customer-name">${escapeHtml(customer.name)}</div>
-              ${customer.email ? `<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${escapeHtml(customer.email)}</span></div>` : ''}
-              ${customer.phone ? `<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escapeHtml(customer.phone)}</span></div>` : ''}
-              ${customer.location ? `<div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${escapeHtml(customer.location)}</span></div>` : ''}
-            </div>
-          </div>
-
-          <div class="info-card">
-            <div class="info-card-header">
-              ${icons.package}
-              <h3>${quote.status === 'accepted' || quote.status === 'converted' ? 'INVOICE DETAILS' : 'QUOTATION DETAILS'}</h3>
-            </div>
-            <div class="info-content">
-              <div class="detail-row">
-                <span class="detail-label">REF Number</span>
-                <span class="detail-value">${quote.quoteNumber}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Date Issued</span>
-                <span class="detail-value">${new Date(quote.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Valid Until</span>
-                <span class="detail-value">${new Date(quote.validUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-              </div>
-              ${(quote.status === 'accepted' || quote.status === 'converted') ? `
-                <div class="detail-row">
-                  <span class="detail-label">Payment Status</span>
-                  <span class="detail-value">
-                    <span class="payment-status-badge ${quote.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}">
-                      ${quote.paymentStatus === 'paid' ? '✓ PAID' : '⚠ UNPAID'}
-                    </span>
-                  </span>
-                </div>
-              ` : ''}
-            </div>
-          </div>
-        </div>
-
-        <!-- TRANSPORT / DELIVERY INFO -->
+        ${getHeaderHTML()}
+        
         ${(transportCost > 0 || transportDescription || estimatedDelivery) ? `
           <div class="transport-info">
             ${transportDescription ? `
@@ -740,98 +314,38 @@ export async function generateQuotationPDF(
             ` : ''}
           </div>
         ` : ''}
+        
+        ${getItemsTableHTML(page1Items)}
+        
+        ${showTotalsOnPage1 ? totalsBoxHTML : ''}
+        
+        ${getFooterHTML()}
+      </div>
+    </body>
+    </html>
+  `;
 
-        <!-- ITEMS TABLE with Individual Tax Toggle Display -->
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th style="width: 45%">Item Description</th>
-              <th style="width: 10%" class="text-center">Qty</th>
-              <th style="width: 20%" class="text-right">Unit Price (KES)</th>
-              ${taxPerItem ? `<th style="width: 12%" class="text-center">Tax (${(taxRate * 100).toFixed(0)}%)</th>` : ''}
-              <th style="width: ${taxPerItem ? '13%' : '25%'}" class="text-right">Total (KES)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsWithCalculations.map((item: any) => `
-              <tr>
-                <td>
-                  <div class="item-name">${escapeHtml(item.name)}</div>
-                  ${item.description ? `<div class="item-description">${escapeHtml(item.description.substring(0, 120))}</div>` : ''}
-                  ${item.customPrice ? `<div class="custom-badge">${icons.check} Custom pricing applied</div>` : ''}
-              ${displayTaxableBadges ? (
-                    item.isTaxable 
-                      ? `<div class="tax-badge tax-badge-taxable">${icons.tax} Taxable: +KES ${item.itemTax.toLocaleString()}</div>`
-                      : `<div class="tax-badge tax-badge-non-taxable">✗ No Tax (Exempt)</div>`
-                  ) : ''}
-
-                </td>
-                <td class="text-center font-mono">${item.qty}</td>
-                <td class="text-right font-mono">
-                  ${item.unitPrice.toLocaleString()}
-                  ${displayTaxableBadges ? `
-                    <div class="item-description" style="margin-top:6px;">Tax: ${item.isTaxable ? ('+' + (item.unitPrice * taxRate).toLocaleString()) : '0'}</div>
-                  ` : ''}
-                </td>
-              ${taxPerItem ? `
-                  <td class="text-center font-mono" style="${item.isTaxable ? 'color: #2c6e3c; font-weight: 600;' : 'color: #b46f0b;'}">
-                    ${item.isTaxable ? `KES ${item.itemTax.toLocaleString()}` : 'Exempt'}
-                  </td>
-                ` : `<td></td>`}
-
-
-                <td class="text-right font-mono" style="font-weight: 600;">${(item.itemTotal + (displayTaxableBadges ? item.itemTax : 0)).toLocaleString()}</td>
-
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-
-        <!-- Tax Calculation Note -->
-        ${taxPerItem ? `
-          <div class="tax-note">
-            <strong>📊 Tax Calculation:</strong> ${(taxRate * 100).toFixed(0)}% VAT applied <strong>per item</strong> only to items marked as "Taxable". 
-            Non-taxable items are marked as "No Tax (Exempt)".
+  // Page 2: Header + Payment Information + Notes + Terms + Footer
+const page2HTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+      <style>${getStyles()}</style>
+    </head>
+    <body>
+      <div class="pdf-container">
+        
+        ${hasPageBreak ? `
+          <div style="margin-top: 20px;">
+            ${getItemsTableHTML(page2Items)}
           </div>
-        ` : `
-          <div class="tax-note">
-            <strong>📊 Tax Calculation:</strong> ${(taxRate * 100).toFixed(0)}% VAT applied to the <strong>total amount after discount</strong>.
-            ${quote.items.some((i: any) => i.taxable === false) ? ' Non-taxable items are included in the subtotal but do not affect tax calculation.' : ''}
-          </div>
-        `}
+        ` : ''}
 
-        <!-- TOTALS -->
-        <div class="totals-wrapper">
-          <div class="totals-box">
-            <div class="total-row">
-              <span>Subtotal</span>
-              <span class="font-mono">KES ${calculatedSubtotal.toLocaleString()}</span>
-            </div>
-            ${quote.discount > 0 ? `
-              <div class="total-row discount">
-                <span>Discount (${quote.discountType === 'percentage' ? `${quote.discount}%` : `KES ${quote.discount.toLocaleString()}`})</span>
-                <span class="font-mono">-KES ${(quote.discountAmount || quote.discount).toLocaleString()}</span>
-              </div>
-            ` : ''}
-            ${transportCost > 0 ? `
-              <div class="total-row">
-                <span>Delivery</span>
-                <span class="font-mono">KES ${transportCost.toLocaleString()}</span>
-              </div>
-            ` : ''}
-            <div class="total-row">
-              <span>Tax (${(taxRate * 100).toFixed(0)}% VAT${taxPerItem ? ' - Per Item' : ' - On Total'})</span>
-              <span class="font-mono">KES ${calculatedTax.toLocaleString()}</span>
-            </div>
-            <div class="total-row grand-total">
-              <span class="grand-total-label">Total Amount</span>
-              <span class="grand-total-amount">KES ${calculatedTotal.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- PAYMENT SECTION -->
-        <div class="payment-section">
+        ${showTotalsOnPage2 ? totalsBoxHTML : ''}
+                
+        <div class="payment-section" style="margin-top: 30px;">
           <div class="payment-header">
             <h4>Payment Information</h4>
           </div>
@@ -845,7 +359,7 @@ export async function generateQuotationPDF(
                 </div>
               </div>
               <div class="payment-details">
-                <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">${escapeHtml(companyName)}</span></div>
+                <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
                 <div class="payment-detail"><span class="payment-detail-key">Account Number</span><span class="payment-detail-value">1312281278</span></div>
                 <div class="payment-detail"><span class="payment-detail-key">Branch</span><span class="payment-detail-value">Moi Avenue, Nairobi</span></div>
               </div>
@@ -854,102 +368,698 @@ export async function generateQuotationPDF(
               <div class="payment-method-header">
                 <img src="${mpesaLogoUrl}" class="payment-logo" alt="M-PESA" crossorigin="anonymous" onerror="this.style.display='none'" />
                 <div>
-                  <div class="payment-method-title">M-PESA</div>
-                  <div class="payment-method-sub">Mobile Money</div>
+                  <div class="payment-method-title">LIPA NA M-PESA</div>
+                  <div class="payment-method-sub">Till Number</div>
                 </div>
               </div>
               <div class="payment-details">
-                <div class="payment-detail"><span class="payment-detail-key">Paybill Number</span><span class="payment-detail-value">9114123</span></div>
-                <div class="payment-detail"><span class="payment-detail-key">Account No.</span><span class="payment-detail-value">${quote.quoteNumber}</span></div>
-                <div class="payment-detail"><span class="payment-detail-key">Payment Terms</span><span class="payment-detail-value">Full payment prior to supply</span></div>
+                <div class="payment-detail"><span class="payment-detail-key">Lipa na M-PESA  - </span><span class="payment-detail-value">Buy Goods & Services </span></div>
+                <div class="payment-detail"><span class="payment-detail-key">Till No.</span><span class="payment-detail-value">9114123</span></div>
+                <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
               </div>
             </div>
           </div>
         </div>
-
-        <!-- NOTES -->
+        
         ${quote.notes ? `
           <div class="notes-box">
             <div class="notes-title">Notes</div>
             <div class="notes-text">${escapeHtml(quote.notes)}</div>
           </div>
         ` : ''}
-
-        <!-- TERMS -->
+        
         ${quote.terms ? `
           <div class="terms-box">
             <div class="terms-title">Terms & Conditions</div>
             <div class="terms-text">${escapeHtml(quote.terms)}</div>
           </div>
         ` : ''}
-
-        <!-- FOOTER -->
-        <div class="footer">
-          <div class="footer-slogan">${escapeHtml(companySlogan)}</div>
-          <div class="footer-copyright">
-            This ${quote.status === 'accepted' || quote.status === 'converted' ? 'invoice' : 'quotation'} is valid until ${new Date(quote.validUntil).toLocaleDateString()}<br/>
-            © ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.
-          </div>
-        </div>
+        
+        ${getFooterHTML()}
       </div>
     </body>
     </html>
   `;
 
-  document.body.appendChild(element);
+  function getStyles() {
+    return `
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-  // Wait for images to load
-  const images = element.querySelectorAll('img');
-  await Promise.race([
-    Promise.all(
-      Array.from(images).map(
-        (img) =>
-          new Promise((resolve) => {
-            if (img.complete && img.naturalHeight !== 0) {
-              resolve(null);
-            } else {
-              img.onload = resolve;
-              img.onerror = resolve;
-              setTimeout(resolve, 5000);
-            }
-          })
-      )
-    ),
-    new Promise((resolve) => setTimeout(resolve, 6000)),
-  ]);
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: #ffffff;
+        padding: 40px 45px;
+        line-height: 1.5;
+        color: #1a2a3a;
+      }
 
-  await new Promise((resolve) => setTimeout(resolve, 300));
+      .pdf-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: white;
+        position: relative;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
 
-  const canvas = await html2canvas(element, {
-    scale: 2.5,
-    backgroundColor: '#ffffff',
-    logging: false,
-    useCORS: true,
-    allowTaint: false,
-    windowWidth: element.scrollWidth,
-    windowHeight: element.scrollHeight,
-  });
+      .header {
+        padding: 25px 0 20px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+      }
 
-  document.body.removeChild(element);
+      .company-info {
+        flex: 1;
+        margin-left: 75px;
+      }
 
-  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      .company-name {
+        font-size: 24px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        margin-bottom: 12px;
+        color: #1a1a1a;
+      }
+
+      .company-address, .company-location, .company-tel, .company-email {
+        font-size: 18px;
+        font-weight: 500;
+        color: #333;
+        margin-bottom: 5px;
+      }
+
+      .logo-area {
+        flex: 0 0 auto;
+        margin-right: 100px;
+      }
+
+      .company-logo {
+        height: 175px;
+        width: auto;
+        max-width: 250px;
+        object-fit: contain;
+        display: block;
+      }
+
+/* Container holds the line profile height */
+.doc-title-section {
+  width: 100%;
+  margin: 35px 0 35px 0 !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important; /* Centers the pill box vertically over the slim line */
+  box-sizing: border-box;
+}
+
+/* QUOTATION: Ultra-slim 4px blue line profile with precise internal accents */
+.doc-title-section.doc-title-quotation {
+  height: 4px !important; 
+  background: #0b355e !important;
+  border-top: 1px solid #ffffff !important;
+  border-bottom: 1px solid #ffffff !important;
+  box-shadow: 0 0 0 1px #0b355e !important;
+}
+
+/* INVOICE: Ultra-slim 4px solid slate grey line profile */
+.doc-title-section.doc-title-invoice {
+  height: 4px !important;
+  background: #374151 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Aligns the inner elements to the right side */
+.doc-title-container {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  padding-right: 60px !important;
+  position: absolute !important; /* Breaks out of the tiny 4px line constraints */
+  z-index: 10 !important;
+}
+
+/* The taller text pill element overlapping the smaller line */
+.doc-title-text {
+  display: inline-block !important;
+  padding: 8px 32px !important; /* Standard layout padding */
+  text-align: center !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  letter-spacing: 2px !important;
+  text-transform: uppercase !important;
+  background: #ffffff !important;
+  line-height: 1.2 !important;
+}
+
+.doc-title-text.text-quotation {
+  color: #0b355e !important;
+  border: 1.5px solid #0b355e !important;
+}
+
+.doc-title-text.text-invoice {
+  color: #374151 !important;
+  border: 1.5px solid #374151 !important;
+}
+      
+      
+      .info-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 40px;
+        margin-bottom: 25px;
+      }
+
+      .info-card {
+        padding: 0;
+      }
+
+      .info-card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 9px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9eef3;
+      }
+
+      .info-card-header h3 {
+        font-size: 15px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        color: #8a9aaa;
+      }
+
+      .info-content {
+        font-size: 16px;
+        color: #2c3e4e;
+        line-height: 1.7;
+      }
+
+      .customer-name {
+        font-size: 22px;
+        font-weight: 700;
+        color: #0a2540;
+        margin-bottom: 7px;
+      }
+
+      .detail-row {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .detail-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #8a9aaa;
+        min-width: 100px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .detail-value {
+        font-size: 16px;
+        color: #2c3e4e;
+      }
+
+      .transport-info {
+        background: #f7f9fc;
+        padding: 18px 28px;
+        border-radius: 16px;
+        margin-bottom: 25px;
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 20px;
+        border: 1px solid #e9eef3;
+      }
+
+      .transport-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .transport-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #5a7a5a;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+      }
+
+      .transport-value {
+        font-size: 16px;
+        font-weight: 500;
+        color: #2c5e3c;
+      }
+
+      .payment-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+
+      .badge-paid {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        color: white;
+        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+      }
+
+      .badge-unpaid {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+      }
+
+      .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 25px;
+      }
+
+      .items-table th {
+        text-align: left;
+        padding: 18px 12px;
+        background: #f7f9fc;
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #8a9aaa;
+        border-bottom: 2px solid #e9eef3;
+      }
+
+      .items-table td {
+        padding: 18px 12px;
+        border-bottom: 1px solid #eef2f6;
+        font-size: 16px;
+        color: #2c3e4e;
+        vertical-align: top;
+      }
+
+      .item-name {
+        font-weight: 700;
+        color: #0f2636;
+        font-size: 18px;
+        margin-bottom: 6px;
+      }
+
+      .item-description {
+        font-size: 14px;
+        color: #8a9aaa;
+        line-height: 1.5;
+        margin-top: 4px;
+      }
+
+      .tax-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 600;
+        margin-top: 6px;
+      }
+
+      .tax-badge-taxable {
+        background: #e8f4ec;
+        color: #2c6e3c;
+      }
+
+      .tax-badge-non-taxable {
+        background: #fef8e7;
+        color: #b46f0b;
+      }
+
+      .custom-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #eef2ff;
+        padding: 3px 10px;
+        border-radius: 14px;
+        font-size: 12px;
+        color: #3b5c8a;
+        font-weight: 500;
+        margin-top: 6px;
+      }
+
+      .text-right {
+        text-align: right;
+      }
+
+      .text-center {
+        text-align: center;
+      }
+
+      .font-mono {
+        font-family: 'Inter', monospace;
+        font-weight: 500;
+      }
+
+      .totals-wrapper {
+        display: flex;
+        justify-content: flex-end;
+        margin: 5x 0 5px 0;
+        padding-top: 4px;
+      }
+
+      .totals-box {
+        width: 380px;
+      }
+
+      .total-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        font-size: 16px;
+        color: #4a5c6a;
+        border-bottom: 1px solid #eef2f6;
+      }
+
+      .total-row.discount {
+        color: #c75c3c;
+      }
+
+      .total-row.grand-total {
+        padding-top: 16px;
+        margin-top: 8px;
+        border-top: 2px solid #0a2540;
+        border-bottom: none;
+      }
+
+      .grand-total-label {
+        font-size: 20px;
+        font-weight: 700;
+        color: #0a2540;
+      }
+
+      .grand-total-amount {
+        font-size: 28px;
+        font-weight: 800;
+        color: #0a2540;
+        letter-spacing: -0.5px;
+      }
+
+      .tax-note {
+        font-size: 11px;
+        color: #6b7280;
+        text-align: right;
+        margin-top: 8px;
+        margin-bottom: 20px;
+        padding: 8px 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        font-style: italic;
+      }
+
+      .payment-section {
+        margin-bottom: 40px;
+        border: 1px solid #e9eef3;
+        border-radius: 20px;
+        overflow: hidden;
+      }
+
+      .payment-header {
+        background: #0a2540;
+        padding: 18px 28px;
+      }
+
+      .payment-header h4 {
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+      }
+
+      .payment-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+      }
+
+      .payment-method {
+        padding: 28px 28px;
+      }
+
+      .payment-method:first-child {
+        border-right: 1px solid #e9eef3;
+      }
+
+      .payment-method-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 22px;
+      }
+
+      .payment-logo {
+        height: 48px;
+        width: auto;
+        object-fit: contain;
+      }
+
+      .payment-method-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #0a2540;
+      }
+
+      .payment-method-sub {
+        font-size: 14px;
+        color: #8a9aaa;
+        margin-top: 3px;
+      }
+
+      .payment-details {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .payment-detail {
+        display: flex;
+        gap: 16px;
+        font-size: 15px;
+      }
+
+      .payment-detail-key {
+        color: #8a9aaa;
+        font-weight: 500;
+        min-width: 110px;
+      }
+
+      .payment-detail-value {
+        color: #2c3e4e;
+        font-weight: 500;
+        font-family: 'Inter', monospace;
+        font-size: 15px;
+      }
+
+      .notes-box {
+        background: #fef8e7;
+        padding: 18px 24px;
+        border-radius: 16px;
+        margin-bottom: 24px;
+        border-left: 4px solid #e6a017;
+      }
+
+      .notes-title, .terms-title {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+      }
+
+      .notes-title {
+        color: #b46f0b;
+      }
+
+      .notes-text {
+        font-size: 15px;
+        color: #7a5a2a;
+        line-height: 1.6;
+      }
+
+      .terms-box {
+        background: #f7f9fc;
+        padding: 18px 24px;
+        border-radius: 16px;
+        margin-bottom: 40px;
+        border-left: 4px solid #8a9aaa;
+      }
+
+      .terms-title {
+        color: #5a6e7c;
+      }
+
+      .terms-text {
+        font-size: 15px;
+        color: #5a6e7c;
+        line-height: 1.6;
+      }
+
+      .footer {
+        margin-top: auto;
+        padding: 25px 0 20px 0;
+        border-top: 2px solid #e9eef3;
+        background: white;
+      }
+
+      .footer-main {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 30px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      .footer-logo-section {
+        flex-shrink: 0;
+      }
+
+      .footer-logo {
+        height: 50px;
+        width: auto;
+        object-fit: contain;
+      }
+
+      .footer-services {
+        flex: 1;
+        text-align: center;
+      }
+
+      .services-title {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #8a9aaa;
+        margin-bottom: 10px;
+      }
+
+      .services-list {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px;
+      }
+
+      .service-item {
+        font-size: 11px;
+        font-weight: 500;
+        color: #2c5e3c;
+        letter-spacing: 0.5px;
+      }
+
+      .footer-slogan {
+        font-family: 'Cormorant Garamond', serif;
+        font-style: italic;
+        font-size: 13px;
+        color: #8a9aaa;
+        margin-bottom: 8px;
+      }
+
+      .footer-copyright {
+        font-size: 10px;
+        color: #a0b0be;
+        line-height: 1.6;
+      }
+    `;
+  }
+
+  // Function to render a single page
+  async function renderPage(html: string): Promise<string> {
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.top = '-9999px';
+    container.style.left = '-9999px';
+    container.style.width = '1100px';
+    container.style.backgroundColor = '#ffffff';
+    container.innerHTML = html;
+    document.body.appendChild(container);
+
+    // Wait for images
+    const images = container.querySelectorAll('img');
+    await Promise.race([
+      Promise.all(
+        Array.from(images).map(
+          (img) =>
+            new Promise((resolve) => {
+              if (img.complete && img.naturalHeight !== 0) {
+                resolve(null);
+              } else {
+                img.onload = resolve;
+                img.onerror = resolve;
+                setTimeout(resolve, 5000);
+              }
+            })
+        )
+      ),
+      new Promise((resolve) => setTimeout(resolve, 6000)),
+    ]);
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const canvas = await html2canvas(container, {
+      scale: 2.5,
+      backgroundColor: '#ffffff',
+      logging: false,
+      useCORS: true,
+      allowTaint: false,
+      windowWidth: container.scrollWidth,
+      windowHeight: container.scrollHeight,
+    });
+
+    document.body.removeChild(container);
+    return canvas.toDataURL('image/jpeg', 0.95);
+  }
+
+  // Render both pages
+  const page1Image = await renderPage(page1HTML);
+  const page2Image = await renderPage(page2HTML);
+
+  // Create PDF
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
   });
 
-  const imgProps = pdf.getImageProperties(imgData);
   const pdfWidth = pdf.internal.pageSize.getWidth();
-  const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-  const pageHeight = pdf.internal.pageSize.getHeight();
 
-  pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+  // Add Page 1
+  const img1Props = pdf.getImageProperties(page1Image);
+  const img1Height = (img1Props.height * pdfWidth) / img1Props.width;
+  pdf.addImage(page1Image, 'JPEG', 0, 0, pdfWidth, img1Height);
 
-  if (pdfHeight > pageHeight) {
-    pdf.addPage();
-    pdf.addImage(imgData, 'JPEG', 0, -pageHeight, pdfWidth, pdfHeight);
-  }
+  // Add Page 2
+  pdf.addPage();
+  const img2Props = pdf.getImageProperties(page2Image);
+  const img2Height = (img2Props.height * pdfWidth) / img2Props.width;
+  pdf.addImage(page2Image, 'JPEG', 0, 0, pdfWidth, img2Height);
 
   return pdf.output('blob');
 }

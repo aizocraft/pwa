@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import authMiddleware from '../middleware/auth';
 import SalesCustomerModel from '../models/SalesCustomer';
-import QuotationModel, { DiscountType, QuotationStatus, generateQuoteNumber } from '../models/Quotation';
+import QuotationModel, { DiscountType, QuotationStatus, generateQuoteNumber, generateInvoiceNumber } from '../models/Quotation';
 import ProductModel from '../models/Product';
 import OrderModel from '../models/Order';
 import { createAuditLog } from '../middleware/auditMiddleware';
@@ -656,6 +656,13 @@ router.post('/quotations/:id/accept', authMiddleware, requireSalesRole, async (r
       });
     }
 
+    // Generate invoice number for the converted quotation
+    const invoiceNumber = await generateInvoiceNumber();
+    
+    // Store invoice number on the quotation
+    quotation.invoiceNumber = invoiceNumber;
+
+    // Generate order number (keep existing format or use new format)
     const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     const shippingAddress = {
@@ -685,6 +692,9 @@ router.post('/quotations/:id/accept', authMiddleware, requireSalesRole, async (r
 
     const orderData = {
       orderNumber,
+      invoiceNumber, // Add invoice number to order
+      quotationId: quotation._id,
+      quotationNumber: quotation.quoteNumber, // Store original quote number for reference
       items: orderItems,
       subtotal: quotation.subtotal,
       shippingCost: transportCost,
@@ -697,7 +707,6 @@ router.post('/quotations/:id/accept', authMiddleware, requireSalesRole, async (r
       status: 'processing',
       notes: `Auto-generated from quotation ${quotation.quoteNumber}\n\n${quotation.notes || ''}`,
       salesCustomerId: quotation.customerId,
-      quotationId: quotation._id,
       shippingAddress: shippingAddress,
       createdBy: req.user!.userId,
       guestInfo: null,
@@ -706,6 +715,7 @@ router.post('/quotations/:id/accept', authMiddleware, requireSalesRole, async (r
     };
 
     console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
+    console.log('Generated invoice number:', invoiceNumber);
 
     const order = new OrderModel(orderData);
     
@@ -723,7 +733,8 @@ router.post('/quotations/:id/accept', authMiddleware, requireSalesRole, async (r
     
     await order.save();
 
-    quotation.status = 'accepted';
+    // Update quotation status
+    quotation.status = 'converted'; // Changed from 'accepted' to 'converted'
     quotation.acceptedAt = new Date();
     quotation.convertedAt = new Date();
     quotation.convertedOrderId = order._id;
@@ -733,16 +744,18 @@ router.post('/quotations/:id/accept', authMiddleware, requireSalesRole, async (r
       action: 'convert',
       resource: 'quotation',
       resourceId: quotation._id.toString(),
-      details: `Quotation ${quotation.quoteNumber} accepted and converted to order ${order.orderNumber}`,
+      details: `Quotation ${quotation.quoteNumber} converted to invoice ${invoiceNumber} and order ${order.orderNumber}`,
       skipIfNoUser: false
     });
 
     res.json({ 
       success: true, 
-      message: 'Quotation accepted and order created successfully',
+      message: 'Quotation accepted and converted successfully',
+      invoiceNumber: invoiceNumber,
       order: {
         _id: order._id,
         orderNumber: order.orderNumber,
+        invoiceNumber: invoiceNumber,
         total: order.total
       }
     });
