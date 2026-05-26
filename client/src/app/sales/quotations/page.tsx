@@ -1,4 +1,3 @@
-// app/sales/quotations/page.tsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -36,6 +35,7 @@ import {
   Settings,
   EyeOff,
   Eye as EyeIcon,
+  Wallet,
 } from 'lucide-react';
 import {
   listSalesQuotations,
@@ -54,6 +54,7 @@ import { useCompanySettings } from '@/lib/use-company-settings';
 import { getLogoUrl, getTaxRate } from '@/lib/company';
 import { toast } from 'react-hot-toast';
 import { generateQuotationPDF } from './components/QuotationPDF';
+import { RecordPaymentModal } from '../../../components/RecordPaymentModal';
 import api from '@/lib/api';
 
 // Types
@@ -107,11 +108,19 @@ export default function QuotationsPage() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
-  const [showTransport, setShowTransport] = useState(true);
+  const [showTransport, setShowTransport] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportStartDate, setReportStartDate] = useState('');
   const [reportEndDate, setReportEndDate] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<{
+    id: string;
+    number: string;
+    total: number;
+    amountPaid: number;
+    balanceDue: number;
+  } | null>(null);
   const itemsPerPage = 10;
   
   // Debounced search
@@ -232,6 +241,15 @@ export default function QuotationsPage() {
       toast.error('Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchQuotationPaymentStatus = async (quotationId: string) => {
+    try {
+      const response = await api.get(`/payments/orders/${quotationId}`);
+      return response.data;
+    } catch {
+      return { amountPaid: 0, balanceDue: 0 };
     }
   };
 
@@ -497,6 +515,9 @@ export default function QuotationsPage() {
     setSelectedCategory('');
     setCustomerSearchTerm('');
     setShowAddCustomerForm(false);
+    // Set valid until to 7 days from now (1 week)
+    const validUntilDate = new Date();
+    validUntilDate.setDate(validUntilDate.getDate() + 7);
     setFormData({
       customerId: '',
       items: [],
@@ -504,7 +525,7 @@ export default function QuotationsPage() {
       discountType: 'fixed',
       notes: '',
       terms: '',
-      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      validUntil: validUntilDate.toISOString().split('T')[0],
       transportCost: 0,
       transportDescription: '',
       estimatedDelivery: '',
@@ -705,10 +726,26 @@ export default function QuotationsPage() {
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{quote.items.length} items</td>
                     <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">KES {quote.total?.toLocaleString() || 0}</td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(quote.status)}`}>
-                        {getStatusIcon(quote.status)}
-                        {quote.status === 'converted' ? 'Invoiced' : quote.status}
-                      </span>
+                      <div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(quote.status)}`}>
+                          {getStatusIcon(quote.status)}
+                          {quote.status === 'converted' ? 'Invoiced' : quote.status}
+                        </span>
+                        {/* Payment status for converted quotes */}
+                        {quote.status === 'converted' && (
+                          <div className="text-xs mt-1">
+                            {quote.paymentStatus === 'paid' ? (
+                              <span className="text-green-600 dark:text-green-400">✓ Paid</span>
+                            ) : quote.paymentStatus === 'partially_paid' ? (
+                              <span className="text-amber-600 dark:text-amber-400">
+                                ⚡ Partially Paid (Balance: KES {quote.balanceDue?.toLocaleString()})
+                              </span>
+                            ) : (
+                              <span className="text-red-600 dark:text-red-400">⚠ Unpaid</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{new Date(quote.createdAt).toLocaleDateString()}</td>
                     <td className="px-6 py-4">
@@ -763,6 +800,26 @@ export default function QuotationsPage() {
                             title="Edit"
                           >
                             <Edit className="w-4 h-4 text-yellow-500" />
+                          </button>
+                        )}
+                        {/* Record Payment button - only for converted/invoiced quotes */}
+                        {quote.status === 'converted' && (
+                          <button
+                            onClick={async () => {
+                              const paymentInfo = await fetchQuotationPaymentStatus(quote._id);
+                              setSelectedOrderForPayment({
+                                id: quote._id,
+                                number: quote.invoiceNumber || quote.quoteNumber,
+                                total: quote.total,
+                                amountPaid: paymentInfo.amountPaid || 0,
+                                balanceDue: paymentInfo.balanceDue || quote.total,
+                              });
+                              setShowPaymentModal(true);
+                            }}
+                            className="p-1.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
+                            title="Record Payment"
+                          >
+                            <Wallet className="w-4 h-4 text-amber-500" />
                           </button>
                         )}
                         {/* Delete button - always available with confirmation */}
@@ -978,7 +1035,7 @@ export default function QuotationsPage() {
                   )}
                 </div>
 
-                {/* Product Selection */}
+                {/* Product Selection with Category Filter */}
                 <div className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50 dark:from-gray-800/30 dark:to-gray-800/30 rounded-xl p-5 border border-gray-200 dark:border-gray-700">
                   <h3 className="font-semibold flex items-center gap-2 mb-4 text-gray-900 dark:text-white">
                     <Package className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
@@ -1000,33 +1057,45 @@ export default function QuotationsPage() {
                         className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                       />
                       {showProductDropdown && (productSearchTerm || selectedCategory) && (
-                        <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                          {filteredProducts.slice(0, 8).map((product) => (
-                            <button
-                              key={product._id}
-                              type="button"
-                              onClick={() => {
-                                setTempItem({ ...tempItem, productId: product._id });
-                                setProductSearchTerm(product.name);
-                                setShowProductDropdown(false);
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-white"
-                            >
-                              <span className="font-medium">{product.name}</span>
-                              <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">KES {product.price.toLocaleString()}</span>
-                            </button>
-                          ))}
+                        <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {filteredProducts.length > 0 ? (
+                            filteredProducts.slice(0, 10).map((product) => (
+                              <button
+                                key={product._id}
+                                type="button"
+                                onClick={() => {
+                                  setTempItem({ ...tempItem, productId: product._id });
+                                  setProductSearchTerm(product.name);
+                                  setShowProductDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-white"
+                              >
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">{product.name}</span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">KES {product.price.toLocaleString()}</span>
+                                </div>
+                                {product.category && (
+                                  <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Category: {product.category}</div>
+                                )}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No products found</div>
+                          )}
                         </div>
                       )}
                     </div>
                     
                     <select
                       value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-40 px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      onChange={(e) => {
+                        setSelectedCategory(e.target.value);
+                        setProductSearchTerm('');
+                      }}
+                      className="w-48 px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     >
                       <option value="">All Categories</option>
-                      {categories.slice(0, 10).map((cat) => (
+                      {categories.map((cat) => (
                         <option key={cat._id} value={cat._id}>{cat.name}</option>
                       ))}
                     </select>
@@ -1098,7 +1167,10 @@ export default function QuotationsPage() {
                           const itemTotal = price * item.qty;
                           return (
                             <tr key={idx} className="border-t dark:border-gray-800">
-                              <td className="px-3 py-2 text-gray-900 dark:text-white">{product?.name}</td>
+                              <td className="px-3 py-2">
+                                <div className="text-gray-900 dark:text-white">{product?.name}</div>
+                                {product?.category && <div className="text-xs text-gray-400">Category: {product.category}</div>}
+                              </td>
                               <td className="px-3 py-2">
                                 <input
                                   type="number"
@@ -1116,7 +1188,7 @@ export default function QuotationsPage() {
                                   className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                                   min="0"
                                 />
-                              </td>
+                               </td>
                               {formData.taxPerItem && (
                                 <td className="px-3 py-2 text-center">
                                   <button
@@ -1167,7 +1239,7 @@ export default function QuotationsPage() {
                   </div>
                 </div>
 
-                {/* Transport Section */}
+                {/* Transport Section - Hidden by default */}
                 <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
                   <button
                     type="button"
@@ -1322,6 +1394,7 @@ export default function QuotationsPage() {
                     value={formData.validUntil} 
                     onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })} 
                   />
+                  <p className="text-xs text-gray-500 mt-1">Default: 1 week from today</p>
                 </div>
 
                 <div className="flex gap-3 pt-4">
@@ -1338,7 +1411,7 @@ export default function QuotationsPage() {
           </div>
         )}
 
-        {/* View Modal - Enhanced with all details */}
+        {/* View Modal */}
         {showViewModal && viewingQuote && viewingCustomer && (
           <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -1394,6 +1467,18 @@ export default function QuotationsPage() {
                       <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Valid Until:</strong> {new Date(viewingQuote.validUntil).toLocaleDateString()}</p>
                       {viewingQuote.convertedAt && (
                         <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Converted:</strong> {new Date(viewingQuote.convertedAt).toLocaleString()}</p>
+                      )}
+                      {viewingQuote.status === 'converted' && (
+                        <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Payment Status:</strong>
+                          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                            viewingQuote.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                            viewingQuote.paymentStatus === 'partially_paid' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {viewingQuote.paymentStatus === 'paid' ? '✓ Paid' :
+                             viewingQuote.paymentStatus === 'partially_paid' ? `⚠ Partially Paid (Balance: KES ${viewingQuote.balanceDue?.toLocaleString()})` :
+                             '⚠ Unpaid'}
+                          </span>
+                        </p>
                       )}
                     </div>
                   </div>
@@ -1462,7 +1547,7 @@ export default function QuotationsPage() {
                   </div>
                 </div>
 
-                {/* Totals Section - Restored with all details */}
+                {/* Totals Section */}
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                   <div className="space-y-2 text-right max-w-md ml-auto">
                     <div className="flex justify-between py-1">
@@ -1550,6 +1635,25 @@ export default function QuotationsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Record Payment Modal */}
+        {showPaymentModal && selectedOrderForPayment && (
+          <RecordPaymentModal
+            isOpen={showPaymentModal}
+            onClose={() => {
+              setShowPaymentModal(false);
+              setSelectedOrderForPayment(null);
+            }}
+            onSuccess={() => {
+              fetchData();
+            }}
+            orderId={selectedOrderForPayment.id}
+            orderNumber={selectedOrderForPayment.number}
+            totalAmount={selectedOrderForPayment.total}
+            amountPaid={selectedOrderForPayment.amountPaid}
+            balanceDue={selectedOrderForPayment.balanceDue}
+          />
         )}
       </div>
     </div>

@@ -30,7 +30,7 @@ import transactionRoutes from './routes/transaction.routes';
 import notificationRoutes from './routes/notification.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import salesRoutes from './routes/sales.routes';
-
+import paymentRoutes from './routes/payment.routes';
 
 
 dotenv.config();
@@ -103,6 +103,7 @@ app.use('/api/order/calculate', orderCalcRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/', healthzRoutes);
 

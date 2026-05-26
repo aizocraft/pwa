@@ -3,6 +3,7 @@
 import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import OrderModel from '../models/Order';
+import TransactionModel from '../models/Transaction';
 import ProductModel from '../models/Product';
 import UserModel from '../models/User';
 import authMiddleware from '../middleware/auth';
@@ -12,6 +13,7 @@ import ShippingAreaModel from '../models/ShippingArea';
 import PromoCodeModel from '../models/PromoCode';
 import { CompanySettings } from '../models/CompanySettings';
 import { createNotification } from '../services/notification.service';
+import { PaymentService } from '../services/payment.service';
 
 const router = Router();
 
@@ -201,6 +203,23 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
 
     const order = new OrderModel(orderData);
     await order.save();
+
+    // Initialize payment tracking (REPLACE existing code)
+const paymentInit = await PaymentService.initializeOrderPayment(
+  order._id.toString(),
+  paymentMethod
+);
+
+// Add to response
+res.status(201).json({
+  success: true,
+  message: 'Order created successfully',
+  _id: order._id,
+  orderNumber: order.orderNumber,
+  total: Number(order.total),
+  // ... existing fields ...
+  paymentStatus: paymentInit.status  // Add this
+});
 
     // Get customer information for emails
     let customerName = shippingAddress.fullName;
@@ -601,9 +620,11 @@ router.put('/:id/cancel', optionalAuthMiddleware, async (req: Request & { user?:
     }
 
     order.status = 'cancelled';
-    if (order.paymentStatus === 'completed') {
+    
+    if (order.paymentStatus === 'paid' || order.paymentStatus === 'partially_paid') {
       order.paymentStatus = 'refunded';
     }
+    
     await order.save();
 
     const formattedOrder = {
@@ -662,38 +683,46 @@ router.patch('/admin/orders/:id/status', authMiddleware, async (req: Request & {
     }
 
     // Update order fields
-order.status = status as any;
+    order.status = status as any;
     if (trackingNumber) order.trackingNumber = trackingNumber;
     if (estimatedDelivery) order.estimatedDelivery = new Date(estimatedDelivery);
     
-    // Update payment status if needed
-    if (status === 'paid' && order.paymentStatus === 'pending') {
-      order.paymentStatus = 'completed';
+    if (status === 'paid') {
+      // When order is marked as paid, ensure payment status reflects that
+      if (order.amountPaid >= order.total) {
+        order.paymentStatus = 'paid';
+      } else if (order.amountPaid > 0) {
+        order.paymentStatus = 'partially_paid';
+      } else {
+        order.paymentStatus = 'paid'; // Admin override
+      }
+    } else if (status === 'cancelled' || status === 'refunded') {
+      order.paymentStatus = 'refunded';
     }
     
     await order.save();
 
-// 🔔 CREATE STATUS UPDATE NOTIFICATION
-try {
-  const adminUsers = await UserModel.find({ role: 'admin', isActive: true }).limit(1);
-  if (adminUsers.length > 0 && status !== 'pending') {
-    const firstAdmin = adminUsers[0];
-    await createNotification({
-      userId: firstAdmin._id.toString(), // Convert ObjectId to string
-      type: 'order',
-      title: `Order #${order.orderNumber} - ${status.toUpperCase()}`,
-      message: `Status updated to: ${status}`,
-      actionUrl: `/dashboard/orders/${order._id}`,
-      metadata: {
-        orderId: order._id.toString(),
-        oldStatus: req.body.oldStatus || 'unknown',
-        newStatus: status
+    // Create notification
+    try {
+      const adminUsers = await UserModel.find({ role: 'admin', isActive: true }).limit(1);
+      if (adminUsers.length > 0 && status !== 'pending') {
+        const firstAdmin = adminUsers[0];
+        await createNotification({
+          userId: firstAdmin._id.toString(),
+          type: 'order',
+          title: `Order #${order.orderNumber} - ${status.toUpperCase()}`,
+          message: `Status updated to: ${status}`,
+          actionUrl: `/dashboard/orders/${order._id}`,
+          metadata: {
+            orderId: order._id.toString(),
+            oldStatus: req.body.oldStatus || 'unknown',
+            newStatus: status
+          }
+        });
       }
-    });
-  }
-} catch (notificationErr) {
-  console.error('Failed to create status notification:', notificationErr);
-}
+    } catch (notificationErr) {
+      console.error('Failed to create status notification:', notificationErr);
+    }
 
     const populated = await OrderModel.findById(req.params.id)
       .populate('userId', 'name email')
@@ -736,18 +765,31 @@ router.post('/:id/retry-payment', optionalAuthMiddleware, async (req: Request & 
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    if (order.paymentStatus !== 'failed') {
-      return res.status(400).json({ error: 'Only failed payments can be retried' });
+    // FIXED: Check payment status correctly
+    // 'refunded' is the only status that cannot be retried
+    if (order.paymentStatus === 'refunded') {
+      return res.status(400).json({ error: 'Cannot retry payment for refunded order' });
+    }
+    
+    // Check if there's a failed transaction
+    const failedTransaction = await TransactionModel.findOne({
+      orderId: order._id,
+      status: 'failed'
+    });
+    
+    if (!failedTransaction) {
+      return res.status(400).json({ error: 'No failed payment found to retry' });
     }
 
-    // Reset payment status
-    order.paymentStatus = 'pending';
+    // Reset payment status to unpaid for retry
+    order.paymentStatus = 'unpaid';
     await order.save();
 
     res.json({
       success: true,
       message: 'Payment retry initiated',
-      orderId: order._id
+      orderId: order._id,
+      failedTransactionId: failedTransaction.transactionId
     });
   } catch (error: any) {
     console.error('Payment retry error:', error);

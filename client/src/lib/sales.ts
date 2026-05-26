@@ -62,6 +62,9 @@ export interface Quotation {
   transportDescription?: string;
   total: number;
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted';
+  paymentStatus: 'unpaid' | 'paid' | 'partially_paid';
+  amountPaid: number;
+  balanceDue: number;
   validUntil: string;
   notes?: string;
   terms?: string;
@@ -87,6 +90,8 @@ export interface OrderWithQuotation extends Order {
   quotationNumber?: string;     // Original quotation number (e.g., 0001-MM-PSMA/Q)
 }
 
+
+// Update Transaction interface
 export interface Transaction {
   _id: string;
   transactionId: string;
@@ -97,14 +102,51 @@ export interface Transaction {
   customerName: string;
   amount: number;
   currency: string;
-  paymentMethod: 'mpesa' | 'card' | 'cod';
+  paymentMethod: 'mpesa' | 'card' | 'cod' | 'cash' | 'bank_transfer' | 'cheque'; // UPDATED
   status: 'pending' | 'completed' | 'failed' | 'refunded';
   mpesaReceipt?: string;
   cardLast4?: string;
   cardBrand?: string;
+  reference?: string;  // NEW
   notes?: string;
+  source: 'checkout' | 'quotation' | 'admin' | 'manual';  // NEW
+  isPartialPayment: boolean;  // NEW
+  recordedBy?: string;  // NEW
+  recordedByName?: string;  // NEW
+  paidAt?: string;  // NEW
+  invoiceNumber?: string;  // NEW
+  quotationNumber?: string;  // NEW
   createdAt: string;
   updatedAt: string;
+}
+
+// NEW: Payment summary type
+export interface PaymentSummary {
+  orderId: string;
+  orderNumber: string;
+  invoiceNumber?: string;
+  total: number;
+  paymentStatus: 'unpaid' | 'partially_paid' | 'paid' | 'overpaid' | 'refunded';
+  amountPaid: number;
+  balanceDue: number;
+  paymentCount: number;
+  lastPayment?: Transaction;
+  transactions: Transaction[];
+}
+
+// NEW: Manual payment request type
+export interface ManualPaymentRequest {
+  orderId: string;
+  amount: number;
+  paymentMethod: 'mpesa' | 'card' | 'cash' | 'bank_transfer' | 'cheque';
+  reference?: string;
+  notes?: string;
+}
+
+// NEW: Refund request type
+export interface RefundRequest {
+  transactionId: string;
+  reason?: string;
 }
 
 // ==================== ANALYTICS TYPES ====================
@@ -476,41 +518,6 @@ export async function deleteSalesQuotation(quotationId: string): Promise<{ succe
   return res.data;
 }
 
-// ==================== MANUAL TRANSACTIONS API ====================
-export async function createManualTransaction(payload: {
-  orderId: string;
-  paymentMethod: 'mpesa' | 'card' | 'cod';
-  amount: number;
-  status: 'pending' | 'completed' | 'failed' | 'refunded';
-  transactionId?: string;
-  mpesaReceipt?: string;
-  cardLast4?: string;
-  cardBrand?: string;
-  notes?: string;
-}): Promise<{ transaction: Transaction; order: Order }> {
-  const { orderId, ...rest } = payload;
-  const res = await api.post(`/sales/orders/${orderId}/transactions`, rest);
-  return res.data;
-}
-
-export async function updateManualTransaction(
-  transactionId: string,
-  payload: {
-    status?: 'pending' | 'completed' | 'failed' | 'refunded';
-    mpesaReceipt?: string;
-    cardLast4?: string;
-    cardBrand?: string;
-    notes?: string;
-  }
-): Promise<{ success: boolean; transaction: Transaction; order: Order }> {
-  const res = await api.patch(`/sales/transactions/${transactionId}`, payload);
-  return res.data;
-}
-
-export async function listOrderTransactions(orderId: string): Promise<{ orderNumber: string; transactions: Transaction[] }> {
-  const res = await api.get(`/sales/orders/${orderId}/transactions`);
-  return res.data;
-}
 
 // ==================== ANALYTICS API ====================
 

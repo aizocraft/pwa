@@ -10,6 +10,8 @@ import ShippingAreaModel from '../models/ShippingArea';
 import PromoCodeModel from '../models/PromoCode';
 import { CompanySettings } from '../models/CompanySettings';
 import { sendQuotation } from '../services/email.service';
+import { PaymentService } from '../services/payment.service';
+
 
 const router = Router();
 
@@ -323,6 +325,7 @@ router.get('/quotations', authMiddleware, requireSalesRole, async (req: Request 
     if (search && typeof search === 'string') {
       query.$or = [
         { quoteNumber: { $regex: search, $options: 'i' } },
+        { invoiceNumber: { $regex: search, $options: 'i' } },
         { customerName: { $regex: search, $options: 'i' } },
         { customerEmail: { $regex: search, $options: 'i' } }
       ];
@@ -340,9 +343,27 @@ router.get('/quotations', authMiddleware, requireSalesRole, async (req: Request 
       QuotationModel.countDocuments(query)
     ]);
 
+    // For converted quotations, fetch payment status from the linked order
+    const quotationsWithPaymentStatus = await Promise.all(
+      quotations.map(async (quote) => {
+        if (quote.status === 'converted' && quote.convertedOrderId) {
+          const order = await OrderModel.findById(quote.convertedOrderId).select('paymentStatus amountPaid balanceDue');
+          if (order) {
+            return {
+              ...quote,
+              paymentStatus: order.paymentStatus,
+              amountPaid: order.amountPaid,
+              balanceDue: order.balanceDue
+            };
+          }
+        }
+        return quote;
+      })
+    );
+
     res.json({
       success: true,
-      quotations,
+      quotations: quotationsWithPaymentStatus,
       pagination: {
         current: p,
         limit: l,
@@ -371,6 +392,23 @@ router.get('/quotations/:id', authMiddleware, requireSalesRole, async (req: Requ
 
     if (req.user!.role === 'sales' && quotation.createdBy.toString() !== req.user!.userId) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // For converted quotations, fetch payment status from the linked order
+    if (quotation.status === 'converted' && quotation.convertedOrderId) {
+      const order = await OrderModel.findById(quotation.convertedOrderId).select('paymentStatus amountPaid balanceDue total');
+      if (order) {
+        return res.json({
+          success: true,
+          quotation: {
+            ...quotation,
+            paymentStatus: order.paymentStatus,
+            amountPaid: order.amountPaid,
+            balanceDue: order.balanceDue,
+            total: quotation.total
+          }
+        });
+      }
     }
 
     res.json({ success: true, quotation });
@@ -594,179 +632,207 @@ router.post('/quotations/:id/send', authMiddleware, requireSalesRole, async (req
   }
 });
 
-// POST /api/sales/quotations/:id/accept - Accept quotation and convert to order
-router.post('/quotations/:id/accept', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
-  try {
-    const { id } = req.params;
-    
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: 'Invalid quotation ID' });
-    }
+// POST /api/sales/quotations/:id/accept
+router.post(
+  '/quotations/:id/accept',
+  authMiddleware,
+  requireSalesRole,
+  async (req: Request & { user?: any }, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { paymentMethod = 'cod' } = req.body;
 
-    const quotation = await QuotationModel.findById(id);
-    if (!quotation) {
-      return res.status(404).json({ error: 'Quotation not found' });
-    }
-
-    if (req.user!.role === 'sales' && quotation.createdBy.toString() !== req.user!.userId) {
-      return res.status(403).json({ error: 'Not allowed' });
-    }
-
-    if (quotation.status !== 'sent' && quotation.status !== 'draft') {
-      return res.status(400).json({ error: `Cannot accept quotation with status: ${quotation.status}` });
-    }
-
-    if (new Date() > new Date(quotation.validUntil)) {
-      quotation.status = 'expired';
-      await quotation.save();
-      return res.status(400).json({ error: 'Quotation has expired' });
-    }
-
-    const customerPhone = (quotation.customerPhone || '').trim();
-    if (!customerPhone) {
-      return res.status(400).json({
-        error: 'Customer phone number is required to create order.',
-        customerId: quotation.customerId,
-      });
-    }
-
-    const shippingAddressFromRequest = req.body.shippingAddress || {};
-    const shippingPhone = String(shippingAddressFromRequest.phone || customerPhone || '').trim();
-    if (!shippingPhone) {
-      return res.status(400).json({ error: 'Shipping phone number is required.' });
-    }
-
-    // Validate stock
-    for (const item of quotation.items) {
-      const product = await ProductModel.findById(item.productId).lean();
-      if (!product) {
-        return res.status(404).json({ error: `Product not found: ${item.name}` });
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'Invalid quotation ID' });
       }
-      if (product.stock < item.qty) {
-        return res.status(400).json({
-          error: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.qty}`,
+
+      const quotation = await QuotationModel.findById(id);
+      if (!quotation) {
+        return res.status(404).json({ error: 'Quotation not found' });
+      }
+
+      if (req.user!.role === 'sales' && quotation.createdBy.toString() !== req.user!.userId) {
+        return res.status(403).json({ error: 'Not allowed' });
+      }
+
+      if (quotation.status !== 'sent' && quotation.status !== 'draft') {
+        return res.status(400).json({ error: `Cannot accept quotation with status: ${quotation.status}` });
+      }
+
+      if (new Date() > new Date(quotation.validUntil)) {
+        quotation.status = 'expired';
+        await quotation.save();
+        return res.status(400).json({ error: 'Quotation has expired' });
+      }
+
+      const customerPhone = String(quotation.customerPhone || '').trim();
+      if (!customerPhone) {
+        return res.status(400).json({ error: 'Customer phone number is required' });
+      }
+
+      // Validate stock
+      for (const item of quotation.items) {
+        const product = await ProductModel.findById(item.productId).lean();
+        if (!product) {
+          return res.status(404).json({ error: `Product not found: ${item.name}` });
+        }
+        if (product.stock < item.qty) {
+          return res.status(400).json({ error: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.qty}` });
+        }
+      }
+
+      // Deduct stock
+      for (const item of quotation.items) {
+        await ProductModel.findByIdAndUpdate(item.productId, {
+          $inc: { stock: -item.qty }
         });
       }
-    }
 
-    // Deduct stock
-    for (const item of quotation.items) {
-      await ProductModel.findByIdAndUpdate(item.productId, {
-        $inc: { stock: -item.qty }
-      });
-    }
-
-    // Generate invoice number for the converted quotation
-    const invoiceNumber = await generateInvoiceNumber();
-    
-    // Store invoice number on the quotation
-    quotation.invoiceNumber = invoiceNumber;
-
-    // Generate order number (keep existing format or use new format)
-    const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    const shippingAddress = {
-      fullName: shippingAddressFromRequest.fullName || quotation.customerName,
-      address1: shippingAddressFromRequest.address1 || 'To be provided',
-      address2: shippingAddressFromRequest.address2 || '',
-      city: shippingAddressFromRequest.city || 'Nairobi',
-      state: shippingAddressFromRequest.state || 'KE',
-      zip: shippingAddressFromRequest.zip || '00000',
-      country: shippingAddressFromRequest.country || 'KE',
-      phone: shippingPhone,
-      email: shippingAddressFromRequest.email || quotation.customerEmail || ''
-    };
-
-    const orderItems = quotation.items.map((item: any) => ({
-      productId: item.productId,
-      name: item.name,
-      slug: item.slug,
-      image: item.image || '',
-      price: Number(item.price),
-      qty: Number(item.qty),
-      description: item.description || '',
-      tax: item.tax || 0
-    }));
-
-    const transportCost = quotation.transportCost || quotation.transportInfo?.cost || 0;
-
-    const orderData = {
-      orderNumber,
-      invoiceNumber, // Add invoice number to order
-      quotationId: quotation._id,
-      quotationNumber: quotation.quoteNumber, // Store original quote number for reference
-      items: orderItems,
-      subtotal: quotation.subtotal,
-      shippingCost: transportCost,
-      tax: quotation.tax,
-      discount: quotation.discount,
-      total: quotation.total,
-      selectedShippingArea: null,
-      paymentMethod: req.body.paymentMethod || 'cod',
-      paymentStatus: 'pending',
-      status: 'processing',
-      notes: `Auto-generated from quotation ${quotation.quoteNumber}\n\n${quotation.notes || ''}`,
-      salesCustomerId: quotation.customerId,
-      shippingAddress: shippingAddress,
-      createdBy: req.user!.userId,
-      guestInfo: null,
-      promoCode: req.body.promoCode || null,
-      promoDiscount: 0
-    };
-
-    console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
-    console.log('Generated invoice number:', invoiceNumber);
-
-    const order = new OrderModel(orderData);
-    
-    const validationError = order.validateSync();
-    if (validationError) {
-      console.error('Order validation error:', validationError.errors);
-      return res.status(400).json({ 
-        error: 'Order validation failed', 
-        details: Object.keys(validationError.errors).map(key => ({
-          field: key,
-          message: validationError.errors[key].message
-        }))
-      });
-    }
-    
-    await order.save();
-
-    // Update quotation status
-    quotation.status = 'converted'; // Changed from 'accepted' to 'converted'
-    quotation.acceptedAt = new Date();
-    quotation.convertedAt = new Date();
-    quotation.convertedOrderId = order._id;
-    await quotation.save();
-
-    await createAuditLog(req as any, {
-      action: 'convert',
-      resource: 'quotation',
-      resourceId: quotation._id.toString(),
-      details: `Quotation ${quotation.quoteNumber} converted to invoice ${invoiceNumber} and order ${order.orderNumber}`,
-      skipIfNoUser: false
-    });
-
-    res.json({ 
-      success: true, 
-      message: 'Quotation accepted and converted successfully',
-      invoiceNumber: invoiceNumber,
-      order: {
-        _id: order._id,
-        orderNumber: order.orderNumber,
-        invoiceNumber: invoiceNumber,
-        total: order.total
+      // Generate invoice number if not exists
+      let invoiceNumber = quotation.invoiceNumber;
+      if (!invoiceNumber) {
+        invoiceNumber = await generateInvoiceNumber();
+        quotation.invoiceNumber = invoiceNumber;
       }
-    });
-  } catch (error: any) {
-    console.error('Accept quotation error:', error);
-    res.status(500).json({ 
-      error: error.message || 'Failed to accept quotation',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+
+      const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      const shippingAddress = {
+        fullName: quotation.customerName,
+        address1: 'To be provided',
+        address2: '',
+        city: 'Nairobi',
+        state: 'KE',
+        zip: '00000',
+        country: 'KE',
+        phone: customerPhone,
+        email: quotation.customerEmail || ''
+      };
+
+      const orderItems = quotation.items.map((item: any) => ({
+        productId: item.productId,
+        name: item.name,
+        slug: item.slug,
+        image: item.image || '',
+        price: Number(item.price),
+        qty: Number(item.qty),
+        description: item.description || ''
+      }));
+
+      const transportCost = quotation.transportCost || quotation.transportInfo?.cost || 0;
+
+      // Determine payment status based on payment method
+      let paymentStatus = 'unpaid';
+      let amountPaid = 0;
+      let balanceDue = quotation.total;
+
+      // If payment method is COD or other non-prepaid methods, order is unpaid
+      if (paymentMethod === 'cod') {
+        paymentStatus = 'unpaid';
+        amountPaid = 0;
+        balanceDue = quotation.total;
+      }
+      // Add other payment methods as needed (mpesa, card might be paid immediately)
+
+      const orderData = {
+        quotationId: quotation._id,
+        quotationNumber: quotation.quoteNumber,
+        orderNumber,
+        invoiceNumber,
+        invoiceDate: new Date(),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        paymentTerms: 'Net 30',
+        userId: quotation.customerId,
+        salesCustomerId: quotation.customerId,
+        items: orderItems,
+        subtotal: quotation.subtotal,
+        shippingCost: transportCost,
+        tax: quotation.tax,
+        discount: quotation.discount,
+        total: quotation.total,
+        paymentMethod,
+        paymentStatus,
+        amountPaid,
+        balanceDue,
+        payments: [],
+        status: paymentMethod === 'cod' ? 'pending' : 'processing',
+        selectedShippingArea: null,
+        shippingAddress,
+        notes: `Auto-generated from quotation ${quotation.quoteNumber}\n\n${quotation.notes || ''}`,
+        createdBy: req.user!.userId,
+        guestInfo: null
+      };
+
+      const order = new OrderModel(orderData);
+      const validationError = order.validateSync();
+
+      if (validationError) {
+        console.error('Order validation error:', validationError.errors);
+        return res.status(400).json({
+          error: 'Order validation failed',
+          details: Object.keys(validationError.errors).map(key => ({
+            field: key,
+            message: validationError.errors[key].message
+          }))
+        });
+      }
+
+      await order.save();
+     
+      // Cast payment status to the correct type
+      const orderPaymentStatus = order.paymentStatus as 'unpaid' | 'partially_paid' | 'paid' | 'overpaid';
+
+      // Update quotation
+      quotation.status = 'converted';
+      quotation.acceptedAt = new Date();
+      quotation.convertedAt = new Date();
+      quotation.convertedOrderId = order._id;
+      quotation.invoiceNumber = invoiceNumber;
+
+      // Sync payment status from order to quotation with type casting
+      quotation.paymentStatus = orderPaymentStatus;
+      quotation.amountPaid = order.amountPaid || 0;
+      quotation.balanceDue = order.balanceDue || order.total;
+
+      await quotation.save();
+
+      await createAuditLog(req as any, {
+        action: 'convert',
+        resource: 'quotation',
+        resourceId: quotation._id.toString(),
+        details: `Quotation ${quotation.quoteNumber} converted to invoice ${invoiceNumber} and order ${order.orderNumber}`,
+        skipIfNoUser: false
+      });
+
+      res.json({
+        success: true,
+        message: 'Quotation converted to invoice successfully',
+        invoice: {
+          invoiceNumber: order.invoiceNumber,
+          quotationNumber: order.quotationNumber,
+          total: order.total,
+          balanceDue: order.balanceDue,
+          paymentStatus: order.paymentStatus,
+          dueDate: order.dueDate,
+          invoiceDate: order.invoiceDate
+        },
+        order: {
+          _id: order._id,
+          orderNumber: order.orderNumber,
+          paymentStatus: order.paymentStatus,
+          amountPaid: order.amountPaid,
+          balanceDue: order.balanceDue
+        }
+      });
+    } catch (error: any) {
+      console.error('Accept quotation error:', error);
+      res.status(500).json({
+        error: error.message || 'Failed to accept quotation',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
   }
-});
+);
 
 // DELETE /api/sales/quotations/:id - Delete quotation
 router.delete('/quotations/:id', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
@@ -899,107 +965,53 @@ const authorizeOrderByQuotationCreator = async (req: Request & { user?: any }, o
 router.post('/orders/:orderId/transactions', authMiddleware, requireSalesOrAdmin, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { orderId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(orderId)) return res.status(400).json({ error: 'Invalid orderId' });
-
+    const { paymentMethod, amount, status, transactionId, mpesaReceipt, notes } = req.body;
+    
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ error: 'Invalid orderId' });
+    }
+    
     const order = await OrderModel.findById(orderId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-
+    
     const allowed = await authorizeOrderByQuotationCreator(req as any, order);
     if (!allowed) return res.status(403).json({ error: 'Not allowed' });
-
-    const { paymentMethod, amount, status, transactionId, mpesaReceipt, cardLast4, cardBrand, notes } = req.body;
-
-    const validPaymentMethods = ['mpesa', 'card', 'cod'];
-    const validStatuses = ['pending', 'completed', 'failed', 'refunded'];
-
-    if (!paymentMethod || !validPaymentMethods.includes(paymentMethod)) {
-      return res.status(400).json({ error: 'Invalid paymentMethod' });
+    
+    if (status !== 'completed') {
+      return res.status(400).json({ error: 'Only completed payments can be recorded via this endpoint' });
     }
-    if (!status || !validStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
-    }
-
+    
     const finalAmount = typeof amount === 'number' ? amount : Number(amount);
     if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
     }
-
-    if (status !== 'pending' && status !== 'completed' && !transactionId) {
-      return res.status(400).json({ error: 'transactionId is required for this status' });
-    }
-
-    if (status === 'completed' || status === 'failed' || status === 'refunded') {
-      const existingSameMethod = await TransactionModel.findOne({
-        orderId: order._id,
-        paymentMethod,
-        status: { $in: ['completed', 'failed', 'refunded'] },
-      });
-
-      if (existingSameMethod) {
-        return res.status(409).json({ error: 'Transaction already recorded for this order/payment method', transactionId: existingSameMethod.transactionId });
-      }
-    }
-
-    if (status === 'refunded') {
-      const hasCompleted = await TransactionModel.findOne({ orderId: order._id, status: 'completed' });
-      if (!hasCompleted) {
-        return res.status(400).json({ error: 'Cannot refund before a completed transaction exists' });
-      }
-    }
-
-    const tx = await TransactionModel.create({
-      orderId: order._id,
-      userId: req.user!.userId,
-      guestEmail: order.guestInfo?.email,
-      guestPhone: order.guestInfo?.phone,
-      customerName: order.shippingAddress?.fullName || order.guestInfo?.name || 'Customer',
+    
+    // Use PaymentService instead of direct Transaction creation
+    const transaction = await PaymentService.recordPayment({
+      orderId,
       amount: finalAmount,
-      currency: 'KES',
       paymentMethod,
-      status,
-      transactionId: transactionId || new mongoose.Types.ObjectId().toString(),
-      mpesaReceipt: mpesaReceipt || undefined,
-      cardLast4: cardLast4 || undefined,
-      cardBrand: cardBrand || undefined,
-      notes: notes || undefined,
+      reference: transactionId,
+      notes,
+      source: 'quotation',
+      recordedBy: req.user!.userId,
+      recordedByName: req.user!.name,
+      transactionId: transactionId,
+      mpesaReceipt
     });
-
-    if (status === 'completed') {
-      order.paymentStatus = 'completed';
-      order.status = 'processing';
-      order.paymentDetails = {
-        ...(order.paymentDetails || {}),
-        transactionId: tx.transactionId,
-        mpesaReceipt: tx.mpesaReceipt,
-        cardLast4: tx.cardLast4,
-        cardBrand: tx.cardBrand,
-        paidAt: new Date(),
-        phoneNumber: order.shippingAddress?.phone,
-      } as any;
-    } else if (status === 'failed') {
-      order.paymentStatus = 'failed';
-      if (order.status === 'processing') order.status = 'pending';
-    } else if (status === 'refunded') {
-      order.paymentStatus = 'refunded';
-      order.status = 'refunded' as any;
-    } else {
-      order.paymentStatus = 'pending';
-    }
-
-    await order.save();
-
+    
     await createAuditLog(req as any, {
       action: 'create',
       resource: 'transaction',
-      resourceId: tx._id.toString(),
-      details: `Manual transaction recorded for order ${order.orderNumber} (${status}/${paymentMethod})`,
+      resourceId: transaction._id.toString(),
+      details: `Payment recorded for order ${order.orderNumber} (${finalAmount}/${paymentMethod})`,
       skipIfNoUser: false,
     });
-
-    return res.status(201).json({ transaction: tx, order });
+    
+    return res.status(201).json({ success: true, transaction, order });
   } catch (e: any) {
     console.error(e);
-    res.status(500).json({ error: 'Failed to record transaction' });
+    res.status(500).json({ error: e.message || 'Failed to record transaction' });
   }
 });
 
@@ -1038,9 +1050,31 @@ router.patch('/transactions/:transactionId', authMiddleware, requireSalesOrAdmin
 
     await tx.save();
 
+    // FIXED: Map transaction status to order payment status correctly
     if (tx.status === 'completed') {
-      order.paymentStatus = 'completed';
+      // Calculate actual paid amount from all completed transactions
+      const allCompletedTransactions = await TransactionModel.find({ 
+        orderId: order._id, 
+        status: 'completed' 
+      });
+      
+      const totalPaid = allCompletedTransactions.reduce((sum, t) => sum + t.amount, 0);
+      
+      // Determine payment status based on total paid vs order total
+      if (totalPaid === 0) {
+        order.paymentStatus = 'unpaid';
+      } else if (totalPaid < order.total) {
+        order.paymentStatus = 'partially_paid';
+      } else if (totalPaid === order.total) {
+        order.paymentStatus = 'paid';
+      } else {
+        order.paymentStatus = 'overpaid';
+      }
+      
       order.status = 'processing';
+      order.amountPaid = totalPaid;
+      order.balanceDue = Math.max(0, order.total - totalPaid);
+      
       order.paymentDetails = {
         ...(order.paymentDetails || {}),
         transactionId: tx.transactionId,
@@ -1049,14 +1083,45 @@ router.patch('/transactions/:transactionId', authMiddleware, requireSalesOrAdmin
         cardBrand: tx.cardBrand,
         paidAt: order.paymentDetails?.paidAt || new Date(),
       } as any;
+      
     } else if (tx.status === 'failed') {
-      order.paymentStatus = 'failed';
-      if (order.status === 'processing') order.status = 'pending';
+      // Failed transaction doesn't change payment status
+      // Only update if there are no completed transactions
+      const hasCompleted = await TransactionModel.findOne({ 
+        orderId: order._id, 
+        status: 'completed' 
+      });
+      
+      if (!hasCompleted) {
+        order.paymentStatus = 'unpaid';
+      }
+      // Don't change order status on failed payment
+      
     } else if (tx.status === 'refunded') {
-      order.paymentStatus = 'refunded';
-      order.status = 'refunded' as any;
-    } else {
-      order.paymentStatus = 'pending';
+      // Recalculate total paid (excluding refunded amounts)
+      const allCompletedTransactions = await TransactionModel.find({ 
+        orderId: order._id, 
+        status: 'completed' 
+      });
+      
+      const totalPaid = allCompletedTransactions.reduce((sum, t) => sum + t.amount, 0);
+      
+      if (totalPaid === 0) {
+        order.paymentStatus = 'refunded';
+      } else if (totalPaid < order.total) {
+        order.paymentStatus = 'partially_paid';
+      } else if (totalPaid === order.total) {
+        order.paymentStatus = 'paid';
+      } else {
+        order.paymentStatus = 'overpaid';
+      }
+      
+      order.amountPaid = totalPaid;
+      order.balanceDue = Math.max(0, order.total - totalPaid);
+      
+    } else if (tx.status === 'pending') {
+      // Pending transaction doesn't change payment status
+      // Keep existing status
     }
 
     await order.save();
@@ -1065,7 +1130,7 @@ router.patch('/transactions/:transactionId', authMiddleware, requireSalesOrAdmin
       action: 'update',
       resource: 'transaction',
       resourceId: tx._id.toString(),
-      details: `Manual transaction updated from ${oldStatus} to ${tx.status} for order ${order.orderNumber}`,
+      details: `Transaction updated from ${oldStatus} to ${tx.status} for order ${order.orderNumber}`,
       skipIfNoUser: false,
     });
 

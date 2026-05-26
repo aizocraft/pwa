@@ -10,10 +10,10 @@ export interface Image {
 
 export interface IProduct extends Document {
   name: string;
-  slug: string;
-  category: string;
-  brand: string;
-  type: string;
+  slug?: string;
+  category?: string;
+  brand?: string;
+  type?: string;
   price: number; 
   compareAtPrice?: number; 
   description?: string;
@@ -45,10 +45,10 @@ const ImageSchema = new Schema({
 
 const productSchema = new Schema<IProduct>({
   name: { type: String, required: true },
-  slug: { type: String, required: true, unique: true },
-  category: { type: String, required: true },
-  brand: { type: String, required: true },
-  type: { type: String, required: true },
+  slug: { type: String, required: false, unique: true },
+  category: { type: String, required: false },
+  brand: { type: String, required: false },
+  type: { type: String, required: false },
   price: { type: Number, required: true },
   compareAtPrice: { type: Number, default: null }, 
   description: { type: String },

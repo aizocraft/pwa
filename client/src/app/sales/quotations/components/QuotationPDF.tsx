@@ -111,67 +111,18 @@ export async function generateQuotationPDF(
   </div>
 </div>
 
-    <div class="info-section">
-      <div class="info-card">
-        <div class="info-card-header">
-          ${icons.user}
-          <h3>Bill To</h3>
-        </div>
-        <div class="info-content">
-          <div class="customer-name">${escapeHtml(customer.name)}</div>
-          ${customer.email ? `<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${escapeHtml(customer.email)}</span></div>` : ''}
-          ${customer.phone ?  `<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escapeHtml(customer.phone)}</span></div>` : ''}
-          ${customer.location ? `<div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${escapeHtml(customer.location)}</span></div>` : ''}
-        </div>
-      </div>
-
-        <div class="info-card">
-          <div class="info-card-header">
-            ${icons.package}
-            <h3>${quote.status === 'accepted' || quote.status === 'converted' ? 'INVOICE DETAILS' : 'QUOTATION DETAILS'}</h3>
-          </div>
-          <div class="info-content">
-            <div class="detail-row">
-              <span class="detail-label">REF Number</span>
-              <span class="detail-value">${quote.status === 'converted' && quote.invoiceNumber ? quote.invoiceNumber : quote.quoteNumber}</span>
-            </div>
-            ${quote.status === 'converted' && quote.invoiceNumber && quote.quoteNumber ? `
-              <div class="detail-row">
-                <span class="detail-label">Quote REF</span>
-                <span class="detail-value">${quote.quoteNumber}</span>
-              </div>
-            ` : ''}
-          <div class="detail-row">
-            <span class="detail-label">Date Issued</span>
-            <span class="detail-value">${new Date(quote.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Valid Until</span>
-            <span class="detail-value">${new Date(quote.validUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-          </div>
-          ${(quote.status === 'accepted' || quote.status === 'converted') ? `
-            <div class="detail-row">
-              <span class="detail-label">Payment Status</span>
-              <span class="detail-value">
-                <span class="payment-status-badge ${quote.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}">
-                  ${quote.paymentStatus === 'paid' ? '✓ PAID' : '⚠ UNPAID'}
-                </span>
-              </span>
-            </div>
-          ` : ''}
-        </div>
-      </div>
-    </div>
   `;
 
-  // Conditional Routing Logic based on item count
-  const hasPageBreak = itemsWithCalculations.length > 6;
-  const page1Items = hasPageBreak ? itemsWithCalculations.slice(0, 6) : itemsWithCalculations;
-  const page2Items = hasPageBreak ? itemsWithCalculations.slice(6) : [];
+  // Updated Routing Logic: 3 items or less = single page, otherwise 2 pages
+  const shouldUseTwoPages = itemsWithCalculations.length > 3;
+  
+  // Items distribution: If 2 pages needed, put items 1-6 on page 1, items 7+ on page 2
+  const page1Items = shouldUseTwoPages ? itemsWithCalculations.slice(0, 9) : itemsWithCalculations;
+  const page2Items = shouldUseTwoPages ? itemsWithCalculations.slice(9) : [];
 
-  // Determine exactly where the totals panel lands
-  const showTotalsOnPage1 = !hasPageBreak;
-  const showTotalsOnPage2 = hasPageBreak;
+  // Determine where totals panel goes
+  const showTotalsOnPage1 = !shouldUseTwoPages || (shouldUseTwoPages && page2Items.length === 0);
+  const showTotalsOnPage2 = shouldUseTwoPages && page2Items.length > 0;
 
   // Items Table Markup Engine
   const getItemsTableHTML = (itemsList: any[]) => `
@@ -243,6 +194,64 @@ export async function generateQuotationPDF(
     </div>
   `;
 
+  // Payment Information + Notes + Terms (shared component)
+  const getPaymentAndNotesHTML = () => `
+    <div class="payment-section" style="margin-top: ${shouldUseTwoPages ? '20px' : '30px'};">
+      <div class="payment-header">
+        <h4>Payment Information</h4>
+      </div>
+      <div class="payment-body">
+        <div class="payment-method">
+          <div class="payment-method-header">
+            <img src="${kcbLogoUrl}" class="payment-logo" alt="KCB Bank" crossorigin="anonymous" onerror="this.style.display='none'" />
+            <div>
+              <div class="payment-method-title">KCB Bank Kenya</div>
+              <div class="payment-method-sub">Bank Transfer</div>
+            </div>
+          </div>
+          <div class="payment-details">
+            <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
+            <div class="payment-detail"><span class="payment-detail-key">Account Number</span><span class="payment-detail-value">1312281278</span></div>
+            <div class="payment-detail"><span class="payment-detail-key">Branch</span><span class="payment-detail-value">Moi Avenue, Nairobi</span></div>
+          </div>
+        </div>
+        <div class="payment-method">
+          <div class="payment-method-header">
+            <img src="${mpesaLogoUrl}" class="payment-logo" alt="M-PESA" crossorigin="anonymous" onerror="this.style.display='none'" />
+            <div>
+              <div class="payment-method-title">LIPA NA M-PESA</div>
+              <div class="payment-method-sub">Till Number</div>
+            </div>
+          </div>
+          <div class="payment-details">
+            <div class="payment-detail"><span class="payment-detail-key">Lipa na M-PESA  - </span><span class="payment-detail-value">Buy Goods & Services </span></div>
+            <div class="payment-detail"><span class="payment-detail-key">Till No.</span><span class="payment-detail-value">9114123</span></div>
+            <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+      ${quote.notes || quote.terms ? `
+        <div class="notes-terms-grid">
+          ${quote.notes ? `
+            <div class="notes-box">
+              <div class="notes-title">Notes</div>
+              <div class="notes-text">${escapeHtml(quote.notes)}</div>
+            </div>
+          ` : '<div class="empty-placeholder"></div>'}
+          
+          ${quote.terms ? `
+            <div class="terms-box">
+              <div class="terms-title">Terms & Conditions</div>
+              <div class="terms-text">${escapeHtml(quote.terms)}</div>
+            </div>
+          ` : '<div class="empty-placeholder"></div>'}
+        </div>
+      ` : ''}
+
+  `;
+
   // Footer HTML (appears on every page)
   const getFooterHTML = () => `
     <div class="footer">
@@ -251,7 +260,6 @@ export async function generateQuotationPDF(
           <img src="${footerLogoUrl}" class="footer-logo" alt="Plasma Water Africa" crossorigin="anonymous" onerror="this.style.display='none'" />
         </div>
         <div class="footer-services">
-         
           <div class="services-list">
             <span class="service-item">Borehole Services</span>
             <span class="service-item">Water Pumps</span>
@@ -262,18 +270,130 @@ export async function generateQuotationPDF(
             <span class="service-item">Swimming Pools</span>
           </div>
           <div class="footer-slogan">${escapeHtml(companySlogan)}  |  © ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.</div>
-           <div class="footer-copyright">
-                 
         </div>
-        </div>
-      </div>
-    
       </div>
     </div>
   `;
 
-  // Page 1: Header + Items + Tax Note + Totals (up to Total Amount)
+  // Page 1: Header + Items + Transport Info + (maybe totals & payment info)
   const page1HTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+      <style>${getStyles()}</style>
+    </head>
+    <body>
+      <div class="pdf-container">
+        ${getHeaderHTML()}
+        
+        <div class="info-section">
+      <div class="info-card">
+        <div class="info-card-header">
+          ${icons.user}
+          <h3>Bill To</h3>
+        </div>
+        <div class="info-content">
+          <div class="customer-name">${escapeHtml(customer.name)}</div>
+            <div class="detail-row">    
+            ${customer.email ? `
+              <div class="contact-item">
+                <span class="detail-label">Email</span>
+                <span class="detail-value">${escapeHtml(customer.email)}</span>
+              </div>
+            ` : ''} </div>
+               <div class="detail-row">
+            ${customer.phone ? `
+              <div class="contact-item">
+                <span class="detail-label">Phone</span>
+                <span class="detail-value">${escapeHtml(customer.phone)}</span>
+              </div>
+            ` : ''} </div>
+          
+          ${customer.location ? `<div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${escapeHtml(customer.location)}</span></div>` : ''}
+        </div>
+
+
+        
+      </div>
+
+        <div class="info-card">
+          <div class="info-card-header">
+            ${icons.package}
+            <h3>${quote.status === 'accepted' || quote.status === 'converted' ? 'INVOICE DETAILS' : 'QUOTATION DETAILS'}</h3>
+          </div>
+          <div class="info-content">
+            <div class="detail-row">
+              <span class="detail-label">REF Number</span>
+              <span class="detail-value">${quote.status === 'converted' && quote.invoiceNumber ? quote.invoiceNumber : quote.quoteNumber}</span>
+            </div>
+          <div class="detail-row">
+            <span class="detail-label">Date Issued</span>
+            <span class="detail-value">${new Date(quote.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Valid Until</span>
+            <span class="detail-value">${new Date(quote.validUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          </div>
+          ${(quote.status === 'accepted' || quote.status === 'converted') ? `
+            <div class="detail-row">
+              <span class="detail-label">Payment Status</span>
+              <span class="detail-value">
+      <span class="payment-status-badge ${quote.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}">
+        ${quote.paymentStatus === 'paid' ? '✓ PAID' : quote.paymentStatus === 'partially_paid' ? `⚠ PARTIALLY PAID (Balance: KES ${quote.balanceDue?.toLocaleString()})` : '⚠ UNPAID'}
+      </span>
+    </span>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+    
+        ${(transportCost > 0 || transportDescription || estimatedDelivery) ? `
+          <div class="transport-info">
+            ${transportDescription ? `
+              <div class="transport-item">
+                ${icons.truck}
+                <div>
+                  <div class="transport-label">Delivery Method</div>
+                  <div class="transport-value">${escapeHtml(transportDescription)}</div>
+                </div>
+              </div>
+            ` : ''}
+            ${transportCost > 0 ? `
+              <div class="transport-item">
+                <div>
+                  <div class="transport-label">Delivery Cost</div>
+                  <div class="transport-value">KES ${transportCost.toLocaleString()}</div>
+                </div>
+              </div>
+            ` : ''}
+            ${estimatedDelivery ? `
+              <div class="transport-item">
+                <div>
+                  <div class="transport-label">Est. Delivery</div>
+                  <div class="transport-value">${escapeHtml(estimatedDelivery)}</div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+        
+        ${getItemsTableHTML(page1Items)}
+        
+        ${showTotalsOnPage1 ? totalsBoxHTML : ''}
+        
+        ${!shouldUseTwoPages ? getPaymentAndNotesHTML() : ''}
+        
+        ${getFooterHTML()}
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Page 2: Remaining items (if any) + totals + payment info + notes + terms + footer
+  const page2HTML = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -315,85 +435,11 @@ export async function generateQuotationPDF(
           </div>
         ` : ''}
         
-        ${getItemsTableHTML(page1Items)}
+        ${page2Items.length > 0 ? getItemsTableHTML(page2Items) : ''}
         
-        ${showTotalsOnPage1 ? totalsBoxHTML : ''}
-        
-        ${getFooterHTML()}
-      </div>
-    </body>
-    </html>
-  `;
-
-  // Page 2: Header + Payment Information + Notes + Terms + Footer
-const page2HTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
-      <style>${getStyles()}</style>
-    </head>
-    <body>
-      <div class="pdf-container">
-        
-        ${hasPageBreak ? `
-          <div style="margin-top: 20px;">
-            ${getItemsTableHTML(page2Items)}
-          </div>
-        ` : ''}
-
         ${showTotalsOnPage2 ? totalsBoxHTML : ''}
-                
-        <div class="payment-section" style="margin-top: 30px;">
-          <div class="payment-header">
-            <h4>Payment Information</h4>
-          </div>
-          <div class="payment-body">
-            <div class="payment-method">
-              <div class="payment-method-header">
-                <img src="${kcbLogoUrl}" class="payment-logo" alt="KCB Bank" crossorigin="anonymous" onerror="this.style.display='none'" />
-                <div>
-                  <div class="payment-method-title">KCB Bank Kenya</div>
-                  <div class="payment-method-sub">Bank Transfer</div>
-                </div>
-              </div>
-              <div class="payment-details">
-                <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
-                <div class="payment-detail"><span class="payment-detail-key">Account Number</span><span class="payment-detail-value">1312281278</span></div>
-                <div class="payment-detail"><span class="payment-detail-key">Branch</span><span class="payment-detail-value">Moi Avenue, Nairobi</span></div>
-              </div>
-            </div>
-            <div class="payment-method">
-              <div class="payment-method-header">
-                <img src="${mpesaLogoUrl}" class="payment-logo" alt="M-PESA" crossorigin="anonymous" onerror="this.style.display='none'" />
-                <div>
-                  <div class="payment-method-title">LIPA NA M-PESA</div>
-                  <div class="payment-method-sub">Till Number</div>
-                </div>
-              </div>
-              <div class="payment-details">
-                <div class="payment-detail"><span class="payment-detail-key">Lipa na M-PESA  - </span><span class="payment-detail-value">Buy Goods & Services </span></div>
-                <div class="payment-detail"><span class="payment-detail-key">Till No.</span><span class="payment-detail-value">9114123</span></div>
-                <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
         
-        ${quote.notes ? `
-          <div class="notes-box">
-            <div class="notes-title">Notes</div>
-            <div class="notes-text">${escapeHtml(quote.notes)}</div>
-          </div>
-        ` : ''}
-        
-        ${quote.terms ? `
-          <div class="terms-box">
-            <div class="terms-title">Terms & Conditions</div>
-            <div class="terms-text">${escapeHtml(quote.terms)}</div>
-          </div>
-        ` : ''}
+        ${shouldUseTwoPages ? getPaymentAndNotesHTML() : ''}
         
         ${getFooterHTML()}
       </div>
@@ -468,73 +514,72 @@ const page2HTML = `
         display: block;
       }
 
-/* Container holds the line profile height */
-.doc-title-section {
-  width: 100%;
-  margin: 35px 0 35px 0 !important;
-  position: relative !important;
-  display: flex !important;
-  align-items: center !important; /* Centers the pill box vertically over the slim line */
-  box-sizing: border-box;
-}
+      /* Container holds the line profile height */
+      .doc-title-section {
+        width: 100%;
+        margin: 35px 0 35px 0 !important;
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box;
+      }
 
-/* QUOTATION: Ultra-slim 4px blue line profile with precise internal accents */
-.doc-title-section.doc-title-quotation {
-  height: 4px !important; 
-  background: #0b355e !important;
-  border-top: 1px solid #ffffff !important;
-  border-bottom: 1px solid #ffffff !important;
-  box-shadow: 0 0 0 1px #0b355e !important;
-}
+      /* QUOTATION: Ultra-slim 4px blue line profile with precise internal accents */
+      .doc-title-section.doc-title-quotation {
+        height: 4px !important; 
+        background: #0b355e !important;
+        border-top: 1px solid #ffffff !important;
+        border-bottom: 1px solid #ffffff !important;
+        box-shadow: 0 0 0 1px #0b355e !important;
+      }
 
-/* INVOICE: Ultra-slim 4px solid slate grey line profile */
-.doc-title-section.doc-title-invoice {
-  height: 4px !important;
-  background: #374151 !important;
-  border: none !important;
-  box-shadow: none !important;
-}
+      /* INVOICE: Ultra-slim 4px solid slate grey line profile */
+      .doc-title-section.doc-title-invoice {
+        height: 4px !important;
+        background: #374151 !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
 
-/* Aligns the inner elements to the right side */
-.doc-title-container {
-  width: 100% !important;
-  display: flex !important;
-  justify-content: flex-end !important;
-  padding-right: 60px !important;
-  position: absolute !important; /* Breaks out of the tiny 4px line constraints */
-  z-index: 10 !important;
-}
+      /* Aligns the inner elements to the right side */
+      .doc-title-container {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        padding-right: 60px !important;
+        position: absolute !important;
+        z-index: 10 !important;
+      }
 
-/* The taller text pill element overlapping the smaller line */
-.doc-title-text {
-  display: inline-block !important;
-  padding: 8px 32px !important; /* Standard layout padding */
-  text-align: center !important;
-  font-family: 'Inter', sans-serif !important;
-  font-size: 22px !important;
-  font-weight: 800 !important;
-  letter-spacing: 2px !important;
-  text-transform: uppercase !important;
-  background: #ffffff !important;
-  line-height: 1.2 !important;
-}
+      /* The taller text pill element overlapping the smaller line */
+      .doc-title-text {
+        display: inline-block !important;
+        padding: 8px 32px !important;
+        text-align: center !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        letter-spacing: 2px !important;
+        text-transform: uppercase !important;
+        background: #ffffff !important;
+        line-height: 1.2 !important;
+      }
 
-.doc-title-text.text-quotation {
-  color: #0b355e !important;
-  border: 1.5px solid #0b355e !important;
-}
+      .doc-title-text.text-quotation {
+        color: #0b355e !important;
+        border: 1.5px solid #0b355e !important;
+      }
 
-.doc-title-text.text-invoice {
-  color: #374151 !important;
-  border: 1.5px solid #374151 !important;
-}
-      
+      .doc-title-text.text-invoice {
+        color: #374151 !important;
+        border: 1.5px solid #374151 !important;
+      }
       
       .info-section {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 40px;
-        margin-bottom: 25px;
+        margin-bottom: 15px;
       }
 
       .info-card {
@@ -591,6 +636,7 @@ const page2HTML = `
         font-size: 16px;
         color: #2c3e4e;
       }
+
 
       .transport-info {
         background: #f7f9fc;
@@ -651,7 +697,7 @@ const page2HTML = `
       .items-table {
         width: 100%;
         border-collapse: collapse;
-        margin-bottom: 25px;
+        margin-bottom: 15px;
       }
 
       .items-table th {
@@ -686,6 +732,7 @@ const page2HTML = `
         color: #8a9aaa;
         line-height: 1.5;
         margin-top: 4px;
+        display: none;
       }
 
       .tax-badge {
@@ -793,7 +840,7 @@ const page2HTML = `
       }
 
       .payment-section {
-        margin-bottom: 40px;
+        margin-bottom: 10px;
         border: 1px solid #e9eef3;
         border-radius: 20px;
         overflow: hidden;
@@ -876,52 +923,72 @@ const page2HTML = `
         font-size: 15px;
       }
 
-      .notes-box {
-        background: #fef8e7;
-        padding: 18px 24px;
-        border-radius: 16px;
-        margin-bottom: 24px;
-        border-left: 4px solid #e6a017;
-      }
+ .notes-terms-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 10px;
+}
 
-      .notes-title, .terms-title {
-        font-size: 13px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 8px;
-      }
+.empty-placeholder {
+  min-height: 100px;
+}
 
-      .notes-title {
-        color: #b46f0b;
-      }
+.notes-box {
+  background: #fef8e7;
+  padding: 18px 24px;
+  border-radius: 16px;
+  margin-bottom: 0;
+  border-left: 4px solid #e6a017;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
 
-      .notes-text {
-        font-size: 15px;
-        color: #7a5a2a;
-        line-height: 1.6;
-      }
+.notes-title, .terms-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
 
-      .terms-box {
-        background: #f7f9fc;
-        padding: 18px 24px;
-        border-radius: 16px;
-        margin-bottom: 40px;
-        border-left: 4px solid #8a9aaa;
-      }
+.notes-title {
+  color: #b46f0b;
+}
 
-      .terms-title {
-        color: #5a6e7c;
-      }
+.notes-text {
+  font-size: 15px;
+  color: #7a5a2a;
+  line-height: 1.6;
+  flex: 1;
+}
 
-      .terms-text {
-        font-size: 15px;
-        color: #5a6e7c;
-        line-height: 1.6;
-      }
+.terms-box {
+  background: #f7f9fc;
+  padding: 18px 24px;
+    border-radius: 16px;
+    margin-bottom: 0;
+    border-left: 4px solid #8a9aaa;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .terms-title {
+    color: #5a6e7c;
+  }
+
+  .terms-text {
+    font-size: 15px;
+    color: #5a6e7c;
+    line-height: 1.6;
+    flex: 1;
+  }
+
 
       .footer {
-        margin-top: auto;
+        margin-top: 5 px;
         padding: 25px 0 20px 0;
         border-top: 2px solid #e9eef3;
         background: white;
@@ -1037,10 +1104,9 @@ const page2HTML = `
     return canvas.toDataURL('image/jpeg', 0.95);
   }
 
-  // Render both pages
+  // Render pages based on logic
   const page1Image = await renderPage(page1HTML);
-  const page2Image = await renderPage(page2HTML);
-
+  
   // Create PDF
   const pdf = new jsPDF({
     orientation: 'portrait',
@@ -1055,11 +1121,14 @@ const page2HTML = `
   const img1Height = (img1Props.height * pdfWidth) / img1Props.width;
   pdf.addImage(page1Image, 'JPEG', 0, 0, pdfWidth, img1Height);
 
-  // Add Page 2
-  pdf.addPage();
-  const img2Props = pdf.getImageProperties(page2Image);
-  const img2Height = (img2Props.height * pdfWidth) / img2Props.width;
-  pdf.addImage(page2Image, 'JPEG', 0, 0, pdfWidth, img2Height);
+  // Add Page 2 if needed
+  if (shouldUseTwoPages) {
+    const page2Image = await renderPage(page2HTML);
+    pdf.addPage();
+    const img2Props = pdf.getImageProperties(page2Image);
+    const img2Height = (img2Props.height * pdfWidth) / img2Props.width;
+    pdf.addImage(page2Image, 'JPEG', 0, 0, pdfWidth, img2Height);
+  }
 
   return pdf.output('blob');
 }

@@ -12,11 +12,7 @@ export interface IOrderItem {
 
 export interface IOrder extends Document {
   userId?: mongoose.Types.ObjectId;
-  guestInfo?: {
-    email: string;
-    phone: string;
-    name?: string;
-  };
+  guestInfo?: { email: string; phone: string; name?: string; };
   items: IOrderItem[];
   subtotal: number;
   shippingCost: number;
@@ -25,8 +21,14 @@ export interface IOrder extends Document {
   total: number;
   status: 'pending' | 'processing' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   paymentMethod: 'cod' | 'mpesa' | 'card';
-  paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded';
-    paymentDetails?: {
+  
+  // Payment summary (denormalized from Transaction model)
+  paymentStatus: 'unpaid' | 'partially_paid' | 'paid' | 'overpaid' | 'refunded';
+  amountPaid: number;
+  balanceDue: number;
+  
+  // Quick reference for latest payment
+  paymentDetails?: {
     transactionId?: string;
     mpesaReceipt?: string;
     cardLast4?: string;
@@ -34,14 +36,22 @@ export interface IOrder extends Document {
     paidAt?: Date;
     phoneNumber?: string;
   };
+  
+  // Invoice fields
+  invoiceNumber?: string;
+  quotationNumber?: string;
+  invoiceDate?: Date;
+  dueDate?: Date;
+  invoiceSentAt?: Date;
+  paymentTerms?: string;
+  
   stripeId?: string;
   selectedShippingArea?: mongoose.Types.ObjectId;
   appliedPromoCode?: mongoose.Types.ObjectId;
-  // Sales integration
   salesCustomerId?: mongoose.Types.ObjectId;
   quotationId?: mongoose.Types.ObjectId;
+  
   shippingAddress: {
-
     fullName: string;
     address1: string;
     address2?: string;
@@ -52,19 +62,19 @@ export interface IOrder extends Document {
     phone: string;
     email?: string;
   };
+  
   notes?: string;
   trackingNumber?: string;
   estimatedDelivery?: Date;
   createdAt: Date;
   updatedAt: Date;
   orderNumber: string;
-
+  
   canCancel(): boolean;
   canRefund(): boolean;
 }
 
-interface IOrderModel extends Model<IOrder> {
-}
+interface IOrderModel extends Model<IOrder> {}
 
 const orderItemSchema = new Schema({
   productId: { type: SchemaTypes.ObjectId, ref: 'Product', required: true },
@@ -74,7 +84,7 @@ const orderItemSchema = new Schema({
   price: { type: Number, required: true },
   qty: { type: Number, required: true, min: 1 },
   description: { type: String }
-});
+}, { _id: false });
 
 const orderSchema = new Schema<IOrder, IOrderModel>({
   userId: { type: SchemaTypes.ObjectId, ref: 'User', required: false, index: true },
@@ -94,27 +104,39 @@ const orderSchema = new Schema<IOrder, IOrderModel>({
     enum: ['pending', 'processing', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'], 
     default: 'pending' 
   },
-  paymentMethod: { 
-    type: String, 
-    enum: ['cod', 'mpesa', 'card'], 
-    required: true 
-  },
+  paymentMethod: { type: String, enum: ['cod', 'mpesa', 'card'], required: true },
+  
+  // Payment summary (denormalized)
   paymentStatus: {
     type: String,
-    enum: ['pending', 'completed', 'failed', 'refunded'],
-    default: 'pending'
+    enum: ['unpaid', 'partially_paid', 'paid', 'overpaid', 'refunded'],
+    default: 'unpaid'
   },
-paymentDetails: {
-  transactionId: { type: String },
-  mpesaReceipt: { type: String },
-  cardLast4: { type: String },
-  cardBrand: { type: String },
-  paidAt: { type: Date },
-  phoneNumber: { type: String }
-},
+  amountPaid: { type: Number, default: 0 },
+  balanceDue: { type: Number, default: 0 },
+  
+  paymentDetails: {
+    transactionId: { type: String },
+    mpesaReceipt: { type: String },
+    cardLast4: { type: String },
+    cardBrand: { type: String },
+    paidAt: { type: Date },
+    phoneNumber: { type: String }
+  },
+  
+  invoiceNumber: { type: String, unique: true, sparse: true, index: true },
+  quotationNumber: { type: String, index: true },
+  invoiceDate: { type: Date, default: Date.now },
+  dueDate: { type: Date },
+  invoiceSentAt: Date,
+  paymentTerms: { type: String, default: 'Due on receipt' },
+  
   stripeId: String,
   selectedShippingArea: { type: SchemaTypes.ObjectId, ref: 'ShippingArea' },
   appliedPromoCode: { type: SchemaTypes.ObjectId, ref: 'PromoCode' },
+  salesCustomerId: { type: SchemaTypes.ObjectId, ref: 'SalesCustomer' },
+  quotationId: { type: SchemaTypes.ObjectId, ref: 'Quotation' },
+  
   shippingAddress: {
     fullName: { type: String, required: true },
     address1: { type: String, required: true },
@@ -135,29 +157,33 @@ paymentDetails: {
   toObject: { virtuals: true }
 });
 
-// Indexes for better query performance
+// Indexes
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ 'guestInfo.email': 1 });
-orderSchema.index({ paymentStatus: 1 });
-orderSchema.index({ selectedShippingArea: 1 });
-orderSchema.index({ appliedPromoCode: 1 });
+orderSchema.index({ invoiceNumber: 1 });
+orderSchema.index({ quotationNumber: 1 });
 
 // Virtual for order number
 orderSchema.virtual('orderNumber').get(function() {
   return `ORD-${this._id.toString().slice(-8).toUpperCase()}`;
 });
 
-// ✅ Method to check if order can be cancelled
+// Methods
 orderSchema.methods.canCancel = function(): boolean {
   return ['pending', 'processing'].includes(this.status);
 };
 
-// ✅ Method to check if order can be refunded
 orderSchema.methods.canRefund = function(): boolean {
-  return this.paymentStatus === 'completed' && 
+  return ['paid', 'partially_paid'].includes(this.paymentStatus) && 
          ['paid', 'shipped', 'delivered'].includes(this.status);
 };
+
+// Pre-save hook to calculate balance
+orderSchema.pre('save', function(next) {
+  this.balanceDue = Math.max(0, this.total - this.amountPaid);
+  next();
+});
 
 const OrderModel = mongoose.model<IOrder, IOrderModel>('Order', orderSchema);
 

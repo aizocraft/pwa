@@ -1324,14 +1324,19 @@ export async function deleteAdminReview(reviewId: string): Promise<void> {
     throw error;
   }
 }
-// ========== TRANSACTION API ==========
-// Get admin transactions (paginated)
+
+// ========== TRANSACTION API (UPDATED) ==========
+
+// Get all transactions (admin only) - Updated endpoint
 export async function getTransactions(params?: {
   page?: number;
   limit?: number;
   status?: string;
   paymentMethod?: string;
+  source?: string;  // NEW: checkout, quotation, manual, admin
   search?: string;
+  startDate?: string;
+  endDate?: string;
 }): Promise<{
   transactions: any[];
   pagination: {
@@ -1349,7 +1354,8 @@ export async function getTransactions(params?: {
   });
 
   try {
-    const response = await api.get(`/transactions/admin?${query.toString()}`);
+    // UPDATED: Use /api/transactions (not /admin)
+    const response = await api.get(`/transactions?${query.toString()}`);
     return response.data;
   } catch (error: any) {
     console.error('Failed to fetch transactions:', error);
@@ -1357,7 +1363,7 @@ export async function getTransactions(params?: {
   }
 }
 
-// Get transaction statistics
+// Get transaction statistics (admin only) - Updated
 export async function getTransactionStats(): Promise<{
   summary: {
     totalVolume: number;
@@ -1366,18 +1372,14 @@ export async function getTransactionStats(): Promise<{
     pending: number;
     failed: number;
     refunded: number;
-    mpesaCount: number;
-    cardCount: number;
-    codCount: number;
   };
-  statusBreakdown: Array<{
-    _id: string;
-    count: number;
-    volume: number;
-  }>;
+  byStatus: Array<{ _id: string; count: number; volume: number }>;
+  bySource: Array<{ _id: string; count: number; volume: number }>;
+  byMethod: Array<{ _id: string; count: number; volume: number }>;
 }> {
   try {
-    const response = await api.get('/transactions/admin/stats');
+    // UPDATED: Use /api/transactions/stats
+    const response = await api.get('/transactions/stats');
     return response.data;
   } catch (error: any) {
     console.error('Failed to fetch transaction stats:', error);
@@ -1385,10 +1387,21 @@ export async function getTransactionStats(): Promise<{
   }
 }
 
-// Update transaction status
-export async function updateTransactionStatus(id: string, status: string): Promise<any> {
+// Get single transaction (admin only) - NEW
+export async function getTransaction(id: string): Promise<any> {
   try {
-    const response = await api.patch(`/transactions/${id}/status`, { status });
+    const response = await api.get(`/transactions/${id}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch transaction:', error);
+    throw error;
+  }
+}
+
+// Update transaction status (admin only) - Updated
+export async function updateTransactionStatus(id: string, status: string, reason?: string): Promise<any> {
+  try {
+    const response = await api.patch(`/transactions/${id}/status`, { status, reason });
     toast.success('Transaction status updated');
     return response.data;
   } catch (error: any) {
@@ -1397,12 +1410,11 @@ export async function updateTransactionStatus(id: string, status: string): Promi
   }
 }
 
-// In api.ts - Add this function to your transaction API section
-
-// Export transactions to CSV
+// Export transactions to CSV (admin only) - Updated
 export async function exportTransactionsToCSV(params?: {
   status?: string;
   paymentMethod?: string;
+  source?: string;
   startDate?: string;
   endDate?: string;
 }): Promise<Blob> {
@@ -1414,7 +1426,8 @@ export async function exportTransactionsToCSV(params?: {
   });
 
   try {
-    const response = await api.get(`/admin/transactions/export/csv?${query.toString()}`, {
+    // UPDATED: Use /api/transactions/export/csv
+    const response = await api.get(`/transactions/export/csv?${query.toString()}`, {
       responseType: 'blob'
     });
     return response.data;
@@ -1424,6 +1437,123 @@ export async function exportTransactionsToCSV(params?: {
     throw error;
   }
 }
+
+// ========== NEW PAYMENT API ==========
+
+// Get payment summary for an order
+export async function getOrderPaymentSummary(orderId: string): Promise<{
+  success: boolean;
+  orderId: string;
+  orderNumber: string;
+  invoiceNumber?: string;
+  total: number;
+  paymentStatus: string;
+  amountPaid: number;
+  balanceDue: number;
+  paymentCount: number;
+  lastPayment: any;
+  transactions: any[];
+}> {
+  try {
+    const response = await api.get(`/payments/orders/${orderId}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch payment summary:', error);
+    throw error;
+  }
+}
+
+// Record manual payment (admin/sales only)
+export async function recordManualPayment(data: {
+  orderId: string;
+  amount: number;
+  paymentMethod: 'mpesa' | 'card' | 'cash' | 'bank_transfer' | 'cheque';
+  reference?: string;
+  notes?: string;
+}): Promise<{
+  success: boolean;
+  message: string;
+  transaction: any;
+  order: {
+    orderNumber: string;
+    paymentStatus: string;
+    amountPaid: number;
+    balanceDue: number;
+  };
+}> {
+  try {
+    const response = await api.post('/payments/record', data);
+    toast.success('Payment recorded successfully');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to record payment');
+    throw error;
+  }
+}
+
+// Refund a transaction
+export async function refundTransaction(transactionId: string, reason?: string): Promise<{
+  success: boolean;
+  message: string;
+  refund: any;
+  originalTransaction: any;
+}> {
+  try {
+    const response = await api.post(`/payments/refund/${transactionId}`, { reason });
+    toast.success('Refund processed successfully');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to process refund');
+    throw error;
+  }
+}
+
+// List all payments (admin only)
+export async function listPayments(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  paymentMethod?: string;
+  source?: string;
+  search?: string;
+}): Promise<{
+  transactions: any[];
+  pagination: any;
+}> {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  });
+
+  try {
+    const response = await api.get(`/payments/transactions?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch payments:', error);
+    throw error;
+  }
+}
+
+// Get payment statistics (admin only)
+export async function getPaymentStats(): Promise<{
+  summary: {
+    totalVolume: number;
+    totalTransactions: number;
+    avgTransaction: number;
+  };
+  sourceBreakdown: Array<{ _id: string; count: number; volume: number }>;
+}> {
+  try {
+    const response = await api.get('/payments/stats');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch payment stats:', error);
+    throw error;
+  }
+}
+
 // Export the api instance for custom requests 
 export default api;
 

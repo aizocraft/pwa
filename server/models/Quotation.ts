@@ -10,6 +10,7 @@ export type QuotationStatus =
   | 'converted';
 
 export type DiscountType = 'percentage' | 'fixed';
+export type PaymentStatus = 'unpaid' | 'partially_paid' | 'paid' | 'overpaid';
 
 export interface IQuotationItem {
   productId: mongoose.Types.ObjectId;
@@ -66,9 +67,15 @@ export interface IQuotation extends Document {
   total: number;
 
   quoteNumber: string;
-  invoiceNumber?: string; // ADDED: for converted quotations
+  invoiceNumber?: string;
 
   status: QuotationStatus;
+  
+  // Payment status fields for converted quotations
+  paymentStatus?: PaymentStatus;
+  amountPaid?: number;
+  balanceDue?: number;
+  
   validUntil: Date;
 
   notes?: string;
@@ -156,7 +163,7 @@ const quotationSchema = new Schema<IQuotation>(
     total: { type: Number, required: true, min: 0 },
 
     quoteNumber: { type: String, required: true, unique: true, index: true },
-    invoiceNumber: { type: String, unique: true, sparse: true }, // ADDED
+    invoiceNumber: { type: String, unique: true, sparse: true },
 
     status: {
       type: String,
@@ -164,6 +171,15 @@ const quotationSchema = new Schema<IQuotation>(
       default: 'draft',
       index: true
     },
+
+    // Payment status fields for converted quotations
+    paymentStatus: {
+      type: String,
+      enum: ['unpaid', 'partially_paid', 'paid', 'overpaid'],
+      default: 'unpaid'
+    },
+    amountPaid: { type: Number, default: 0, min: 0 },
+    balanceDue: { type: Number, default: 0, min: 0 },
 
     validUntil: { type: Date, required: true, index: true },
 
@@ -184,10 +200,11 @@ const quotationSchema = new Schema<IQuotation>(
 // Indexes for better query performance
 quotationSchema.index({ createdBy: 1, status: 1, createdAt: -1 });
 quotationSchema.index({ quoteNumber: 1 });
-quotationSchema.index({ invoiceNumber: 1 }); // ADDED
+quotationSchema.index({ invoiceNumber: 1 });
 quotationSchema.index({ customerId: 1, status: 1 });
 quotationSchema.index({ validUntil: 1 });
 quotationSchema.index({ status: 1, createdAt: -1 });
+quotationSchema.index({ paymentStatus: 1 }); // Index for payment status queries
 
 // Pre-save middleware to calculate totals
 quotationSchema.pre('save', function(next) {
@@ -226,6 +243,28 @@ quotationSchema.pre('save', function(next) {
   next();
 });
 
+// Pre-save middleware to calculate balance due when amountPaid changes
+quotationSchema.pre('save', function(next) {
+  if (this.isModified('amountPaid') || this.isModified('total')) {
+    this.balanceDue = Math.max(0, (this.total || 0) - (this.amountPaid || 0));
+    
+    // Update payment status based on amount paid
+    const total = this.total || 0;
+    const paid = this.amountPaid || 0;
+    
+    if (paid === 0) {
+      this.paymentStatus = 'unpaid';
+    } else if (paid < total) {
+      this.paymentStatus = 'partially_paid';
+    } else if (paid === total) {
+      this.paymentStatus = 'paid';
+    } else {
+      this.paymentStatus = 'overpaid';
+    }
+  }
+  next();
+});
+
 // Virtual for getting effective transport info
 quotationSchema.virtual('effectiveTransportInfo').get(function() {
   if (this.transportInfo) {
@@ -245,7 +284,7 @@ const QuotationModel = mongoose.model<IQuotation>('Quotation', quotationSchema);
 // Generate quote number in format: 0001-MM-PSMA/Q
 export async function generateQuoteNumber(date: Date = new Date()): Promise<string> {
   const year = date.getFullYear();
-  const monthNumber = date.getMonth() + 1; // 1-12
+  const monthNumber = date.getMonth() + 1;
   const month = String(monthNumber).padStart(2, '0');
 
   const counter = await QuoteNumberCounterModel.findOneAndUpdate(
@@ -261,7 +300,7 @@ export async function generateQuoteNumber(date: Date = new Date()): Promise<stri
 // Generate invoice number in format: 0001-MM-PSMA/I
 export async function generateInvoiceNumber(date: Date = new Date()): Promise<string> {
   const year = date.getFullYear();
-  const monthNumber = date.getMonth() + 1; // 1-12
+  const monthNumber = date.getMonth() + 1;
   const month = String(monthNumber).padStart(2, '0');
 
   const counter = await QuoteNumberCounterModel.findOneAndUpdate(

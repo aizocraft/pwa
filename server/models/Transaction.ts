@@ -2,23 +2,36 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export interface ITransaction extends Document {
   orderId: mongoose.Types.ObjectId;
+  invoiceNumber?: string;
+  quotationNumber?: string;
+  
   userId?: mongoose.Types.ObjectId;
   guestEmail?: string;
   guestPhone?: string;
   customerName: string;
+  
   amount: number;
   currency: string;
-  paymentMethod: 'mpesa' | 'card' | 'cod';
+  paymentMethod: 'mpesa' | 'card' | 'cod' | 'cash' | 'bank_transfer' | 'cheque';
   status: 'pending' | 'completed' | 'failed' | 'refunded';
   transactionId: string;
+  
+  // Payment details
   mpesaReceipt?: string;
   cardLast4?: string;
   cardBrand?: string;
+  reference?: string;
+  
+  // Metadata
   notes?: string;
+  recordedBy?: mongoose.Types.ObjectId;
+  recordedByName?: string;
+  source: 'checkout' | 'quotation' | 'admin' | 'manual';
+  isPartialPayment: boolean;
+  paidAt?: Date;
+  
   createdAt: Date;
   updatedAt: Date;
-
-  canRefund(): boolean;
 }
 
 interface TransactionModel extends Model<ITransaction> {}
@@ -30,57 +43,58 @@ const transactionSchema = new Schema<ITransaction, TransactionModel>({
     required: true, 
     index: true 
   },
-  userId: { 
-    type: mongoose.SchemaTypes.ObjectId, 
-    ref: 'User' 
-  },
+  invoiceNumber: { type: String, index: true },
+  quotationNumber: { type: String, index: true },
+  
+  userId: { type: mongoose.SchemaTypes.ObjectId, ref: 'User' },
   guestEmail: String,
   guestPhone: String,
-  customerName: { 
-    type: String, 
-    required: true 
-  },
-  amount: { 
-    type: Number, 
-    required: true 
-  },
-  currency: { 
-    type: String, 
-    default: 'KES' 
-  },
+  customerName: { type: String, required: true },
+  
+  amount: { type: Number, required: true, min: 0 },
+  currency: { type: String, default: 'KES' },
+  
   paymentMethod: { 
     type: String, 
-    enum: ['mpesa', 'card', 'cod'],
+    enum: ['mpesa', 'card', 'cod', 'cash', 'bank_transfer', 'cheque'],
     required: true
   },
+  
   status: { 
     type: String,
     enum: ['pending', 'completed', 'failed', 'refunded'],
     default: 'pending'
   },
-  transactionId: { 
-    type: String, 
-    required: true,
-    unique: true
-  },
+  
+  transactionId: { type: String, required: true, unique: true },
+  
   mpesaReceipt: String,
   cardLast4: String,
   cardBrand: String,
-  notes: String
-}, {
-  timestamps: true
-});
+  reference: String,
+  
+  notes: String,
+  recordedBy: { type: mongoose.SchemaTypes.ObjectId, ref: 'User' },
+  recordedByName: String,
+  
+  source: { 
+    type: String, 
+    enum: ['checkout', 'quotation', 'admin', 'manual'],
+    required: true,
+    default: 'manual'
+  },
+  
+  isPartialPayment: { type: Boolean, default: false },
+  paidAt: { type: Date }
+}, { timestamps: true });
 
 // Indexes
 transactionSchema.index({ status: 1 });
 transactionSchema.index({ paymentMethod: 1 });
 transactionSchema.index({ createdAt: -1 });
-transactionSchema.index({ 'orderId': 1 });
-
-// Can this transaction be refunded?
-transactionSchema.methods.canRefund = function(): boolean {
-  return this.status === 'completed';
-};
+transactionSchema.index({ orderId: 1, status: 1 });
+transactionSchema.index({ invoiceNumber: 1 });
+transactionSchema.index({ source: 1 });
 
 const TransactionModel = mongoose.model<ITransaction, TransactionModel>('Transaction', transactionSchema);
 
