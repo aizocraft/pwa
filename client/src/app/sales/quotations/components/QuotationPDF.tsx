@@ -20,15 +20,11 @@ export async function generateQuotationPDF(
   const companySlogan = settings?.slogan || 'Quality Water Solutions';
   const taxRate = quote.taxRate || 0.16;
   const partnerLogos = [
-  { src: '/logo/dayliff.png', name: 'Dayliff' },
-  { src: '/logo/taflo.png', name: 'Taflo' },
-  { src: '/logo/pedrollo.png', name: 'Pedrollo' },
-   { src: '/logo/grundfos.png', name: 'Grundfos' },
-
-
-
-  // Add more partner logos as needed
-];
+    { src: '/logo/dayliff.png', name: 'Dayliff' },
+    { src: '/logo/taflo.png', name: 'Taflo' },
+    { src: '/logo/pedrollo.png', name: 'Pedrollo' },
+    { src: '/logo/grundfos.png', name: 'Grundfos' },
+  ];
 
   // Get transport info
   const transportCost = quote.transportCost || quote.transportInfo?.cost || 0;
@@ -150,19 +146,17 @@ export async function generateQuotationPDF(
               <div class="item-name">${escapeHtml(item.name)}</div>
               ${item.description ? `<div class="item-description">${escapeHtml(item.description.substring(0, 120))}</div>` : ''}
             </td>
-            <td class="text-center font-mono">${item.qty}</td>
-            <td class="text-right font-mono">
+            <td class="text-center">${item.qty}</td>
+            <td class="text-right">
               ${item.unitPrice.toLocaleString()}
-              ${displayTaxableBadges ? `
-                <div class="item-description" style="margin-top:6px;">Tax: ${item.isTaxable ? ('+' + (item.unitPrice * taxRate).toLocaleString()) : '0'}</div>
-              ` : ''}
+
             </td>
             ${taxPerItem ? `
-              <td class="text-center font-mono" style="${item.isTaxable ? 'color: #2c6e3c; font-weight: 600;' : 'color: #b46f0b;'}">
+              <td class="text-center" style="${item.isTaxable ? 'color: #2c6e3c; font-weight: 600;' : 'color: #b46f0b;'}">
                 ${item.isTaxable ? `KES ${item.itemTax.toLocaleString()}` : 'Exempt'}
               </td>
-            ` : `<td class="text-center"></td>`}
-            <td class="text-right font-mono" style="font-weight: 600;">${(item.itemTotal + (displayTaxableBadges ? item.itemTax : 0)).toLocaleString()}</td>
+            ` : ''}
+            <td class="text-right" style="font-weight: 600;">${(item.itemTotal + (displayTaxableBadges ? item.itemTax : 0)).toLocaleString()}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -175,23 +169,23 @@ export async function generateQuotationPDF(
       <div class="totals-box">
         <div class="total-row">
           <span>Subtotal</span>
-          <span class="font-mono">KES ${calculatedSubtotal.toLocaleString()}</span>
+          <span>KES ${calculatedSubtotal.toLocaleString()}</span>
         </div>
         ${quote.discount > 0 ? `
           <div class="total-row discount">
             <span>Discount (${quote.discountType === 'percentage' ? `${quote.discount}%` : `KES ${quote.discount.toLocaleString()}`})</span>
-            <span class="font-mono">-KES ${discountAmount.toLocaleString()}</span>
+            <span>-KES ${discountAmount.toLocaleString()}</span>
           </div>
         ` : ''}
         ${transportCost > 0 ? `
           <div class="total-row">
             <span>Transport</span>
-            <span class="font-mono">KES ${transportCost.toLocaleString()}</span>
+            <span>KES ${transportCost.toLocaleString()}</span>
           </div>
         ` : ''}
         <div class="total-row">
           <span>Tax (${(taxRate * 100).toFixed(0)}% VAT)</span>
-          <span class="font-mono">KES ${calculatedTax.toLocaleString()}</span>
+          <span>KES ${calculatedTax.toLocaleString()}</span>
         </div>
         <div class="total-row grand-total">
           <span class="grand-total-label">Total Amount</span>
@@ -231,7 +225,7 @@ export async function generateQuotationPDF(
             </div>
           </div>
           <div class="payment-details">
-            <div class="payment-detail"><span class="payment-detail-key">Lipa na M-PESA  - </span><span class="payment-detail-value">Buy Goods & Services </span></div>
+            <div class="payment-detail"><span class="payment-detail-key">Lipa na M-PESA</span><span class="payment-detail-value">Buy Goods & Services</span></div>
             <div class="payment-detail"><span class="payment-detail-key">Till No.</span><span class="payment-detail-value">9114123</span></div>
             <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
           </div>
@@ -257,20 +251,6 @@ export async function generateQuotationPDF(
       </div>
     ` : ''}
   `;
-// Add this function to get partner logos HTML
-const getPartnerLogosHTML = () => `
-  <div class="partner-logos-section">
-    <div class="partner-logos-title">Our Trusted Partners</div>
-    <div class="partner-logos-grid">
-      ${partnerLogos.map(logo => `
-        <div class="partner-logo-item">
-          <img src="${logo.src}" class="partner-logo" alt="${logo.name}" crossorigin="anonymous" onerror="this.style.display='none'" />
-        </div>
-      `).join('')}
-    </div>
-  </div>
-`;
-
 
 const getFooterHTML = () => `
   <div class="footer">
@@ -283,13 +263,13 @@ const getFooterHTML = () => `
           <span class="service-item">Water Treatment</span>
           <span class="service-item">Generators</span>
           <span class="service-item">Irrigation Systems</span>
-          <span class="service-item">Swimming Pools</span>
+   
         </div>
-        <div class="footer-slogan">${escapeHtml(companySlogan)}  |  © ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.</div>
       </div>
       <div class="footer-logo-section">
         <img src="${footerLogoUrl}" class="footer-logo" alt="Plasma Water Africa" crossorigin="anonymous" onerror="this.style.display='none'" />
       </div>
+      <div class="footer-slogan">${escapeHtml(companySlogan)}  |  © ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.</div>
     </div>
   </div>
 `;
@@ -531,8 +511,9 @@ const getFooterHTML = () => `
       }
 
       .doc-title-section.doc-title-quotation {
-        height: 4px !important; 
+        height: 22px !important; 
         background: #0b355e !important;
+        width: 100% !important;
         border-top: 1px solid #ffffff !important;
         border-bottom: 1px solid #ffffff !important;
         box-shadow: 0 0 0 1px #0b355e !important;
@@ -542,23 +523,25 @@ const getFooterHTML = () => `
         width: 100% !important;
         display: flex !important;
         justify-content: flex-end !important;
-        padding-right: 60px !important;
+        padding-right: 80px !important;
         position: absolute !important;
         z-index: 10 !important;
       }
 
-      .doc-title-text {
-        display: inline-block !important;
-        padding: 8px 32px !important;
-        text-align: center !important;
-        font-family: 'Inter', sans-serif !important;
-        font-size: 22px !important;
-        font-weight: 800 !important;
-        letter-spacing: 2px !important;
-        text-transform: uppercase !important;
-        background: #ffffff !important;
-        line-height: 1.2 !important;
-      }
+.doc-title-text {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0px 32px 20px 32px !important;
+  text-align: center !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  letter-spacing: 2px !important;
+  text-transform: uppercase !important;
+  background: #ffffff !important;
+  line-height: 1.2 !important;
+}
 
       .doc-title-text.text-quotation {
         color: #0b355e !important;
@@ -686,6 +669,16 @@ const getFooterHTML = () => `
         vertical-align: top;
       }
 
+      .items-table th.text-center,
+      .items-table td.text-center {
+        text-align: center;
+      }
+
+      .items-table th.text-right,
+      .items-table td.text-right {
+        text-align: right;
+      }
+
       .item-name {
         font-weight: 700;
         color: #0f2636;
@@ -697,21 +690,8 @@ const getFooterHTML = () => `
         font-size: 14px;
         color: #8a9aaa;
         line-height: 1.5;
+        margin-top: 4px;\
         display: none;
-        margin-top: 4px;
-      }
-
-      .text-right {
-        text-align: right;
-      }
-
-      .text-center {
-        text-align: center;
-      }
-
-      .font-mono {
-        font-family: 'Inter', monospace;
-        font-weight: 500;
       }
 
       .totals-wrapper {
@@ -760,135 +740,93 @@ const getFooterHTML = () => `
       }
 
       .payment-section {
-  margin-bottom: 10px;
-  border: 1px solid #e9eef3;
-  border-radius: 20px;
-  overflow: hidden;
-}
+        margin-bottom: 10px;
+        border: 1px solid #e9eef3;
+        border-radius: 20px;
+        overflow: hidden;
+      }
 
-.payment-header {
-  background: #0a2540;
-  padding: 18px 28px;
-}
+      .payment-header {
+        background: #0a2540;
+        padding: 18px 28px;
+      }
 
-.payment-header h4 {
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-}
+      .payment-header h4 {
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+      }
 
-.payment-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
-}
+      .payment-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+      }
 
-.payment-method {
-  padding: 28px 28px;
-}
+      .payment-method {
+        padding: 28px 28px;
+      }
 
-.payment-method:first-child {
-  border-right: 1px solid #e9eef3;
-}
+      .payment-method:first-child {
+        border-right: 1px solid #e9eef3;
+      }
 
-.payment-method-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 22px;
-}
+      .payment-method-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 22px;
+      }
 
-.payment-logo {
-  height: 48px;
-  width: auto;
-  object-fit: contain;
-}
+      .payment-logo {
+        height: 48px;
+        width: auto;
+        object-fit: contain;
+      }
 
-.payment-method-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #0a2540;
-}
+      .payment-method-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #0a2540;
+      }
 
-.payment-method-sub {
-  font-size: 14px;
-  color: #8a9aaa;
-  margin-top: 3px;
-}
+      .payment-method-sub {
+        font-size: 14px;
+        color: #8a9aaa;
+        margin-top: 3px;
+      }
 
-.payment-details {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
+      .payment-details {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
 
-.payment-detail {
-  display: flex;
-  gap: 16px;
-  font-size: 14px;
-  flex-wrap: wrap;
-}
+      .payment-detail {
+        display: flex;
+        gap: 16px;
+        font-size: 14px;
+        flex-wrap: wrap;
+      }
 
-.payment-detail-key {
-  color: #8a9aaa;
-  font-weight: 600;
-  min-width: 130px;
-  font-size: 14px;
-  letter-spacing: 0.3px;
-}
+      .payment-detail-key {
+        color: #8a9aaa;
+        font-weight: 600;
+        min-width: 130px;
+        font-size: 14px;
+        letter-spacing: 0.3px;
+      }
 
-.payment-detail-value {
-  color: #1a2a3a;
-  font-weight: 700;
-  font-family: 'Courier New', 'Inter', monospace;
-  font-size: 16px;
-  letter-spacing: 0.5px;
-  background: #f8fafc;
-  padding: 4px 10px;
-  border-radius: 8px;
-  border: 1px solid #eef2f6;
-}
+      .payment-detail-value {
+        color: #1a2a3a;
+        font-weight: 800;
+        font-size: 16px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
 
-/* Larger font for account number specifically */
-.payment-detail:first-child .payment-detail-value {
-  font-size: 18px;
-  font-weight: 800;
-  color: #0a2540;
-  background: #eef2ff;
-  letter-spacing: 1px;
-}
-
-/* Make phone number and other details more readable */
-.payment-detail-key:contains("Till No.") + .payment-detail-value,
-.payment-detail-value:contains("9114123") {
-  font-size: 20px;
-  font-weight: 800;
-  color: #059669;
-  background: #ecfdf5;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .payment-body {
-    grid-template-columns: 1fr;
-  }
-  
-  .payment-method:first-child {
-    border-right: none;
-    border-bottom: 1px solid #e9eef3;
-  }
-  
-  .payment-detail-value {
-    font-size: 14px;
-    word-break: break-all;
-  }
-  
-  .payment-detail:first-child .payment-detail-value {
-    font-size: 16px;
-  }
-}
       .notes-terms-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -953,26 +891,31 @@ const getFooterHTML = () => `
       }
 
       .footer {
-  margin-top: 5px;
-  padding: 20px 20px 25px 20px;
-  border-top: 2px solid #e9eef3;
-  background: white;
-}
+        margin-top: 5px;
+        padding: 20px 20px 25px 20px;
+        border-top: 2px solid #e9eef3;
+        background: white;
+      }
 
-.footer-main {
+ .footer-main {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 25px;
+  gap: 20px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
+.footer-services {
+  width: 100%;
+  text-align: center;
+  order: 1;
+}
+
 .footer-logo-section {
   text-align: center;
-  order: 2; /* Moves logo down */
-  margin-top: 10px;
+  order: 2;
 }
 
 .footer-logo {
@@ -981,64 +924,57 @@ const getFooterHTML = () => `
   object-fit: contain;
 }
 
-.footer-services {
-  width: 100%;
-  text-align: center;
-  order: 1; /* Services go above logo */
-}
+      .services-list {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 28px;
+        margin-bottom: 15px;
+      }
 
-.services-list {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 28px;
-  margin-bottom: 15px;
-}
+      .service-item {
+        font-size: 15px;
+        font-weight: 600;
+        color: #2c5e3c;
+        letter-spacing: 0.5px;
+      }
 
-.service-item {
-  font-size: 15px;
-  font-weight: 600;
-  color: #2c5e3c;
-  letter-spacing: 0.5px;
-}
+      .footer-slogan {
+        font-family: 'Cormorant Garamond', serif;
+        font-style: italic;
+        font-size: 13px;
+        color: #8a9aaa;
+        margin-top: 5px;
+        text-align: center;
+        order: 3;
+      }
 
-.footer-slogan {
-  font-family: 'Cormorant Garamond', serif;
-  font-style: italic;
-  font-size: 13px;
-  color: #8a9aaa;
-  margin-top: 5px;
-  text-align: center;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .footer {
-    padding: 15px 16px 20px 16px;
-  }
-  
-  .footer-main {
-    gap: 18px;
-  }
-  
-  .services-list {
-    gap: 16px;
-  }
-  
-  .service-item {
-    font-size: 13px;
-  }
-  
-  .footer-logo {
-    height: 42px;
-  }
-  
-  .footer-slogan {
-    font-size: 11px;
-  }
-}
-  
+      @media (max-width: 768px) {
+        .footer {
+          padding: 15px 16px 20px 16px;
+        }
+        
+        .footer-main {
+          gap: 18px;
+        }
+        
+        .services-list {
+          gap: 16px;
+        }
+        
+        .service-item {
+          font-size: 13px;
+        }
+        
+        .footer-logo {
+          height: 42px;
+        }
+        
+        .footer-slogan {
+          font-size: 11px;
+        }
+      }
     `;
   }
 

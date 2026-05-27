@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Loader2, Smartphone, DollarSign, Banknote, Receipt, CreditCard, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '@/lib/api';
@@ -34,31 +34,69 @@ export function RecordPaymentModal({
     notes: '',
   });
 
+  // Reset form when modal opens with fresh balance
+  useEffect(() => {
+    if (isOpen) {
+      // Round to nearest whole number to avoid floating point issues
+      const roundedBalance = Math.round(balanceDue * 100) / 100;
+      setFormData(prev => ({
+        ...prev,
+        amount: roundedBalance > 0 ? roundedBalance : 0,
+      }));
+    }
+  }, [isOpen, balanceDue]);
+
   if (!isOpen) return null;
+
+  // Helper to round to 2 decimal places
+  const roundToTwoDecimals = (num: number): number => {
+    return Math.round(num * 100) / 100;
+  };
+
+  const handleAmountChange = (value: string) => {
+    let parsedValue = parseFloat(value);
+    if (isNaN(parsedValue)) parsedValue = 0;
+    
+    // Round to 2 decimal places
+    const roundedValue = roundToTwoDecimals(parsedValue);
+    const maxAllowed = roundToTwoDecimals(balanceDue);
+    
+    // Ensure amount doesn't exceed balance due
+    if (roundedValue > maxAllowed) {
+      setFormData({ ...formData, amount: maxAllowed });
+    } else if (roundedValue < 0) {
+      setFormData({ ...formData, amount: 0 });
+    } else {
+      setFormData({ ...formData, amount: roundedValue });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (formData.amount <= 0) {
+    const paymentAmount = roundToTwoDecimals(formData.amount);
+    const currentBalance = roundToTwoDecimals(balanceDue);
+    
+    if (paymentAmount <= 0) {
       toast.error('Please enter a valid amount');
       return;
     }
     
-    if (formData.amount > balanceDue) {
-      toast.error(`Amount cannot exceed balance due of KES ${balanceDue.toLocaleString()}`);
+    if (paymentAmount > currentBalance + 0.01) { // Add small tolerance for floating point
+      toast.error(`Amount cannot exceed balance due of KES ${currentBalance.toLocaleString()}`);
       return;
     }
 
     setLoading(true);
     try {
       await api.post(`/sales/invoices/${invoiceId}/payments`, {
-        amount: formData.amount,
+        amount: paymentAmount,
         method: formData.paymentMethod,
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
       });
       
-      toast.success(`Payment of KES ${formData.amount.toLocaleString()} recorded successfully`);
+      toast.success(`Payment of KES ${paymentAmount.toLocaleString()} recorded successfully`);
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -78,6 +116,11 @@ export function RecordPaymentModal({
   ];
 
   const selectedMethod = paymentMethods.find(m => m.value === formData.paymentMethod);
+
+  // Calculate safe display values with rounding
+  const displayTotal = roundToTwoDecimals(totalAmount).toLocaleString();
+  const displayAmountPaid = roundToTwoDecimals(amountPaid).toLocaleString();
+  const displayBalance = roundToTwoDecimals(balanceDue).toLocaleString();
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -105,15 +148,15 @@ export function RecordPaymentModal({
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 text-center">
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">KES {totalAmount.toLocaleString()}</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">KES {displayTotal}</p>
             </div>
             <div className="bg-green-50 dark:bg-green-950/20 rounded-xl p-3 text-center">
               <p className="text-xs text-green-600 dark:text-green-400 mb-1">Paid</p>
-              <p className="text-lg font-bold text-green-600 dark:text-green-400">KES {amountPaid.toLocaleString()}</p>
+              <p className="text-lg font-bold text-green-600 dark:text-green-400">KES {displayAmountPaid}</p>
             </div>
             <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-3 text-center">
               <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">Balance</p>
-              <p className="text-lg font-bold text-amber-600 dark:text-amber-400">KES {balanceDue.toLocaleString()}</p>
+              <p className="text-lg font-bold text-amber-600 dark:text-amber-400">KES {displayBalance}</p>
             </div>
           </div>
 
@@ -128,17 +171,17 @@ export function RecordPaymentModal({
                 type="number"
                 step="100"
                 min="1"
-                max={balanceDue}
+                max={roundToTwoDecimals(balanceDue)}
                 value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                onChange={(e) => handleAmountChange(e.target.value)}
                 className="w-full pl-16 pr-4 py-3 text-lg font-semibold border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
                 required
               />
             </div>
-            <p className="text-xs text-gray-400 mt-1.5">Max: KES {balanceDue.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 mt-1.5">Max: KES {displayBalance}</p>
           </div>
 
-          {/* Payment Method Dropdown - Sleek Design */}
+          {/* Payment Method Dropdown */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Payment Method
