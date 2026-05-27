@@ -257,7 +257,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     await createProduct(productData);
     
-    toast.success('Product created successfully!');
+
     router.push('/dashboard/products');
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Failed to create product');
@@ -326,7 +326,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             
             <div className="p-5 sm:p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
+                <div className="md:col-span-1">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Product Name <span className="text-red-500">*</span>
                   </label>
@@ -387,6 +387,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                       <option value="Solar Lights">Solar Lights</option>
                       <option value="Generators">Generators</option>
                       <option value="Accessories">Accessories</option>
+                      <option value="Other">Other </option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>
@@ -404,7 +405,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                       onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
                       className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., SolarTech"
-                      required
+                     
                     />
                   </div>
                 </div>
@@ -421,7 +422,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                       onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
                       className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., Monocrystalline"
-                      required
+                      
                     />
                   </div>
                 </div>

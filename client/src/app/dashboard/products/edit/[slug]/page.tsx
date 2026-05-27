@@ -268,8 +268,7 @@ export default function EditProductPage() {
       };
 
       await updateProduct(productSlug, productData);
-      
-      toast.success('Product updated successfully!');
+  
       router.push('/dashboard/products');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update product');
@@ -432,6 +431,7 @@ export default function EditProductPage() {
                       <option value="Solar Lights">Solar Lights</option>
                       <option value="Generators">Generators</option>
                       <option value="Accessories">Accessories</option>
+                      <option value="Other">Other</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>
