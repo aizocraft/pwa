@@ -26,7 +26,7 @@ export interface ITransaction extends Document {
   notes?: string;
   recordedBy?: mongoose.Types.ObjectId;
   recordedByName?: string;
-  source: 'checkout' | 'quotation' | 'admin' | 'manual';
+  source: 'checkout' | 'quotation' | 'admin' | 'manual' | 'invoice';
   isPartialPayment: boolean;
   paidAt?: Date;
   
@@ -40,7 +40,7 @@ const transactionSchema = new Schema<ITransaction, TransactionModel>({
   orderId: { 
     type: mongoose.SchemaTypes.ObjectId, 
     ref: 'Order', 
-    required: true, 
+    required: false, 
     index: true 
   },
   invoiceNumber: { type: String, index: true },
@@ -79,10 +79,11 @@ const transactionSchema = new Schema<ITransaction, TransactionModel>({
   
   source: { 
     type: String, 
-    enum: ['checkout', 'quotation', 'admin', 'manual'],
+    enum: ['checkout', 'quotation', 'admin', 'manual', 'invoice'],
     required: true,
     default: 'manual'
   },
+
   
   isPartialPayment: { type: Boolean, default: false },
   paidAt: { type: Date }

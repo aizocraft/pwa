@@ -34,56 +34,52 @@ export function RecordPaymentModal({
     notes: '',
   });
 
-  // Reset form when modal opens with fresh balance
+  // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      // Round to nearest whole number to avoid floating point issues
-      const roundedBalance = Math.round(balanceDue * 100) / 100;
-      setFormData(prev => ({
-        ...prev,
-        amount: roundedBalance > 0 ? roundedBalance : 0,
-      }));
+      setFormData({
+        amount: balanceDue,
+        paymentMethod: 'mpesa',
+        reference: '',
+        notes: '',
+      });
     }
   }, [isOpen, balanceDue]);
 
   if (!isOpen) return null;
 
-  // Helper to round to 2 decimal places
-  const roundToTwoDecimals = (num: number): number => {
-    return Math.round(num * 100) / 100;
-  };
-
   const handleAmountChange = (value: string) => {
-    let parsedValue = parseFloat(value);
-    if (isNaN(parsedValue)) parsedValue = 0;
+    // Allow empty string temporarily for typing
+    if (value === '') {
+      setFormData({ ...formData, amount: 0 });
+      return;
+    }
     
-    // Round to 2 decimal places
-    const roundedValue = roundToTwoDecimals(parsedValue);
-    const maxAllowed = roundToTwoDecimals(balanceDue);
+    let parsedValue = parseFloat(value);
+    if (isNaN(parsedValue)) return;
     
     // Ensure amount doesn't exceed balance due
-    if (roundedValue > maxAllowed) {
-      setFormData({ ...formData, amount: maxAllowed });
-    } else if (roundedValue < 0) {
+    if (parsedValue > balanceDue) {
+      setFormData({ ...formData, amount: balanceDue });
+    } else if (parsedValue < 0) {
       setFormData({ ...formData, amount: 0 });
     } else {
-      setFormData({ ...formData, amount: roundedValue });
+      setFormData({ ...formData, amount: parsedValue });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const paymentAmount = roundToTwoDecimals(formData.amount);
-    const currentBalance = roundToTwoDecimals(balanceDue);
+    const paymentAmount = formData.amount;
     
     if (paymentAmount <= 0) {
       toast.error('Please enter a valid amount');
       return;
     }
     
-    if (paymentAmount > currentBalance + 0.01) { // Add small tolerance for floating point
-      toast.error(`Amount cannot exceed balance due of KES ${currentBalance.toLocaleString()}`);
+    if (paymentAmount > balanceDue) {
+      toast.error(`Amount cannot exceed balance due of KES ${balanceDue.toLocaleString()}`);
       return;
     }
 
@@ -117,11 +113,6 @@ export function RecordPaymentModal({
 
   const selectedMethod = paymentMethods.find(m => m.value === formData.paymentMethod);
 
-  // Calculate safe display values with rounding
-  const displayTotal = roundToTwoDecimals(totalAmount).toLocaleString();
-  const displayAmountPaid = roundToTwoDecimals(amountPaid).toLocaleString();
-  const displayBalance = roundToTwoDecimals(balanceDue).toLocaleString();
-
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
@@ -148,19 +139,19 @@ export function RecordPaymentModal({
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 text-center">
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">KES {displayTotal}</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">KES {totalAmount.toLocaleString()}</p>
             </div>
             <div className="bg-green-50 dark:bg-green-950/20 rounded-xl p-3 text-center">
               <p className="text-xs text-green-600 dark:text-green-400 mb-1">Paid</p>
-              <p className="text-lg font-bold text-green-600 dark:text-green-400">KES {displayAmountPaid}</p>
+              <p className="text-lg font-bold text-green-600 dark:text-green-400">KES {amountPaid.toLocaleString()}</p>
             </div>
             <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-3 text-center">
               <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">Balance</p>
-              <p className="text-lg font-bold text-amber-600 dark:text-amber-400">KES {displayBalance}</p>
+              <p className="text-lg font-bold text-amber-600 dark:text-amber-400">KES {balanceDue.toLocaleString()}</p>
             </div>
           </div>
 
-          {/* Amount Input */}
+          {/* Amount Input - No rounding, allows any amount up to balance */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Payment Amount
@@ -169,16 +160,19 @@ export function RecordPaymentModal({
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">KES</span>
               <input
                 type="number"
-                step="100"
-                min="1"
-                max={roundToTwoDecimals(balanceDue)}
+                step="any"
+                min="0"
+                max={balanceDue}
                 value={formData.amount}
                 onChange={(e) => handleAmountChange(e.target.value)}
                 className="w-full pl-16 pr-4 py-3 text-lg font-semibold border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
                 required
+                placeholder="Enter amount"
               />
             </div>
-            <p className="text-xs text-gray-400 mt-1.5">Max: KES {displayBalance}</p>
+            <p className="text-xs text-gray-400 mt-1.5">
+              Maximum: KES {balanceDue.toLocaleString()}
+            </p>
           </div>
 
           {/* Payment Method Dropdown */}
@@ -243,12 +237,32 @@ export function RecordPaymentModal({
             />
           </div>
 
+          {/* Quick Actions */}
+          {balanceDue > 0 && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, amount: balanceDue })}
+                className="flex-1 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300"
+              >
+                Pay Full Balance
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, amount: Math.round(balanceDue / 2) })}
+                className="flex-1 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300"
+              >
+                Pay Half ({Math.round(balanceDue / 2).toLocaleString()})
+              </button>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
-              disabled={loading}
-              className="flex-1 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25"
+              disabled={loading || formData.amount <= 0}
+              className="flex-1 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />

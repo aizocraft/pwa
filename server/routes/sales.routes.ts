@@ -1042,8 +1042,9 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
 
     const transactionId = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`;
 
+    // Create transaction with all required fields and proper enum values
     const transaction = await TransactionModel.create({
-      orderId: invoice.orderId || null,
+      orderId: invoice.orderId || null, // Can be null for invoice payments
       invoiceId: invoice._id,
       invoiceNumber: invoice.invoiceNumber,
       quotationNumber: invoice.quotationNumber,
@@ -1062,11 +1063,13 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
       notes: notes || null,
       recordedBy: req.user!.userId,
       recordedByName: req.user!.name || req.user!.email,
-      source: 'invoice',
+      source: 'invoice', // Make sure 'invoice' is in the enum in Transaction model
       isPartialPayment: paymentAmount < invoice.balanceDue,
-      paidAt: new Date()
+      paidAt: new Date(),
+
     });
 
+    // Add payment to invoice payments array
     invoice.payments.push({
       amount: paymentAmount,
       method,
@@ -1079,9 +1082,7 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
     invoice.amountPaid += paymentAmount;
     invoice.balanceDue = invoice.total - invoice.amountPaid;
 
-    let wasFullyPaid = false;
-    let createdOrder = null;
-
+    // Update payment status
     if (invoice.amountPaid === 0) {
       invoice.paymentStatus = 'unpaid';
     } else if (invoice.amountPaid < invoice.total) {
@@ -1089,17 +1090,16 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
       if (invoice.status === 'sent') {
         invoice.status = 'partially_paid';
       }
-    } else if (invoice.amountPaid === invoice.total) {
+    } else if (invoice.amountPaid >= invoice.total) {
       invoice.paymentStatus = 'paid';
       invoice.status = 'paid';
-      wasFullyPaid = true;
-    } else {
-      invoice.paymentStatus = 'overpaid';
     }
 
     await invoice.save();
 
-    if (wasFullyPaid && !invoice.orderId) {
+    let createdOrder = null;
+    // Auto-create order if fully paid
+    if (invoice.paymentStatus === 'paid' && !invoice.orderId) {
       createdOrder = await createOrderFromInvoice(invoice, req.user);
     }
 
@@ -1113,6 +1113,7 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
 
     res.json({
       success: true,
+      message: 'Payment recorded successfully',
       invoice: {
         _id: invoice._id,
         invoiceNumber: invoice.invoiceNumber,
@@ -1137,7 +1138,12 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
     });
   } catch (error: any) {
     console.error('Record payment error:', error);
-    res.status(500).json({ error: 'Failed to record payment' });
+    // Check for validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map((err: any) => err.message);
+      return res.status(400).json({ error: 'Validation failed', details: errors });
+    }
+    res.status(500).json({ error: error.message || 'Failed to record payment' });
   }
 });
 
