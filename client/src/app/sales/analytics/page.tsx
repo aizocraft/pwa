@@ -185,38 +185,49 @@ export default function SalesAnalytics() {
     URL.revokeObjectURL(url);
     toast.success('Analytics exported');
   };
+// Update the getOverview function to include profit fields
+const getOverview = (): OverviewMetrics => analytics?.overview || {
+  totalRevenue: 0,
+  totalCost: 0,           // Add this
+  totalProfit: 0,         // Add this
+  profitMargin: 0,        // Add this
+  totalOrders: 0,
+  averageOrderValue: 0,
+  conversionRate: 0,
+  totalCustomers: 0,
+  activeCustomers: 0,
+  totalQuotations: 0,
+  successRate: 0,
+};
 
-  const getOverview = (): OverviewMetrics => analytics?.overview || {
-    totalRevenue: 0,
-    totalOrders: 0,
-    averageOrderValue: 0,
-    conversionRate: 0,
-    totalCustomers: 0,
-    activeCustomers: 0,
-    totalQuotations: 0,
-    successRate: 0,
-  };
+// Update the getOrders function to include profit fields
+const getOrders = (): OrderMetrics => analytics?.orders || {
+  totalOrders: 0,
+  totalRevenue: 0,
+  totalCost: 0,           // Add this
+  totalProfit: 0,         // Add this
+  profitMargin: 0,        // Add this
+  averageProfitPerOrder: 0, // Add this
+  paidOrders: 0,
+  pendingOrders: 0,
+  cancelledOrders: 0,
+  averageOrderValue: 0,
+  completionRate: 0,
+};
 
-  const getQuotations = (): QuotationMetrics => analytics?.quotations || {
-    totalQuotations: 0,
-    convertedCount: 0,
-    acceptedCount: 0,
-    draftCount: 0,
-    sentCount: 0,
-    rejectedCount: 0,
-    conversionRate: 0,
-    totalQuotationValue: 0,
-  };
-
-  const getOrders = (): OrderMetrics => analytics?.orders || {
-    totalOrders: 0,
-    totalRevenue: 0,
-    paidOrders: 0,
-    pendingOrders: 0,
-    cancelledOrders: 0,
-    averageOrderValue: 0,
-    completionRate: 0,
-  };
+// Update the getQuotations function to include profit fields
+const getQuotations = (): QuotationMetrics => analytics?.quotations || {
+  totalQuotations: 0,
+  totalQuotationValue: 0,
+  totalQuotationProfit: 0,   // Add this
+  averageQuotationMargin: 0, // Add this
+  convertedCount: 0,
+  acceptedCount: 0,
+  draftCount: 0,
+  sentCount: 0,
+  rejectedCount: 0,
+  conversionRate: 0,
+};
 
   const getTransactions = (): TransactionMetrics => analytics?.transactions || {
     totalTransactions: 0,

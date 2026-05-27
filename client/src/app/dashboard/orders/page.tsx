@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 import { 
   Search, Download, ChevronLeft, ChevronRight, Eye, 
   Filter, RefreshCw, ShoppingCart, AlertCircle, Loader2, 
-  Smartphone, CreditCard, Truck, Mail, Phone, X
+  Smartphone, CreditCard, Truck, Mail, Phone, X, Wallet, Building, FileText
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -90,12 +90,15 @@ const StatusUpdateDropdown = ({
   )
 }
 
-// Payment method badge
+// Payment method badge - Add missing payment methods
 const PaymentMethodBadge = ({ method }: { method: Order['paymentMethod'] }) => {
   const config = {
     cod: { icon: Truck, label: 'Cash on Delivery' },
     mpesa: { icon: Smartphone, label: 'M-PESA' },
     card: { icon: CreditCard, label: 'Card' },
+    cash: { icon: Wallet, label: 'Cash' },
+    bank_transfer: { icon: Building, label: 'Bank Transfer' },
+    cheque: { icon: FileText, label: 'Cheque' },
   }
   const { icon: Icon, label } = config[method] || config.cod
   return (

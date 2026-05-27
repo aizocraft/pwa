@@ -5,7 +5,7 @@ import { User, UserListResponse, UserResponse, BulkStatusResponse, CreateUserReq
 import type { Order, OrderListResponse, CreateOrderRequest } from '@/types/order';
 import toast from 'react-hot-toast';
 import { getToken } from './auth';
-import type {  ContactStatus, CreateContactRequest, ContactSubmissionResponse, ContactListResponse, ContactMessage } from '@/types/contact';
+import type { ContactStatus, CreateContactRequest, ContactSubmissionResponse, ContactListResponse, ContactMessage } from '@/types/contact';
 import type {
   FeedbackCategory,
   CreateFeedbackRequest,
@@ -13,7 +13,6 @@ import type {
   PublicFeedbackResponse,
   FeedbackStatsResponse
 } from '@/types/feedback';
-
 import type { 
   Review, 
   CreateReviewRequest, 
@@ -21,13 +20,10 @@ import type {
   ReviewListResponse,
   ReviewStats 
 } from '@/types/review';
-
 import type { SendOrderEmailRequest, SendContactEmailRequest, SendStatusUpdateRequest, EmailResponse, SendOrderEmailsResponse
 } from '@/types/email';
 import type { ShippingArea, CreateShippingAreaRequest, UpdateShippingAreaRequest } from '@/types/order';
 import type { PromoCode } from '@/types/order';
-
-
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -47,22 +43,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor for errors - FIXED: Only "session expired" for REAL token expiry
+// Response interceptor for errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       const token = getToken();
       if (token) {
-        // REAL session expiry (had token, now invalid)
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         toast.error('Session expired. Please log in again.');
         if (typeof window !== 'undefined') {
           window.location.href = '/auth/login';
         }
-      } 
-      // else: Guest 401 - silent fail (handled by app logic)
+      }
     }
     return Promise.reject(error);
   }
@@ -75,7 +69,6 @@ export async function loginUser(credentials: { email: string; password: string }
     const { token, user } = response.data;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
-    
     return { token, user };
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Login failed');
@@ -104,11 +97,7 @@ export async function registerUser(userData: {
 
 export async function getProfile() {
   const token = getToken();
-  
-  // Don't make the request if no token exists
-  if (!token) {
-    return null;
-  }
+  if (!token) return null;
   
   try {
     const response = await api.get('/auth/profile');
@@ -116,7 +105,6 @@ export async function getProfile() {
     localStorage.setItem('user', JSON.stringify(user));
     return user;
   } catch (error: any) {
-    // Silent fail - don't show toast for auth errors
     if (error.response?.status !== 401) {
       toast.error(error.response?.data?.error || 'Failed to fetch profile');
     }
@@ -163,7 +151,6 @@ export async function resetPassword(token: string, newPassword: string) {
   }
 }
 
-
 export async function logout() {
   try {
     await api.post('/auth/logout');
@@ -180,32 +167,16 @@ export async function logout() {
 }
 
 // ========== GOOGLE AUTH API ==========
-
-/**
- * Initialize Google Sign-In
- * This redirects to the backend Google auth endpoint
- */
 export const initiateGoogleLogin = () => {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-  // Redirect to backend Google auth endpoint
   window.location.href = `${API_URL}/auth/google`;
 };
 
-/**
- * Handle Google auth callback
- * This should be called on your callback page
- */
 export const handleGoogleCallback = async (token: string, userData: string) => {
   try {
-    // Parse user data from URL parameter
     const user = JSON.parse(decodeURIComponent(userData));
-    
-    // Store token and user in localStorage
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
-    
-  
-    
     return { token, user };
   } catch (error) {
     console.error('Error handling Google callback:', error);
@@ -214,9 +185,6 @@ export const handleGoogleCallback = async (token: string, userData: string) => {
   }
 };
 
-/**
- * Check if Google auth is configured on the backend
- */
 export const checkGoogleAuthStatus = async (): Promise<{
   configured: boolean;
   message: string;
@@ -230,9 +198,6 @@ export const checkGoogleAuthStatus = async (): Promise<{
   }
 };
 
-/**
- * Get current user with proper typing including provider
- */
 export const getCurrentUser = (): {
   id: string;
   name: string;
@@ -269,14 +234,8 @@ export async function deleteAvatar(userId: string): Promise<{ success: true; mes
 export function getAvatarUrl(userId: string): string {
   return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/users/${userId}/avatar`;
 }
+
 // ========== USER MANAGEMENT API ==========
-
-
-
-/**
- * Get all users with pagination and filtering
- * Access: Admin or Sales
- */
 export async function getUsers(params?: {
   role?: string;
   search?: string;
@@ -287,181 +246,81 @@ export async function getUsers(params?: {
   sortOrder?: 'asc' | 'desc';
 }): Promise<UserListResponse> {
   const query = new URLSearchParams();
-  
-  if (params?.role && params.role !== 'all') {
-    query.append('role', params.role);
-  }
-  if (params?.search) {
-    query.append('search', params.search);
-  }
-  if (params?.isActive !== undefined && params?.isActive !== null) {
-    query.append('isActive', String(params.isActive));
-  }
-  if (params?.page) {
-    query.append('page', String(params.page));
-  }
-  if (params?.limit) {
-    query.append('limit', String(params.limit));
-  }
-  if (params?.sortBy) {
-    query.append('sortBy', params.sortBy);
-  }
-  if (params?.sortOrder) {
-    query.append('sortOrder', params.sortOrder);
-  }
+  if (params?.role && params.role !== 'all') query.append('role', params.role);
+  if (params?.search) query.append('search', params.search);
+  if (params?.isActive !== undefined && params?.isActive !== null) query.append('isActive', String(params.isActive));
+  if (params?.page) query.append('page', String(params.page));
+  if (params?.limit) query.append('limit', String(params.limit));
+  if (params?.sortBy) query.append('sortBy', params.sortBy);
+  if (params?.sortOrder) query.append('sortOrder', params.sortOrder);
 
   const response = await api.get(`/users?${query.toString()}`);
-  
-  // Align with user.ts UserListResponse shape (users instead of data)
   return {
     ...response.data,
     users: response.data.users || response.data.data || [],
   };
 }
 
-/**
- * Get single user by ID
- * Access: Admin or Sales (Admin gets additional stats)
- */
 export async function getUser(id: string): Promise<UserResponse> {
   const response = await api.get(`/users/${id}`);
   return response.data;
 }
 
-/**
- * Create new user
- * Access: Admin only
- */
 export async function createUser(data: CreateUserRequest): Promise<UserResponse> {
   const response = await api.post('/users', data);
   return response.data;
 }
 
-/**
- * Update user information
- * Access: Admin (full) or Sales (limited)
- */
 export async function updateUser(id: string, data: UpdateUserRequest): Promise<UserResponse> {
   const response = await api.put(`/users/${id}`, data);
   return response.data;
 }
 
-/**
- * Delete user (or deactivate if has orders)
- * Access: Admin only
- */
-export async function deleteUser(id: string): Promise<{ 
-  success: boolean; 
-  message: string; 
-  data?: { action: string; userId: string } 
-}> {
+export async function deleteUser(id: string): Promise<{ success: boolean; message: string; data?: { action: string; userId: string } }> {
   const response = await api.delete(`/users/${id}`);
   return response.data;
 }
 
-/**
- * Reset user password
- * Access: Admin only
- */
-export async function resetUserPassword(id: string, newPassword: string): Promise<{
-  success: boolean;
-  message: string;
-}> {
+export async function resetUserPassword(id: string, newPassword: string): Promise<{ success: boolean; message: string }> {
   const response = await api.post(`/users/${id}/reset-password`, { newPassword });
   return response.data;
 }
 
-/**
- * Toggle user active status
- * Access: Admin only
- */
-export async function toggleUserStatus(id: string): Promise<{
-  success: boolean;
-  message: string;
-  data: { isActive: boolean };
-}> {
+export async function toggleUserStatus(id: string): Promise<{ success: boolean; message: string; data: { isActive: boolean } }> {
   const response = await api.post(`/users/${id}/toggle-status`);
   return response.data;
 }
 
-/**
- * Bulk update user status
- * Access: Admin only
- */
 export async function bulkUpdateUserStatus(userIds: string[], isActive: boolean): Promise<BulkStatusResponse> {
   const response = await api.post('/users/bulk/status', { userIds, isActive });
   return response.data;
 }
 
-/**
- * Export users to CSV
- * Access: Admin only
- */
-export async function exportUsersToCSV(params?: {
-  role?: string;
-  isActive?: boolean;
-}): Promise<Blob> {
+export async function exportUsersToCSV(params?: { role?: string; isActive?: boolean }): Promise<Blob> {
   const query = new URLSearchParams();
-  
-  if (params?.role) {
-    query.append('role', params.role);
-  }
-  if (params?.isActive !== undefined) {
-    query.append('isActive', String(params.isActive));
-  }
-  
-  const response = await api.get(`/users/export/csv?${query.toString()}`, {
-    responseType: 'blob'
-  });
-  
+  if (params?.role) query.append('role', params.role);
+  if (params?.isActive !== undefined) query.append('isActive', String(params.isActive));
+  const response = await api.get(`/users/export/csv?${query.toString()}`, { responseType: 'blob' });
   return response.data;
 }
 
-// Legacy function aliases for backward compatibility
-export async function getUsersLegacy(params?: {
-  role?: string;
-  search?: string;
-  isActive?: boolean;
-  page?: number;
-  limit?: number;
-}): Promise<{ users: User[]; pagination: any }> {
-  const response = await getUsers(params);
-  return {
-    users: response.users,
-    pagination: response.pagination
-  };
-}
-
-export async function getUserLegacy(id: string): Promise<{ user: User }> {
-  const response = await getUser(id);
-  return { user: response.data };
-}
 // Image utility
 export const getImageUrl = (image: import('@/types/product').ProductImage): string => {
-  if ((image as any).type === 'url' && image.url) {
-    return image.url;
-  }
-  if (image.type === 'gridfs' && image.fileId) {
-    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/products/image/${image.fileId}`;
-  }
+  if ((image as any).type === 'url' && image.url) return image.url;
+  if (image.type === 'gridfs' && image.fileId) return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/products/image/${image.fileId}`;
   return '/placeholder.svg';
 };
 
-// Get first image URL from product (safe fallback)
 export const getProductImageUrl = (product: import('@/types/product').Product, index: number = 0): string => {
   if (!product?.images?.[index]) return '/placeholder-product.jpg';
   return getImageUrl(product.images[index]);
 };
 
 // ========== PRODUCT API ==========
-export async function uploadProductImages(
-  productId: string | null, 
-  files: File[]
-): Promise<any[]> {
+export async function uploadProductImages(productId: string | null, files: File[]): Promise<any[]> {
   try {
     const formData = new FormData();
     files.forEach(file => formData.append('images', file));
-    
     if (productId) {
       const response = await api.post(`/products/${productId}/upload-images`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -502,6 +361,8 @@ export async function getProducts(params?: {
   minStock?: number;
   minRating?: number;
   tags?: string;
+  supplier?: string;
+  lowStock?: boolean;
 }): Promise<ProductListResponse> {
   const query = new URLSearchParams();
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -509,7 +370,6 @@ export async function getProducts(params?: {
       query.append(key, String(value));
     }
   });
-
   try {
     const response = await api.get(`/products?${query.toString()}`);
     return response.data;
@@ -520,9 +380,10 @@ export async function getProducts(params?: {
 }
 
 export async function getBrands(): Promise<string[]> {
-  const response = await api.get('/products/brands')
-  return response.data
+  const response = await api.get('/products/brands');
+  return response.data;
 }
+
 export async function getProduct(id: string): Promise<Product> {
   try {
     const response = await api.get(`/products/${id}`);
@@ -537,11 +398,9 @@ export async function createProduct(productData: Omit<Product, '_id' | 'createdA
   try {
     const dataToSend = {
       ...productData,
-      price: typeof productData.price === 'string' 
-        ? parseFloat(productData.price) 
-        : productData.price
+      price: typeof productData.price === 'string' ? parseFloat(productData.price) : productData.price,
+      buyingPrice: typeof productData.buyingPrice === 'string' ? parseFloat(productData.buyingPrice) : productData.buyingPrice
     };
-    
     const response = await api.post('/products', dataToSend);
     toast.success('Product created successfully');
     return response.data;
@@ -555,11 +414,11 @@ export async function updateProduct(slug: string, productData: Partial<Omit<Prod
   try {
     const dataToSend = { ...productData };
     if (dataToSend.price !== undefined) {
-      dataToSend.price = typeof dataToSend.price === 'string' 
-        ? parseFloat(dataToSend.price) 
-        : dataToSend.price;
+      dataToSend.price = typeof dataToSend.price === 'string' ? parseFloat(dataToSend.price) : dataToSend.price;
     }
-    
+    if (dataToSend.buyingPrice !== undefined) {
+      dataToSend.buyingPrice = typeof dataToSend.buyingPrice === 'string' ? parseFloat(dataToSend.buyingPrice) : dataToSend.buyingPrice;
+    }
     const response = await api.put(`/products/slug/${slug}`, dataToSend);
     toast.success('Product updated successfully');
     return response.data;
@@ -580,7 +439,6 @@ export async function deleteProduct(id: string): Promise<void> {
 }
 
 // ========== ORDERS API ==========
-// Get user's own orders (authenticated users)
 export async function getUserOrders(): Promise<Order[]> {
   try {
     const response = await api.get('/orders');
@@ -591,7 +449,6 @@ export async function getUserOrders(): Promise<Order[]> {
   }
 }
 
-// Get single order by ID
 export async function getOrder(id: string): Promise<Order> {
   try {
     const response = await api.get(`/orders/${id}`);
@@ -602,7 +459,6 @@ export async function getOrder(id: string): Promise<Order> {
   }
 }
 
-// Track order by order number (public)
 export async function trackOrder(orderNumber: string): Promise<{
   orderNumber: string;
   status: string;
@@ -621,7 +477,6 @@ export async function trackOrder(orderNumber: string): Promise<{
   }
 }
 
-// Get guest orders by email and phone
 export async function getGuestOrders(email: string, phone: string): Promise<Order[]> {
   try {
     const response = await api.get(`/orders/guest/${encodeURIComponent(email)}/${encodeURIComponent(phone)}`);
@@ -632,33 +487,20 @@ export async function getGuestOrders(email: string, phone: string): Promise<Orde
   }
 }
 
-// Create new order (supports both auth and guest)
 export async function createOrder(orderData: CreateOrderRequest): Promise<Order> {
   try {
     const response = await api.post('/orders', orderData);
     toast.success('Order placed successfully');
-    
-    // Handle different response formats
-    // Backend might return { order: {...} } or just {...}
-    if (response.data.order) {
-      return response.data.order;
-    }
-    
-    // If response has _id, it's the order object
-    if (response.data._id) {
-      return response.data;
-    }
-    
-    // Fallback: return the whole response data
+    if (response.data.order) return response.data.order;
+    if (response.data._id) return response.data;
     return response.data;
   } catch (error: any) {
     console.error('Create order error:', error);
-    const errorMessage = error.response?.data?.error || 'Failed to place order';
-    toast.error(errorMessage);
+    toast.error(error.response?.data?.error || 'Failed to place order');
     throw error;
   }
 }
-// Cancel order (user or guest)
+
 export async function cancelOrder(id: string, verification?: { email?: string; phone?: string }): Promise<Order> {
   try {
     const response = await api.put(`/orders/${id}/cancel`, verification || {});
@@ -670,7 +512,6 @@ export async function cancelOrder(id: string, verification?: { email?: string; p
   }
 }
 
-// Retry failed payment
 export async function retryPayment(orderId: string): Promise<{ success: boolean; message: string }> {
   try {
     const response = await api.post(`/orders/${orderId}/retry-payment`);
@@ -682,7 +523,6 @@ export async function retryPayment(orderId: string): Promise<{ success: boolean;
   }
 }
 
-// Get admin orders (paginated)
 export async function getAdminOrders(params?: {
   page?: number;
   limit?: number;
@@ -698,7 +538,6 @@ export async function getAdminOrders(params?: {
       query.append(key, String(value));
     }
   });
-
   try {
     const response = await api.get(`/orders/admin/orders?${query.toString()}`);
     return response.data;
@@ -708,14 +547,12 @@ export async function getAdminOrders(params?: {
   }
 }
 
-// Update order status (admin only)
 export async function updateOrderStatus(id: string, status: Order['status'], data?: {
   trackingNumber?: string;
   estimatedDelivery?: string;
 }): Promise<Order> {
   try {
     const response = await api.patch(`/orders/admin/orders/${id}/status`, { status, ...data });
-    
     return response.data.order;
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Failed to update status');
@@ -723,17 +560,17 @@ export async function updateOrderStatus(id: string, status: Order['status'], dat
   }
 }
 
-// Get order statistics (admin only)
 export async function getOrderStats(): Promise<{
   summary: {
     totalOrders: number;
     totalRevenue: number;
+    totalProfit: number;
     averageOrderValue: number;
     codOrders: number;
     mpesaOrders: number;
     cardOrders: number;
   };
-  statusBreakdown: Array<{ _id: string; count: number; revenue: number }>;
+  statusBreakdown: Array<{ _id: string; count: number; revenue: number; profit: number }>;
 }> {
   try {
     const response = await api.get('/orders/admin/stats/summary');
@@ -744,6 +581,34 @@ export async function getOrderStats(): Promise<{
   }
 }
 
+// ========== ORDER PROFIT ANALYTICS ==========
+export async function getOrderProfitAnalytics(params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  success: boolean;
+  analytics: {
+    totalRevenue: number;
+    totalCost: number;
+    totalProfit: number;
+    totalOrders: number;
+    totalUnitsSold: number;
+    averageOrderValue: number;
+    profitMargin: number;
+    averageProfitPerOrder: number;
+  };
+}> {
+  const query = new URLSearchParams();
+  if (params?.startDate) query.append('startDate', params.startDate);
+  if (params?.endDate) query.append('endDate', params.endDate);
+  try {
+    const response = await api.get(`/orders/profit/analytics?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch order profit analytics:', error);
+    throw error;
+  }
+}
 
 // ========== SHIPPING AREAS API ==========
 export async function getShippingAreas(params?: { page?: number; limit?: number; search?: string }): Promise<{ areas: ShippingArea[]; pagination: any }> {
@@ -752,7 +617,6 @@ export async function getShippingAreas(params?: { page?: number; limit?: number;
     if (params?.page) query.append('page', params.page.toString());
     if (params?.limit) query.append('limit', params.limit.toString());
     if (params?.search) query.append('search', params.search);
-    
     const response = await api.get(`/shipping?${query.toString()}`);
     return response.data;
   } catch (error: any) {
@@ -761,7 +625,6 @@ export async function getShippingAreas(params?: { page?: number; limit?: number;
   }
 }
 
-// Public endpoint for customers
 export async function getPublicShippingAreas(): Promise<ShippingArea[]> {
   try {
     const response = await api.get('/shipping/public');
@@ -786,7 +649,6 @@ export async function createShippingArea(data: CreateShippingAreaRequest): Promi
 export async function updateShippingArea(id: string, data: UpdateShippingAreaRequest): Promise<ShippingArea> {
   try {
     const response = await api.put(`/shipping/${id}`, data);
-   
     return response.data;
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Failed to update shipping area');
@@ -811,7 +673,6 @@ export async function getPromoCodes(params?: { page?: number; limit?: number; se
     if (params?.page) query.append('page', params.page.toString());
     if (params?.limit) query.append('limit', params.limit.toString());
     if (params?.search) query.append('search', params.search);
-    
     const response = await api.get(`/promo?${query.toString()}`);
     return response.data;
   } catch (error: any) {
@@ -830,16 +691,10 @@ export async function validatePromo(code: string, subtotal: number): Promise<{
   error?: string;
 }> {
   try {
-    const response = await api.get(`/promo/validate/${code}`, {
-      params: { subtotal }
-    });
+    const response = await api.get(`/promo/validate/${code}`, { params: { subtotal } });
     return response.data;
   } catch (error: any) {
-    return { 
-      valid: false, 
-      discount: 0, 
-      error: error.response?.data?.error || 'Invalid promo code' 
-    };
+    return { valid: false, discount: 0, error: error.response?.data?.error || 'Invalid promo code' };
   }
 }
 
@@ -909,12 +764,7 @@ export async function calculateOrderTotals(
   errors: string[];
 }> {
   try {
-    const response = await api.post('/order/calculate', { 
-      items, 
-      subtotal, 
-      shippingAreaId, 
-      promoCode 
-    });
+    const response = await api.post('/order/calculate', { items, subtotal, shippingAreaId, promoCode });
     return response.data;
   } catch (error: any) {
     console.error('Calculation error:', error);
@@ -1008,10 +858,7 @@ export async function submitFeedback(data: CreateFeedbackRequest): Promise<Feedb
   }
 }
 
-export async function getPublicFeedback(params?: {
-  limit?: number;
-  rating?: number;
-}): Promise<PublicFeedbackResponse> {
+export async function getPublicFeedback(params?: { limit?: number; rating?: number }): Promise<PublicFeedbackResponse> {
   const query = new URLSearchParams();
   Object.entries(params || {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && typeof value === 'string' && value !== '') {
@@ -1073,15 +920,7 @@ export async function deleteFeedback(id: string): Promise<{ success: true; messa
 }
 
 // ========== EMAIL API ==========
-
-/**
- * Send a test email
- */
-export async function sendTestEmail(data: {
-  to: string;
-  subject: string;
-  message: string;
-}): Promise<EmailResponse> {
+export async function sendTestEmail(data: { to: string; subject: string; message: string }): Promise<EmailResponse> {
   try {
     const response = await api.post('/email/send-test', data);
     toast.success('Test email sent successfully!');
@@ -1092,11 +931,6 @@ export async function sendTestEmail(data: {
   }
 }
 
-
-
-/**
- * Send order confirmation email (admin only)
- */
 export async function sendOrderConfirmationEmail(data: SendOrderEmailRequest): Promise<EmailResponse> {
   try {
     const response = await api.post('/email/send-order-confirmation', data);
@@ -1108,9 +942,6 @@ export async function sendOrderConfirmationEmail(data: SendOrderEmailRequest): P
   }
 }
 
-/**
- * Send order status update email (admin only)
- */
 export async function sendOrderStatusUpdateEmail(data: SendStatusUpdateRequest): Promise<EmailResponse> {
   try {
     const response = await api.post('/email/send-status-update', data);
@@ -1122,9 +953,6 @@ export async function sendOrderStatusUpdateEmail(data: SendStatusUpdateRequest):
   }
 }
 
-/**
- * Send bulk order confirmation emails (admin only)
- */
 export async function sendBulkOrderEmails(orderIds: string[]): Promise<SendOrderEmailsResponse> {
   try {
     const response = await api.post('/email/bulk-order-emails', { orderIds });
@@ -1136,13 +964,7 @@ export async function sendBulkOrderEmails(orderIds: string[]): Promise<SendOrder
   }
 }
 
-/**
- * Send welcome email to new user (admin only)
- */
-export async function sendWelcomeEmail(data: {
-  email: string;
-  name: string;
-}): Promise<EmailResponse> {
+export async function sendWelcomeEmail(data: { email: string; name: string }): Promise<EmailResponse> {
   try {
     const response = await api.post('/email/send-welcome', data);
     toast.success('Welcome email sent');
@@ -1153,9 +975,6 @@ export async function sendWelcomeEmail(data: {
   }
 }
 
-/**
- * Send password reset email
- */
 export async function sendPasswordResetEmail(email: string): Promise<EmailResponse> {
   try {
     const response = await api.post('/email/send-password-reset', { email });
@@ -1166,33 +985,17 @@ export async function sendPasswordResetEmail(email: string): Promise<EmailRespon
     throw error;
   }
 }
-// ========== REVIEWS API ==========
-// Add these functions after the PRODUCTS API section (around line 200)
 
-export async function getProductReviews(
-  productId: string,
-  params?: {
-    page?: number;
-    limit?: number;
-  }
-): Promise<{
+// ========== REVIEWS API ==========
+export async function getProductReviews(productId: string, params?: { page?: number; limit?: number }): Promise<{
   reviews: Review[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-  stats: {
-    averageRating: number;
-    totalReviews: number;
-  };
+  pagination: { page: number; limit: number; total: number; pages: number };
+  stats: { averageRating: number; totalReviews: number };
 }> {
   try {
     const query = new URLSearchParams();
     if (params?.page) query.append('page', params.page.toString());
     if (params?.limit) query.append('limit', params.limit.toString());
-    
     const url = `/reviews/${productId}${query.toString() ? `?${query.toString()}` : ''}`;
     const response = await api.get(url);
     return response.data;
@@ -1208,8 +1011,7 @@ export async function createReview(data: { productId: string; rating: number; re
     toast.success('Review submitted successfully!');
     return response.data;
   } catch (error: any) {
-    const errorMessage = error.response?.data?.error || 'Failed to submit review';
-    toast.error(errorMessage);
+    toast.error(error.response?.data?.error || 'Failed to submit review');
     throw error;
   }
 }
@@ -1220,8 +1022,7 @@ export async function updateReview(id: string, data: { rating?: number; review?:
     toast.success('Review updated successfully!');
     return response.data;
   } catch (error: any) {
-    const errorMessage = error.response?.data?.error || 'Failed to update review';
-    toast.error(errorMessage);
+    toast.error(error.response?.data?.error || 'Failed to update review');
     throw error;
   }
 }
@@ -1231,8 +1032,7 @@ export async function deleteReview(id: string): Promise<void> {
     await api.delete(`/reviews/${id}`);
     toast.success('Review deleted successfully!');
   } catch (error: any) {
-    const errorMessage = error.response?.data?.error || 'Failed to delete review';
-    toast.error(errorMessage);
+    toast.error(error.response?.data?.error || 'Failed to delete review');
     throw error;
   }
 }
@@ -1257,21 +1057,9 @@ export async function hasUserReviewed(productId: string): Promise<{ hasReviewed:
   }
 }
 
-// ========== ADMIN REVIEWS API ==========
-export async function getAdminReviews(params?: {
-  page?: number;
-  limit?: number;
-  status?: string;
-  rating?: number;
-  search?: string;
-}): Promise<{
+export async function getAdminReviews(params?: { page?: number; limit?: number; status?: string; rating?: number; search?: string }): Promise<{
   data: Review[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
+  pagination: { page: number; limit: number; total: number; pages: number };
 }> {
   try {
     const query = new URLSearchParams();
@@ -1289,10 +1077,7 @@ export async function getAdminReviews(params?: {
   }
 }
 
-export async function getAdminReviewStats(): Promise<{
-  total: number;
-  averageRating: number;
-}> {
+export async function getAdminReviewStats(): Promise<{ total: number; averageRating: number }> {
   try {
     const response = await api.get('/reviews/admin/stats');
     return response.data;
@@ -1308,8 +1093,7 @@ export async function updateReviewStatus(reviewId: string, status: 'pending' | '
     toast.success('Review status updated successfully');
     return response.data;
   } catch (error: any) {
-    const errorMessage = error.response?.data?.error || 'Failed to update review status';
-    toast.error(errorMessage);
+    toast.error(error.response?.data?.error || 'Failed to update review status');
     throw error;
   }
 }
@@ -1319,32 +1103,24 @@ export async function deleteAdminReview(reviewId: string): Promise<void> {
     await api.delete(`/reviews/admin/${reviewId}`);
     toast.success('Review deleted successfully');
   } catch (error: any) {
-    const errorMessage = error.response?.data?.error || 'Failed to delete review';
-    toast.error(errorMessage);
+    toast.error(error.response?.data?.error || 'Failed to delete review');
     throw error;
   }
 }
 
-// ========== TRANSACTION API (UPDATED) ==========
-
-// Get all transactions (admin only) - Updated endpoint
+// ========== TRANSACTION API ==========
 export async function getTransactions(params?: {
   page?: number;
   limit?: number;
   status?: string;
   paymentMethod?: string;
-  source?: string;  // NEW: checkout, quotation, manual, admin
+  source?: string;
   search?: string;
   startDate?: string;
   endDate?: string;
 }): Promise<{
   transactions: any[];
-  pagination: {
-    current: number;
-    pages: number;
-    total: number;
-    limit: number;
-  };
+  pagination: { current: number; pages: number; total: number; limit: number };
 }> {
   const query = new URLSearchParams();
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -1352,9 +1128,7 @@ export async function getTransactions(params?: {
       query.append(key, String(value));
     }
   });
-
   try {
-    // UPDATED: Use /api/transactions (not /admin)
     const response = await api.get(`/transactions?${query.toString()}`);
     return response.data;
   } catch (error: any) {
@@ -1363,22 +1137,13 @@ export async function getTransactions(params?: {
   }
 }
 
-// Get transaction statistics (admin only) - Updated
 export async function getTransactionStats(): Promise<{
-  summary: {
-    totalVolume: number;
-    totalTransactions: number;
-    completed: number;
-    pending: number;
-    failed: number;
-    refunded: number;
-  };
+  summary: { totalVolume: number; totalTransactions: number; completed: number; pending: number; failed: number; refunded: number };
   byStatus: Array<{ _id: string; count: number; volume: number }>;
   bySource: Array<{ _id: string; count: number; volume: number }>;
   byMethod: Array<{ _id: string; count: number; volume: number }>;
 }> {
   try {
-    // UPDATED: Use /api/transactions/stats
     const response = await api.get('/transactions/stats');
     return response.data;
   } catch (error: any) {
@@ -1387,7 +1152,6 @@ export async function getTransactionStats(): Promise<{
   }
 }
 
-// Get single transaction (admin only) - NEW
 export async function getTransaction(id: string): Promise<any> {
   try {
     const response = await api.get(`/transactions/${id}`);
@@ -1398,7 +1162,6 @@ export async function getTransaction(id: string): Promise<any> {
   }
 }
 
-// Update transaction status (admin only) - Updated
 export async function updateTransactionStatus(id: string, status: string, reason?: string): Promise<any> {
   try {
     const response = await api.patch(`/transactions/${id}/status`, { status, reason });
@@ -1410,7 +1173,6 @@ export async function updateTransactionStatus(id: string, status: string, reason
   }
 }
 
-// Export transactions to CSV (admin only) - Updated
 export async function exportTransactionsToCSV(params?: {
   status?: string;
   paymentMethod?: string;
@@ -1424,12 +1186,8 @@ export async function exportTransactionsToCSV(params?: {
       query.append(key, String(value));
     }
   });
-
   try {
-    // UPDATED: Use /api/transactions/export/csv
-    const response = await api.get(`/transactions/export/csv?${query.toString()}`, {
-      responseType: 'blob'
-    });
+    const response = await api.get(`/transactions/export/csv?${query.toString()}`, { responseType: 'blob' });
     return response.data;
   } catch (error: any) {
     console.error('Failed to export transactions:', error);
@@ -1438,9 +1196,7 @@ export async function exportTransactionsToCSV(params?: {
   }
 }
 
-// ========== NEW PAYMENT API ==========
-
-// Get payment summary for an order
+// ========== PAYMENT API ==========
 export async function getOrderPaymentSummary(orderId: string): Promise<{
   success: boolean;
   orderId: string;
@@ -1463,7 +1219,6 @@ export async function getOrderPaymentSummary(orderId: string): Promise<{
   }
 }
 
-// Record manual payment (admin/sales only)
 export async function recordManualPayment(data: {
   orderId: string;
   amount: number;
@@ -1474,12 +1229,7 @@ export async function recordManualPayment(data: {
   success: boolean;
   message: string;
   transaction: any;
-  order: {
-    orderNumber: string;
-    paymentStatus: string;
-    amountPaid: number;
-    balanceDue: number;
-  };
+  order: { orderNumber: string; paymentStatus: string; amountPaid: number; balanceDue: number };
 }> {
   try {
     const response = await api.post('/payments/record', data);
@@ -1491,7 +1241,6 @@ export async function recordManualPayment(data: {
   }
 }
 
-// Refund a transaction
 export async function refundTransaction(transactionId: string, reason?: string): Promise<{
   success: boolean;
   message: string;
@@ -1508,7 +1257,6 @@ export async function refundTransaction(transactionId: string, reason?: string):
   }
 }
 
-// List all payments (admin only)
 export async function listPayments(params?: {
   page?: number;
   limit?: number;
@@ -1516,17 +1264,13 @@ export async function listPayments(params?: {
   paymentMethod?: string;
   source?: string;
   search?: string;
-}): Promise<{
-  transactions: any[];
-  pagination: any;
-}> {
+}): Promise<{ transactions: any[]; pagination: any }> {
   const query = new URLSearchParams();
   Object.entries(params || {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       query.append(key, String(value));
     }
   });
-
   try {
     const response = await api.get(`/payments/transactions?${query.toString()}`);
     return response.data;
@@ -1536,13 +1280,8 @@ export async function listPayments(params?: {
   }
 }
 
-// Get payment statistics (admin only)
 export async function getPaymentStats(): Promise<{
-  summary: {
-    totalVolume: number;
-    totalTransactions: number;
-    avgTransaction: number;
-  };
+  summary: { totalVolume: number; totalTransactions: number; avgTransaction: number };
   sourceBreakdown: Array<{ _id: string; count: number; volume: number }>;
 }> {
   try {
@@ -1554,6 +1293,384 @@ export async function getPaymentStats(): Promise<{
   }
 }
 
-// Export the api instance for custom requests 
-export default api;
+// ========== PROFIT TRACKING API ==========
+export async function getProfitSummary(params?: {
+  startDate?: string;
+  endDate?: string;
+  category?: string;
+  supplier?: string;
+  brand?: string;
+}): Promise<{
+  success: boolean;
+  summary: {
+    totalRevenue: number;
+    totalCost: number;
+    totalProfit: number;
+    totalUnitsSold: number;
+    overallMargin: string;
+  };
+}> {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  });
+  try {
+    const response = await api.get(`/profits/summary?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch profit summary:', error);
+    throw error;
+  }
+}
 
+export async function getProfitByProduct(params?: {
+  startDate?: string;
+  endDate?: string;
+  category?: string;
+  supplier?: string;
+  brand?: string;
+  sortBy?: 'profit' | 'margin' | 'unitsSold' | 'revenue';
+  limit?: number;
+}): Promise<{
+  success: boolean;
+  products: Array<{
+    _id: string;
+    productName: string;
+    productSku: string;
+    category: string;
+    brand: string;
+    supplierId: string;
+    supplierName: string;
+    totalUnitsSold: number;
+    totalRevenue: number;
+    totalCost: number;
+    totalProfit: number;
+    averageMargin: number;
+    averageSellingPrice: number;
+    averageBuyingPrice: number;
+  }>;
+  totalProducts: number;
+}> {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  });
+  try {
+    const response = await api.get(`/profits/by-product?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch profit by product:', error);
+    throw error;
+  }
+}
+
+export async function getProfitByCategory(params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  success: boolean;
+  categories: Array<{
+    _id: string;
+    totalRevenue: number;
+    totalCost: number;
+    totalUnitsSold: number;
+    totalProfit: number;
+    margin: number;
+  }>;
+}> {
+  const query = new URLSearchParams();
+  if (params?.startDate) query.append('startDate', params.startDate);
+  if (params?.endDate) query.append('endDate', params.endDate);
+  try {
+    const response = await api.get(`/profits/by-category?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch profit by category:', error);
+    throw error;
+  }
+}
+
+export async function getProfitBySupplier(params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  success: boolean;
+  suppliers: Array<{
+    _id: string;
+    supplierId: string;
+    totalRevenue: number;
+    totalCost: number;
+    totalUnitsSold: number;
+    totalProfit: number;
+    margin: number;
+  }>;
+  allSuppliers: Array<{ name: string; email: string; phone: string; totalPurchases: number }>;
+}> {
+  const query = new URLSearchParams();
+  if (params?.startDate) query.append('startDate', params.startDate);
+  if (params?.endDate) query.append('endDate', params.endDate);
+  try {
+    const response = await api.get(`/profits/by-supplier?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch profit by supplier:', error);
+    throw error;
+  }
+}
+
+export async function getProfitTrends(params?: {
+  period?: 'daily' | 'weekly' | 'monthly';
+  months?: number;
+}): Promise<{
+  success: boolean;
+  period: string;
+  trends: Array<{
+    _id: string;
+    revenue: number;
+    cost: number;
+    unitsSold: number;
+    profit: number;
+    margin: number;
+  }>;
+}> {
+  const query = new URLSearchParams();
+  if (params?.period) query.append('period', params.period);
+  if (params?.months) query.append('months', String(params.months));
+  try {
+    const response = await api.get(`/profits/trends?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch profit trends:', error);
+    throw error;
+  }
+}
+
+export async function getTopProfitProducts(params?: {
+  metric?: 'profit' | 'margin' | 'units' | 'revenue';
+  limit?: number;
+}): Promise<{
+  success: boolean;
+  metric: string;
+  products: Array<{
+    _id: string;
+    name: string;
+    sku: string;
+    category: string;
+    totalRevenue: number;
+    totalProfit: number;
+    totalUnitsSold: number;
+    profitPerUnit: number;
+    margin: number;
+  }>;
+}> {
+  const query = new URLSearchParams();
+  if (params?.metric) query.append('metric', params.metric);
+  if (params?.limit) query.append('limit', String(params.limit));
+  try {
+    const response = await api.get(`/profits/top-products?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch top profit products:', error);
+    throw error;
+  }
+}
+
+export async function recalculateProfitAnalysis(): Promise<{
+  success: boolean;
+  message: string;
+  totalProducts: number;
+  recalculated: number;
+}> {
+  try {
+    const response = await api.post('/profits/recalculate');
+    toast.success('Profit analysis recalculated');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to recalculate profit analysis');
+    throw error;
+  }
+}
+
+// ========== SUPPLIER API ==========
+export async function getSuppliers(params?: {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{
+  suppliers: Array<{
+    _id: string;
+    name: string;
+    email: string;
+    phone: string;
+    status: string;
+    totalPurchases: number;
+    createdAt: string;
+  }>;
+  pagination: { page: number; limit: number; total: number; pages: number };
+}> {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  });
+  try {
+    const response = await api.get(`/suppliers?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch suppliers:', error);
+    throw error;
+  }
+}
+
+export async function getSupplier(id: string): Promise<{
+  supplier: any;
+  products: any[];
+  productCount: number;
+}> {
+  try {
+    const response = await api.get(`/suppliers/${id}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch supplier:', error);
+    throw error;
+  }
+}
+
+export async function createSupplier(data: {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: any;
+  paymentTerms?: string;
+  leadTime?: number;
+  notes?: string;
+}): Promise<{ success: boolean; supplier: any }> {
+  try {
+    const response = await api.post('/suppliers', data);
+    toast.success('Supplier created successfully');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to create supplier');
+    throw error;
+  }
+}
+
+export async function updateSupplier(id: string, data: any): Promise<{ success: boolean; supplier: any }> {
+  try {
+    const response = await api.put(`/suppliers/${id}`, data);
+    toast.success('Supplier updated successfully');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to update supplier');
+    throw error;
+  }
+}
+
+export async function deleteSupplier(id: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await api.delete(`/suppliers/${id}`);
+    toast.success('Supplier deleted successfully');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to delete supplier');
+    throw error;
+  }
+}
+
+export async function getSupplierStats(): Promise<{
+  summary: { totalSuppliers: number; activeSuppliers: number; totalPurchaseVolume: number };
+  supplierProducts: any[];
+}> {
+  try {
+    const response = await api.get('/suppliers/stats/summary');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch supplier stats:', error);
+    throw error;
+  }
+}
+
+// ========== INVENTORY API ==========
+export async function getInventorySummary(): Promise<{
+  summary: {
+    totalStockValue: number;
+    totalInventoryValue: number;
+    totalPotentialProfit: number;
+    totalUnits: number;
+    lowStockItems: number;
+    outOfStockItems: number;
+  };
+  categoryBreakdown: Array<{
+    _id: string;
+    stockValue: number;
+    inventoryValue: number;
+    units: number;
+  }>;
+}> {
+  try {
+    const response = await api.get('/inventory/summary');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch inventory summary:', error);
+    throw error;
+  }
+}
+
+export async function getLowStockProducts(threshold?: number, category?: string, supplier?: string): Promise<{
+  products: any[];
+  count: number;
+  threshold: number;
+}> {
+  const query = new URLSearchParams();
+  if (threshold) query.append('threshold', String(threshold));
+  if (category) query.append('category', category);
+  if (supplier) query.append('supplier', supplier);
+  try {
+    const response = await api.get(`/inventory/low-stock?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch low stock products:', error);
+    throw error;
+  }
+}
+
+export async function restockProduct(productId: string, data: { quantity: number; buyingPrice?: number; reason?: string }): Promise<{
+  success: boolean;
+  product: { _id: string; name: string; stock: number; buyingPrice: number };
+}> {
+  try {
+    const response = await api.post(`/inventory/restock/${productId}`, data);
+    toast.success('Stock updated successfully');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to update stock');
+    throw error;
+  }
+}
+
+// ========== PRODUCT STATS API ==========
+export async function getProductProfitStats(): Promise<{
+  averageProfitMargin: number;
+  averageMarkup: number;
+  totalInventoryValue: number;
+  totalPotentialProfit: number;
+  productsWithMargin: number;
+  negativeMarginProducts: number;
+}> {
+  try {
+    const response = await api.get('/products/stats/profit-summary');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch product profit stats:', error);
+    throw error;
+  }
+}
+
+// Export the api instance
+export default api;

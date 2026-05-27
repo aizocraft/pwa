@@ -1,17 +1,18 @@
+// src/routes/sales.ts - Updated with profit tracking
 import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import authMiddleware from '../middleware/auth';
 import SalesCustomerModel from '../models/SalesCustomer';
-import QuotationModel, { DiscountType, QuotationStatus, generateQuoteNumber, generateInvoiceNumber } from '../models/Quotation';
+import QuotationModel, { generateQuoteNumber } from '../models/Quotation';
+import InvoiceModel, { generateInvoiceNumber } from '../models/Invoice';
 import ProductModel from '../models/Product';
 import OrderModel from '../models/Order';
 import { createAuditLog } from '../middleware/auditMiddleware';
+import TransactionModel from '../models/Transaction';
 import ShippingAreaModel from '../models/ShippingArea';
 import PromoCodeModel from '../models/PromoCode';
 import { CompanySettings } from '../models/CompanySettings';
-import { sendQuotation } from '../services/email.service';
-import { PaymentService } from '../services/payment.service';
-
+import { sendQuotation, sendInvoice } from '../services/email.service';
 
 const router = Router();
 
@@ -24,11 +25,129 @@ const requireSalesRole = (req: Request & { user?: any }, res: Response, next: an
   next();
 };
 
+// Helper function to create order from invoice with profit tracking
+async function createOrderFromInvoice(invoice: any, user: any) {
+  try {
+    if (invoice.orderId) {
+      const existingOrder = await OrderModel.findById(invoice.orderId);
+      if (existingOrder) return existingOrder;
+    }
+
+    // Check stock availability
+    for (const item of invoice.items) {
+      const product = await ProductModel.findById(item.productId).lean();
+      if (!product) {
+        throw new Error(`Product not found: ${item.name}`);
+      }
+      if (product.stock < item.qty) {
+        throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.qty}`);
+      }
+    }
+
+    // Deduct stock and prepare order items with profit tracking
+    let totalCost = 0;
+    let totalProfit = 0;
+    const orderItems = [];
+
+    for (const item of invoice.items) {
+      const product = await ProductModel.findById(item.productId);
+      if (!product) continue;
+      
+      const sellingPrice = Number(item.price);
+      const buyingPrice = product.buyingPrice || 0;
+      const profitPerItem = sellingPrice - buyingPrice;
+      const itemCost = buyingPrice * item.qty;
+      const itemProfit = profitPerItem * item.qty;
+      
+      totalCost += itemCost;
+      totalProfit += itemProfit;
+      
+      orderItems.push({
+        productId: item.productId,
+        name: item.name,
+        slug: item.slug || item.name.toLowerCase().replace(/\s+/g, '-'),
+        image: item.image || '',
+        sellingPrice: sellingPrice,
+        buyingPrice: buyingPrice,
+        profit: profitPerItem,
+        qty: Number(item.qty),
+        description: item.description || ''
+      });
+      
+      await ProductModel.findByIdAndUpdate(item.productId, {
+        $inc: { stock: -item.qty }
+      });
+    }
+
+    const shippingAddress = {
+      fullName: invoice.customerName,
+      address1: invoice.customerLocation || 'To be provided',
+      address2: '',
+      city: 'Nairobi',
+      state: 'KE',
+      zip: '00000',
+      country: 'KE',
+      phone: invoice.customerPhone || '',
+      email: invoice.customerEmail || ''
+    };
+
+    const transportCost = invoice.transportCost || invoice.transportInfo?.cost || 0;
+
+    const order = await OrderModel.create({
+      invoiceId: invoice._id,
+      invoiceNumber: invoice.invoiceNumber,
+      quotationId: invoice.quotationId,
+      quotationNumber: invoice.quotationNumber,
+      userId: invoice.customerId,
+      salesCustomerId: invoice.customerId,
+      items: orderItems,
+      subtotal: invoice.subtotal,
+      totalCost: totalCost,
+      totalProfit: totalProfit,
+      shippingCost: transportCost,
+      tax: invoice.tax,
+      discount: invoice.discount,
+      total: invoice.total,
+      paymentMethod: 'cod',
+      paymentStatus: invoice.paymentStatus,
+      amountPaid: invoice.amountPaid,
+      balanceDue: invoice.balanceDue,
+      status: invoice.paymentStatus === 'paid' ? 'processing' : 'pending',
+      shippingAddress,
+      notes: `Order created from invoice ${invoice.invoiceNumber}\n\n${invoice.notes || ''}`,
+      createdBy: user?.userId,
+      paymentDetails: invoice.amountPaid > 0 ? {
+        paidAt: invoice.payments[invoice.payments.length - 1]?.date || new Date(),
+        transactionId: invoice.payments[invoice.payments.length - 1]?.transactionId
+      } : undefined
+    });
+
+    invoice.orderId = order._id;
+    invoice.orderCreatedAt = new Date();
+    await invoice.save();
+
+    if (invoice.payments.length > 0) {
+      for (const payment of invoice.payments) {
+        if (payment.transactionId) {
+          await TransactionModel.findOneAndUpdate(
+            { transactionId: payment.transactionId },
+            { orderId: order._id }
+          );
+        }
+      }
+    }
+
+    return order;
+  } catch (error: any) {
+    console.error('Auto-create order error:', error);
+    return null;
+  }
+}
+
 // =====================
 // Customers
 // =====================
 
-// POST /api/sales/customers - admin/sales create customer
 router.post('/customers', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { name, email, phone, location, notes, status } = req.body;
@@ -75,7 +194,6 @@ router.post('/customers', authMiddleware, requireSalesRole, async (req: Request 
   }
 });
 
-// GET /api/sales/customers
 router.get('/customers', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { search, status, page = '1', limit = '20' } = req.query;
@@ -113,7 +231,6 @@ router.get('/customers', authMiddleware, requireSalesRole, async (req: Request &
   }
 });
 
-// PATCH /api/sales/customers/:id
 router.patch('/customers/:id', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { id } = req.params;
@@ -145,14 +262,11 @@ router.patch('/customers/:id', authMiddleware, requireSalesRole, async (req: Req
 });
 
 // =====================
-// Quotations with Tax Per Item & Transport
+// Quotations with Profit Tracking
 // =====================
 
-// POST /api/sales/quotations - Create quotation with tax per item and transport
 router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
-    console.log('📥 Received quotation data:', JSON.stringify(req.body, null, 2));
-    
     const {
       customerId,
       items,
@@ -166,27 +280,24 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       estimatedDelivery
     } = req.body;
 
-    // Validation
     if (!customerId) return res.status(400).json({ error: 'customerId is required' });
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'items are required' });
     }
 
-    // Get customer
     const customer = await SalesCustomerModel.findById(customerId);
     if (!customer) return res.status(404).json({ error: 'Customer not found' });
 
-    // Check permission
     if (req.user!.role === 'sales' && customer.createdBy.toString() !== req.user!.userId) {
       return res.status(403).json({ error: 'Not allowed for this customer' });
     }
 
-    // Get company settings for tax rate
     const settings = await CompanySettings.findOne();
     const taxRate = settings?.taxRate ?? 0.16;
 
-    // Process items with tax calculation
     let subtotal = 0;
+    let totalCost = 0;
+    let totalProfit = 0;
     let totalItemTax = 0;
     const processedItems = [];
 
@@ -197,11 +308,16 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       }
       
       const price = typeof it.customPrice === 'number' ? it.customPrice : (it.price ?? product.price);
+      const buyingPrice = product.buyingPrice || 0;
       const qty = Number(it.qty);
       const itemTotal = price * qty;
-      subtotal += itemTotal;
+      const itemCost = buyingPrice * qty;
+      const itemProfit = (price - buyingPrice) * qty;
       
-      // Calculate item tax if taxPerItem is enabled and item is taxable
+      subtotal += itemTotal;
+      totalCost += itemCost;
+      totalProfit += itemProfit;
+      
       let itemTax = 0;
       const isTaxable = it.taxable !== false;
       if (taxPerItem && isTaxable) {
@@ -215,6 +331,9 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
         slug: product.slug,
         qty,
         price,
+        buyingPrice: buyingPrice,
+        profitPerItem: price - buyingPrice,
+        totalProfit: itemProfit,
         total: itemTotal,
         tax: itemTax,
         customPrice: it.customPrice !== undefined,
@@ -226,12 +345,10 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       });
     }
 
-    // Calculate discount
     const discountAmount = discountType === 'percentage' 
       ? subtotal * (discount / 100)
       : (discount || 0);
     
-    // Calculate tax based on taxPerItem setting
     let tax = 0;
     if (taxPerItem) {
       tax = totalItemTax;
@@ -240,7 +357,6 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       tax = taxableAmount * taxRate;
     }
     
-    // Transport info
     const transportCost = transport?.cost || 0;
     const transportDescription = transport?.description || '';
     const transportInfo = (transportCost > 0 || transportDescription) ? {
@@ -248,16 +364,10 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       description: transportDescription
     } : undefined;
     
-    // Calculate total
     const total = subtotal - discountAmount + tax + transportCost;
-
-    // Generate quote number
     const quoteNumber = await generateQuoteNumber();
-
-    // Set valid until date (default 30 days)
     const validUntilDate = validUntil ? new Date(validUntil) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    // Create quotation
     const quote = await QuotationModel.create({
       customerId: customer._id,
       customerName: customer.name,
@@ -268,12 +378,13 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       createdByName: req.user!.name || req.user!.email,
       items: processedItems,
       subtotal,
+      totalCost,
+      totalProfit,
       taxRate,
       tax,
       taxPerItem: taxPerItem || false,
       discount: discountAmount,
       discountType: discountType || 'fixed',
-      discountReason: '',
       transportInfo,
       transportCost,
       transportDescription,
@@ -286,9 +397,6 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       terms
     });
 
-    console.log('✅ Quotation created with taxPerItem:', taxPerItem, 'transport:', transport);
-
-    // Create audit log
     await createAuditLog(req as any, {
       action: 'create',
       resource: 'quotation',
@@ -297,7 +405,6 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       skipIfNoUser: false
     });
 
-    // Return the populated quotation
     const populatedQuote = await QuotationModel.findById(quote._id).lean();
     
     res.status(201).json({ success: true, quotation: populatedQuote });
@@ -307,7 +414,7 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
   }
 });
 
-// GET /api/sales/quotations - List quotations with filters
+// GET /api/sales/quotations - List quotations
 router.get('/quotations', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { search, status, page = '1', limit = '20', sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
@@ -325,7 +432,6 @@ router.get('/quotations', authMiddleware, requireSalesRole, async (req: Request 
     if (search && typeof search === 'string') {
       query.$or = [
         { quoteNumber: { $regex: search, $options: 'i' } },
-        { invoiceNumber: { $regex: search, $options: 'i' } },
         { customerName: { $regex: search, $options: 'i' } },
         { customerEmail: { $regex: search, $options: 'i' } }
       ];
@@ -343,27 +449,9 @@ router.get('/quotations', authMiddleware, requireSalesRole, async (req: Request 
       QuotationModel.countDocuments(query)
     ]);
 
-    // For converted quotations, fetch payment status from the linked order
-    const quotationsWithPaymentStatus = await Promise.all(
-      quotations.map(async (quote) => {
-        if (quote.status === 'converted' && quote.convertedOrderId) {
-          const order = await OrderModel.findById(quote.convertedOrderId).select('paymentStatus amountPaid balanceDue');
-          if (order) {
-            return {
-              ...quote,
-              paymentStatus: order.paymentStatus,
-              amountPaid: order.amountPaid,
-              balanceDue: order.balanceDue
-            };
-          }
-        }
-        return quote;
-      })
-    );
-
     res.json({
       success: true,
-      quotations: quotationsWithPaymentStatus,
+      quotations,
       pagination: {
         current: p,
         limit: l,
@@ -394,23 +482,6 @@ router.get('/quotations/:id', authMiddleware, requireSalesRole, async (req: Requ
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // For converted quotations, fetch payment status from the linked order
-    if (quotation.status === 'converted' && quotation.convertedOrderId) {
-      const order = await OrderModel.findById(quotation.convertedOrderId).select('paymentStatus amountPaid balanceDue total');
-      if (order) {
-        return res.json({
-          success: true,
-          quotation: {
-            ...quotation,
-            paymentStatus: order.paymentStatus,
-            amountPaid: order.amountPaid,
-            balanceDue: order.balanceDue,
-            total: quotation.total
-          }
-        });
-      }
-    }
-
     res.json({ success: true, quotation });
   } catch (error: any) {
     console.error('Fetch quotation error:', error);
@@ -435,16 +506,11 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
       return res.status(403).json({ error: 'Not allowed' });
     }
 
-    if (quotation.status === 'converted') {
-      return res.status(409).json({ error: 'Cannot edit converted quotation' });
-    }
-
     const { 
       status, notes, terms, items, discount, discountType, validUntil, 
       taxPerItem, transport, estimatedDelivery 
     } = req.body;
 
-    // Update basic fields
     if (status && ['draft', 'sent', 'accepted', 'rejected', 'expired'].includes(status)) {
       if (status === 'sent' && quotation.status !== 'sent') quotation.sentAt = new Date();
       if (status === 'accepted' && quotation.status !== 'accepted') quotation.acceptedAt = new Date();
@@ -460,7 +526,6 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
     if (taxPerItem !== undefined) quotation.taxPerItem = taxPerItem;
     if (estimatedDelivery !== undefined) quotation.estimatedDelivery = estimatedDelivery;
     
-    // Update transport info
     if (transport !== undefined) {
       if (transport.cost > 0 || transport.description) {
         quotation.transportInfo = {
@@ -476,12 +541,13 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
       }
     }
 
-    // Update items if provided
     if (items && Array.isArray(items)) {
       const settings = await CompanySettings.findOne();
       const taxRate = settings?.taxRate ?? 0.16;
       const updatedItems = [];
       let subtotal = 0;
+      let totalCost = 0;
+      let totalProfit = 0;
       let totalItemTax = 0;
       
       for (const it of items) {
@@ -490,9 +556,15 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
           return res.status(404).json({ error: `Product not found: ${it.productId}` });
         }
         const price = it.customPrice || it.price || product.price;
+        const buyingPrice = product.buyingPrice || 0;
         const qty = Number(it.qty);
         const itemTotal = price * qty;
+        const itemCost = buyingPrice * qty;
+        const itemProfit = (price - buyingPrice) * qty;
+        
         subtotal += itemTotal;
+        totalCost += itemCost;
+        totalProfit += itemProfit;
         
         let itemTax = 0;
         const isTaxable = it.taxable !== false;
@@ -507,6 +579,9 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
           slug: product.slug,
           qty,
           price,
+          buyingPrice: buyingPrice,
+          profitPerItem: price - buyingPrice,
+          totalProfit: itemProfit,
           total: itemTotal,
           tax: itemTax,
           customPrice: it.customPrice !== undefined,
@@ -520,8 +595,9 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
       
       quotation.items = updatedItems;
       quotation.subtotal = subtotal;
+      quotation.totalCost = totalCost;
+      quotation.totalProfit = totalProfit;
       
-      // Recalculate tax
       const discountAmount = quotation.discountType === 'percentage' 
         ? subtotal * (quotation.discount / 100)
         : quotation.discount;
@@ -533,7 +609,6 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
         quotation.tax = taxableAmount * taxRate;
       }
       
-      // Recalculate total
       const transportCost = quotation.transportCost || 0;
       quotation.total = subtotal - discountAmount + quotation.tax + transportCost;
     }
@@ -583,7 +658,7 @@ router.post('/quotations/:id/send', authMiddleware, requireSalesRole, async (req
       quoteNumber: quotation.quoteNumber,
       quoteTotal: quotation.total,
       validUntil: quotation.validUntil,
-      items: quotation.items.map(item => ({
+      items: quotation.items.map((item: any) => ({
         name: item.name,
         quantity: item.qty,
         price: item.price,
@@ -632,207 +707,123 @@ router.post('/quotations/:id/send', authMiddleware, requireSalesRole, async (req
   }
 });
 
-// POST /api/sales/quotations/:id/accept
-router.post(
-  '/quotations/:id/accept',
-  authMiddleware,
-  requireSalesRole,
-  async (req: Request & { user?: any }, res: Response) => {
-    try {
-      const { id } = req.params;
-      const { paymentMethod = 'cod' } = req.body;
+// POST /api/sales/quotations/:id/accept - Accept quotation and create invoice
+router.post('/quotations/:id/accept', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ error: 'Invalid quotation ID' });
-      }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid quotation ID' });
+    }
 
-      const quotation = await QuotationModel.findById(id);
-      if (!quotation) {
-        return res.status(404).json({ error: 'Quotation not found' });
-      }
+    const quotation = await QuotationModel.findById(id);
+    if (!quotation) {
+      return res.status(404).json({ error: 'Quotation not found' });
+    }
 
-      if (req.user!.role === 'sales' && quotation.createdBy.toString() !== req.user!.userId) {
-        return res.status(403).json({ error: 'Not allowed' });
-      }
+    if (req.user!.role === 'sales' && quotation.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
 
-      if (quotation.status !== 'sent' && quotation.status !== 'draft') {
-        return res.status(400).json({ error: `Cannot accept quotation with status: ${quotation.status}` });
-      }
+    if (quotation.status !== 'sent' && quotation.status !== 'draft') {
+      return res.status(400).json({ error: `Cannot accept quotation with status: ${quotation.status}` });
+    }
 
-      if (new Date() > new Date(quotation.validUntil)) {
-        quotation.status = 'expired';
-        await quotation.save();
-        return res.status(400).json({ error: 'Quotation has expired' });
-      }
+    if (new Date() > new Date(quotation.validUntil)) {
+      quotation.status = 'expired';
+      await quotation.save();
+      return res.status(400).json({ error: 'Quotation has expired' });
+    }
 
-      const customerPhone = String(quotation.customerPhone || '').trim();
-      if (!customerPhone) {
-        return res.status(400).json({ error: 'Customer phone number is required' });
-      }
+    quotation.status = 'accepted';
+    quotation.acceptedAt = new Date();
+    await quotation.save();
 
-      // Validate stock
-      for (const item of quotation.items) {
-        const product = await ProductModel.findById(item.productId).lean();
-        if (!product) {
-          return res.status(404).json({ error: `Product not found: ${item.name}` });
-        }
-        if (product.stock < item.qty) {
-          return res.status(400).json({ error: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.qty}` });
-        }
-      }
+    const invoiceNumber = await generateInvoiceNumber();
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
 
-      // Deduct stock
-      for (const item of quotation.items) {
-        await ProductModel.findByIdAndUpdate(item.productId, {
-          $inc: { stock: -item.qty }
-        });
-      }
-
-      // Generate invoice number if not exists
-      let invoiceNumber = quotation.invoiceNumber;
-      if (!invoiceNumber) {
-        invoiceNumber = await generateInvoiceNumber();
-        quotation.invoiceNumber = invoiceNumber;
-      }
-
-      const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-      const shippingAddress = {
-        fullName: quotation.customerName,
-        address1: 'To be provided',
-        address2: '',
-        city: 'Nairobi',
-        state: 'KE',
-        zip: '00000',
-        country: 'KE',
-        phone: customerPhone,
-        email: quotation.customerEmail || ''
-      };
-
-      const orderItems = quotation.items.map((item: any) => ({
+    const invoice = await InvoiceModel.create({
+      quotationId: quotation._id,
+      quotationNumber: quotation.quoteNumber,
+      customerId: quotation.customerId,
+      customerName: quotation.customerName,
+      customerEmail: quotation.customerEmail,
+      customerPhone: quotation.customerPhone,
+      customerLocation: quotation.customerLocation,
+      createdBy: req.user!.userId,
+      createdByName: req.user!.name || req.user!.email,
+      items: quotation.items.map((item: any) => ({
         productId: item.productId,
         name: item.name,
         slug: item.slug,
-        image: item.image || '',
-        price: Number(item.price),
-        qty: Number(item.qty),
-        description: item.description || ''
-      }));
+        qty: item.qty,
+        price: item.price,
+        buyingPrice: item.buyingPrice,
+        profitPerItem: item.profitPerItem,
+        totalProfit: item.totalProfit,
+        total: item.total,
+        tax: item.tax,
+        taxable: item.taxable,
+        description: item.description
+      })),
+      subtotal: quotation.subtotal,
+      totalCost: quotation.totalCost,
+      totalProfit: quotation.totalProfit,
+      taxRate: quotation.taxRate,
+      tax: quotation.tax,
+      taxPerItem: quotation.taxPerItem,
+      discount: quotation.discount,
+      discountType: quotation.discountType,
+      transportInfo: quotation.transportInfo,
+      transportCost: quotation.transportCost,
+      transportDescription: quotation.transportDescription,
+      total: quotation.total,
+      invoiceNumber,
+      status: 'sent',
+      paymentStatus: 'unpaid',
+      amountPaid: 0,
+      balanceDue: quotation.total,
+      issueDate: new Date(),
+      dueDate,
+      notes: `Invoice generated from accepted quotation ${quotation.quoteNumber}\n\n${quotation.notes || ''}`,
+      terms: quotation.terms,
+      sentAt: new Date()
+    });
 
-      const transportCost = quotation.transportCost || quotation.transportInfo?.cost || 0;
+    await createAuditLog(req as any, {
+      action: 'accept',
+      resource: 'quotation',
+      resourceId: quotation._id.toString(),
+      details: `Quotation ${quotation.quoteNumber} accepted and invoice ${invoiceNumber} created`,
+      skipIfNoUser: false
+    });
 
-      // Determine payment status based on payment method
-      let paymentStatus = 'unpaid';
-      let amountPaid = 0;
-      let balanceDue = quotation.total;
-
-      // If payment method is COD or other non-prepaid methods, order is unpaid
-      if (paymentMethod === 'cod') {
-        paymentStatus = 'unpaid';
-        amountPaid = 0;
-        balanceDue = quotation.total;
+    res.json({
+      success: true,
+      message: 'Quotation accepted and invoice created',
+      quotation: {
+        _id: quotation._id,
+        quoteNumber: quotation.quoteNumber,
+        status: quotation.status,
+        acceptedAt: quotation.acceptedAt
+      },
+      invoice: {
+        _id: invoice._id,
+        invoiceNumber: invoice.invoiceNumber,
+        total: invoice.total,
+        balanceDue: invoice.balanceDue,
+        dueDate: invoice.dueDate
       }
-      // Add other payment methods as needed (mpesa, card might be paid immediately)
-
-      const orderData = {
-        quotationId: quotation._id,
-        quotationNumber: quotation.quoteNumber,
-        orderNumber,
-        invoiceNumber,
-        invoiceDate: new Date(),
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        paymentTerms: 'Net 30',
-        userId: quotation.customerId,
-        salesCustomerId: quotation.customerId,
-        items: orderItems,
-        subtotal: quotation.subtotal,
-        shippingCost: transportCost,
-        tax: quotation.tax,
-        discount: quotation.discount,
-        total: quotation.total,
-        paymentMethod,
-        paymentStatus,
-        amountPaid,
-        balanceDue,
-        payments: [],
-        status: paymentMethod === 'cod' ? 'pending' : 'processing',
-        selectedShippingArea: null,
-        shippingAddress,
-        notes: `Auto-generated from quotation ${quotation.quoteNumber}\n\n${quotation.notes || ''}`,
-        createdBy: req.user!.userId,
-        guestInfo: null
-      };
-
-      const order = new OrderModel(orderData);
-      const validationError = order.validateSync();
-
-      if (validationError) {
-        console.error('Order validation error:', validationError.errors);
-        return res.status(400).json({
-          error: 'Order validation failed',
-          details: Object.keys(validationError.errors).map(key => ({
-            field: key,
-            message: validationError.errors[key].message
-          }))
-        });
-      }
-
-      await order.save();
-     
-      // Cast payment status to the correct type
-      const orderPaymentStatus = order.paymentStatus as 'unpaid' | 'partially_paid' | 'paid' | 'overpaid';
-
-      // Update quotation
-      quotation.status = 'converted';
-      quotation.acceptedAt = new Date();
-      quotation.convertedAt = new Date();
-      quotation.convertedOrderId = order._id;
-      quotation.invoiceNumber = invoiceNumber;
-
-      // Sync payment status from order to quotation with type casting
-      quotation.paymentStatus = orderPaymentStatus;
-      quotation.amountPaid = order.amountPaid || 0;
-      quotation.balanceDue = order.balanceDue || order.total;
-
-      await quotation.save();
-
-      await createAuditLog(req as any, {
-        action: 'convert',
-        resource: 'quotation',
-        resourceId: quotation._id.toString(),
-        details: `Quotation ${quotation.quoteNumber} converted to invoice ${invoiceNumber} and order ${order.orderNumber}`,
-        skipIfNoUser: false
-      });
-
-      res.json({
-        success: true,
-        message: 'Quotation converted to invoice successfully',
-        invoice: {
-          invoiceNumber: order.invoiceNumber,
-          quotationNumber: order.quotationNumber,
-          total: order.total,
-          balanceDue: order.balanceDue,
-          paymentStatus: order.paymentStatus,
-          dueDate: order.dueDate,
-          invoiceDate: order.invoiceDate
-        },
-        order: {
-          _id: order._id,
-          orderNumber: order.orderNumber,
-          paymentStatus: order.paymentStatus,
-          amountPaid: order.amountPaid,
-          balanceDue: order.balanceDue
-        }
-      });
-    } catch (error: any) {
-      console.error('Accept quotation error:', error);
-      res.status(500).json({
-        error: error.message || 'Failed to accept quotation',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
-    }
+    });
+  } catch (error: any) {
+    console.error('Accept quotation error:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to accept quotation',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
-);
+});
 
 // DELETE /api/sales/quotations/:id - Delete quotation
 router.delete('/quotations/:id', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
@@ -849,10 +840,6 @@ router.delete('/quotations/:id', authMiddleware, requireSalesRole, async (req: R
 
     if (req.user!.role === 'sales' && quotation.createdBy.toString() !== req.user!.userId) {
       return res.status(403).json({ error: 'Not allowed' });
-    }
-
-    if (quotation.status === 'converted') {
-      return res.status(409).json({ error: 'Cannot delete a converted quotation' });
     }
 
     await QuotationModel.deleteOne({ _id: quotation._id });
@@ -873,10 +860,291 @@ router.delete('/quotations/:id', authMiddleware, requireSalesRole, async (req: R
 });
 
 // =====================
+// Invoices
+// =====================
+
+router.get('/invoices', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { search, status, paymentStatus, page = '1', limit = '20', sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const p = Number(page);
+    const l = Number(limit);
+    const skip = (p - 1) * l;
+
+    const query: any = {};
+    if (status) query.status = status;
+    if (paymentStatus) query.paymentStatus = paymentStatus;
+    
+    if (req.user!.role === 'sales') {
+      query.createdBy = req.user!.userId;
+    }
+
+    if (search && typeof search === 'string') {
+      query.$or = [
+        { invoiceNumber: { $regex: search, $options: 'i' } },
+        { quotationNumber: { $regex: search, $options: 'i' } },
+        { customerName: { $regex: search, $options: 'i' } },
+        { customerEmail: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const sort: any = {};
+    sort[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
+
+    const [invoices, total] = await Promise.all([
+      InvoiceModel.find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(l)
+        .lean(),
+      InvoiceModel.countDocuments(query)
+    ]);
+
+    res.json({
+      success: true,
+      invoices,
+      pagination: {
+        current: p,
+        limit: l,
+        total,
+        pages: Math.ceil(total / l)
+      }
+    });
+  } catch (error: any) {
+    console.error('Fetch invoices error:', error);
+    res.status(500).json({ error: 'Failed to fetch invoices' });
+  }
+});
+
+router.get('/invoices/:id', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid invoice ID' });
+    }
+
+    const invoice = await InvoiceModel.findById(id).lean();
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    if (req.user!.role === 'sales' && invoice.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    res.json({ success: true, invoice });
+  } catch (error: any) {
+    console.error('Fetch invoice error:', error);
+    res.status(500).json({ error: 'Failed to fetch invoice' });
+  }
+});
+
+router.post('/invoices/:id/send', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid invoice ID' });
+    }
+
+    const invoice = await InvoiceModel.findById(id).lean();
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    if (req.user!.role === 'sales' && invoice.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    if (!invoice.customerEmail) {
+      return res.status(400).json({ error: 'Customer has no email address' });
+    }
+
+    const emailResult = await sendInvoice({
+      to: invoice.customerEmail,
+      customerName: invoice.customerName,
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceTotal: invoice.total,
+      dueDate: invoice.dueDate,
+      items: invoice.items.map((item: any) => ({
+        name: item.name,
+        quantity: item.qty,
+        price: item.price,
+        tax: item.tax,
+        description: item.description
+      })),
+      taxPerItem: invoice.taxPerItem,
+      transportInfo: invoice.transportInfo ? { cost: invoice.transportCost || 0, description: invoice.transportDescription || '' } : undefined,
+      discount: invoice.discount,
+      discountType: invoice.discountType,
+      tax: invoice.tax,
+      subtotal: invoice.subtotal,
+      notes: invoice.notes,
+      terms: invoice.terms,
+      amountPaid: invoice.amountPaid,
+      balanceDue: invoice.balanceDue
+    });
+
+    if (!emailResult.success) {
+      console.error('Email sending failed:', emailResult.error);
+      return res.status(500).json({ error: emailResult.error || 'Failed to send email' });
+    }
+
+    await InvoiceModel.updateOne(
+      { _id: invoice._id },
+      { sentAt: new Date() }
+    );
+
+    await createAuditLog(req as any, {
+      action: 'send',
+      resource: 'invoice',
+      resourceId: invoice._id.toString(),
+      details: `Invoice sent to ${invoice.customerEmail}`,
+      skipIfNoUser: false
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Invoice sent successfully via email'
+    });
+  } catch (error: any) {
+    console.error('Send invoice error:', error);
+    res.status(500).json({ error: error.message || 'Failed to send invoice' });
+  }
+});
+
+router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { amount, method, reference, notes } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid invoice ID' });
+    }
+
+    const invoice = await InvoiceModel.findById(id);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    if (req.user!.role === 'sales' && invoice.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    const paymentAmount = Number(amount);
+    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+      return res.status(400).json({ error: 'Invalid payment amount' });
+    }
+
+    if (paymentAmount > invoice.balanceDue) {
+      return res.status(400).json({ 
+        error: `Payment amount exceeds balance due. Balance: KES ${invoice.balanceDue.toLocaleString()}` 
+      });
+    }
+
+    const transactionId = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`;
+
+    const transaction = await TransactionModel.create({
+      orderId: invoice.orderId || null,
+      invoiceId: invoice._id,
+      invoiceNumber: invoice.invoiceNumber,
+      quotationNumber: invoice.quotationNumber,
+      userId: invoice.customerId,
+      customerName: invoice.customerName,
+      guestEmail: invoice.customerEmail,
+      guestPhone: invoice.customerPhone,
+      amount: paymentAmount,
+      currency: 'KES',
+      paymentMethod: method === 'bank_transfer' ? 'bank_transfer' : 
+                     method === 'mpesa' ? 'mpesa' : 
+                     method === 'card' ? 'card' : 'cash',
+      status: 'completed',
+      transactionId: transactionId,
+      reference: reference || null,
+      notes: notes || null,
+      recordedBy: req.user!.userId,
+      recordedByName: req.user!.name || req.user!.email,
+      source: 'invoice',
+      isPartialPayment: paymentAmount < invoice.balanceDue,
+      paidAt: new Date()
+    });
+
+    invoice.payments.push({
+      amount: paymentAmount,
+      method,
+      reference,
+      date: new Date(),
+      recordedBy: req.user!.userId,
+      transactionId: transaction.transactionId
+    });
+
+    invoice.amountPaid += paymentAmount;
+    invoice.balanceDue = invoice.total - invoice.amountPaid;
+
+    let wasFullyPaid = false;
+    let createdOrder = null;
+
+    if (invoice.amountPaid === 0) {
+      invoice.paymentStatus = 'unpaid';
+    } else if (invoice.amountPaid < invoice.total) {
+      invoice.paymentStatus = 'partially_paid';
+      if (invoice.status === 'sent') {
+        invoice.status = 'partially_paid';
+      }
+    } else if (invoice.amountPaid === invoice.total) {
+      invoice.paymentStatus = 'paid';
+      invoice.status = 'paid';
+      wasFullyPaid = true;
+    } else {
+      invoice.paymentStatus = 'overpaid';
+    }
+
+    await invoice.save();
+
+    if (wasFullyPaid && !invoice.orderId) {
+      createdOrder = await createOrderFromInvoice(invoice, req.user);
+    }
+
+    await createAuditLog(req as any, {
+      action: 'payment',
+      resource: 'invoice',
+      resourceId: invoice._id.toString(),
+      details: `Payment of KES ${paymentAmount.toLocaleString()} recorded for invoice ${invoice.invoiceNumber}`,
+      skipIfNoUser: false
+    });
+
+    res.json({
+      success: true,
+      invoice: {
+        _id: invoice._id,
+        invoiceNumber: invoice.invoiceNumber,
+        paymentStatus: invoice.paymentStatus,
+        amountPaid: invoice.amountPaid,
+        balanceDue: invoice.balanceDue
+      },
+      transaction: {
+        _id: transaction._id,
+        transactionId: transaction.transactionId,
+        amount: transaction.amount,
+        paymentMethod: transaction.paymentMethod,
+        status: transaction.status,
+        paidAt: transaction.paidAt
+      },
+      order: createdOrder ? {
+        _id: createdOrder._id,
+        orderNumber: createdOrder.orderNumber,
+        status: createdOrder.status,
+        total: createdOrder.total
+      } : null
+    });
+  } catch (error: any) {
+    console.error('Record payment error:', error);
+    res.status(500).json({ error: 'Failed to record payment' });
+  }
+});
+
+// =====================
 // Categories API
 // =====================
 
-// GET /api/sales/categories - Get distinct product categories
 router.get('/categories', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const categories = await ProductModel.distinct('category');
@@ -892,10 +1160,9 @@ router.get('/categories', authMiddleware, requireSalesRole, async (req: Request 
 });
 
 // =====================
-// Products API with Category Filter
+// Products API
 // =====================
 
-// GET /api/sales/products - Get products with search and category filter
 router.get('/products', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { search, category, page = '1', limit = '50' } = req.query;
@@ -922,7 +1189,7 @@ router.get('/products', authMiddleware, requireSalesRole, async (req: Request & 
         .sort({ name: 1 })
         .skip(skip)
         .limit(l)
-        .select('_id name slug price stock images category description sku')
+        .select('_id name slug price buyingPrice stock images category description sku profitMargin')
         .lean(),
       ProductModel.countDocuments(query),
     ]);
@@ -937,227 +1204,57 @@ router.get('/products', authMiddleware, requireSalesRole, async (req: Request & 
   }
 });
 
-// =====================
-// Manual Transactions (sales/admin)
-// =====================
-
-import TransactionModel from '../models/Transaction';
-
-const requireSalesOrAdmin = (req: Request & { user?: any }, res: Response, next: any) => {
-  return requireSalesRole(req, res, next);
-};
-
-const getSalesQuotationCreator = async (quotationId: mongoose.Types.ObjectId) => {
-  const q = await QuotationModel.findById(quotationId).select('createdBy');
-  return q?.createdBy?.toString();
-};
-
-const authorizeOrderByQuotationCreator = async (req: Request & { user?: any }, order: any) => {
-  if (!order?.quotationId) return false;
-  if (req.user!.role === 'admin') return true;
-
-  const createdBy = await getSalesQuotationCreator(order.quotationId);
-  if (!createdBy) return false;
-  return createdBy === req.user!.userId;
-};
-
-// POST /api/sales/orders/:orderId/transactions
-router.post('/orders/:orderId/transactions', authMiddleware, requireSalesOrAdmin, async (req: Request & { user?: any }, res: Response) => {
+router.post('/invoices/:id/create-order', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
-    const { orderId } = req.params;
-    const { paymentMethod, amount, status, transactionId, mpesaReceipt, notes } = req.body;
-    
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return res.status(400).json({ error: 'Invalid orderId' });
-    }
-    
-    const order = await OrderModel.findById(orderId);
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    
-    const allowed = await authorizeOrderByQuotationCreator(req as any, order);
-    if (!allowed) return res.status(403).json({ error: 'Not allowed' });
-    
-    if (status !== 'completed') {
-      return res.status(400).json({ error: 'Only completed payments can be recorded via this endpoint' });
-    }
-    
-    const finalAmount = typeof amount === 'number' ? amount : Number(amount);
-    if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
-      return res.status(400).json({ error: 'Invalid amount' });
-    }
-    
-    // Use PaymentService instead of direct Transaction creation
-    const transaction = await PaymentService.recordPayment({
-      orderId,
-      amount: finalAmount,
-      paymentMethod,
-      reference: transactionId,
-      notes,
-      source: 'quotation',
-      recordedBy: req.user!.userId,
-      recordedByName: req.user!.name,
-      transactionId: transactionId,
-      mpesaReceipt
-    });
-    
-    await createAuditLog(req as any, {
-      action: 'create',
-      resource: 'transaction',
-      resourceId: transaction._id.toString(),
-      details: `Payment recorded for order ${order.orderNumber} (${finalAmount}/${paymentMethod})`,
-      skipIfNoUser: false,
-    });
-    
-    return res.status(201).json({ success: true, transaction, order });
-  } catch (e: any) {
-    console.error(e);
-    res.status(500).json({ error: e.message || 'Failed to record transaction' });
-  }
-});
+    const { id } = req.params;
+    const { paymentMethod = 'cod' } = req.body;
 
-// PATCH /api/sales/transactions/:transactionId
-router.patch('/transactions/:transactionId', authMiddleware, requireSalesOrAdmin, async (req: Request & { user?: any }, res: Response) => {
-  try {
-    const { transactionId } = req.params;
-
-    const tx = await TransactionModel.findOne({ transactionId });
-    if (!tx) return res.status(404).json({ error: 'Transaction not found' });
-
-    const order = await OrderModel.findById(tx.orderId);
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-
-    const allowed = await authorizeOrderByQuotationCreator(req as any, order);
-    if (!allowed) return res.status(403).json({ error: 'Not allowed' });
-
-    const { status, mpesaReceipt, cardLast4, cardBrand, notes } = req.body;
-    const validStatuses = ['pending', 'completed', 'failed', 'refunded'];
-
-    if (status !== undefined && !validStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid invoice ID' });
     }
 
-    if (status === 'refunded') {
-      const hasCompleted = await TransactionModel.findOne({ orderId: order._id, status: 'completed' });
-      if (!hasCompleted) return res.status(400).json({ error: 'Cannot refund before a completed transaction exists' });
+    const invoice = await InvoiceModel.findById(id);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    const oldStatus = tx.status;
-    if (status !== undefined) tx.status = status;
-    if (mpesaReceipt !== undefined) tx.mpesaReceipt = mpesaReceipt;
-    if (cardLast4 !== undefined) tx.cardLast4 = cardLast4;
-    if (cardBrand !== undefined) tx.cardBrand = cardBrand;
-    if (notes !== undefined) tx.notes = notes;
+    if (req.user!.role === 'sales' && invoice.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
 
-    await tx.save();
-
-    // FIXED: Map transaction status to order payment status correctly
-    if (tx.status === 'completed') {
-      // Calculate actual paid amount from all completed transactions
-      const allCompletedTransactions = await TransactionModel.find({ 
-        orderId: order._id, 
-        status: 'completed' 
-      });
-      
-      const totalPaid = allCompletedTransactions.reduce((sum, t) => sum + t.amount, 0);
-      
-      // Determine payment status based on total paid vs order total
-      if (totalPaid === 0) {
-        order.paymentStatus = 'unpaid';
-      } else if (totalPaid < order.total) {
-        order.paymentStatus = 'partially_paid';
-      } else if (totalPaid === order.total) {
-        order.paymentStatus = 'paid';
-      } else {
-        order.paymentStatus = 'overpaid';
+    if (invoice.orderId) {
+      const existingOrder = await OrderModel.findById(invoice.orderId);
+      if (existingOrder) {
+        return res.status(409).json({ 
+          error: 'Order already exists for this invoice',
+          order: {
+            _id: existingOrder._id,
+            orderNumber: existingOrder.orderNumber
+          }
+        });
       }
-      
-      order.status = 'processing';
-      order.amountPaid = totalPaid;
-      order.balanceDue = Math.max(0, order.total - totalPaid);
-      
-      order.paymentDetails = {
-        ...(order.paymentDetails || {}),
-        transactionId: tx.transactionId,
-        mpesaReceipt: tx.mpesaReceipt,
-        cardLast4: tx.cardLast4,
-        cardBrand: tx.cardBrand,
-        paidAt: order.paymentDetails?.paidAt || new Date(),
-      } as any;
-      
-    } else if (tx.status === 'failed') {
-      // Failed transaction doesn't change payment status
-      // Only update if there are no completed transactions
-      const hasCompleted = await TransactionModel.findOne({ 
-        orderId: order._id, 
-        status: 'completed' 
-      });
-      
-      if (!hasCompleted) {
-        order.paymentStatus = 'unpaid';
-      }
-      // Don't change order status on failed payment
-      
-    } else if (tx.status === 'refunded') {
-      // Recalculate total paid (excluding refunded amounts)
-      const allCompletedTransactions = await TransactionModel.find({ 
-        orderId: order._id, 
-        status: 'completed' 
-      });
-      
-      const totalPaid = allCompletedTransactions.reduce((sum, t) => sum + t.amount, 0);
-      
-      if (totalPaid === 0) {
-        order.paymentStatus = 'refunded';
-      } else if (totalPaid < order.total) {
-        order.paymentStatus = 'partially_paid';
-      } else if (totalPaid === order.total) {
-        order.paymentStatus = 'paid';
-      } else {
-        order.paymentStatus = 'overpaid';
-      }
-      
-      order.amountPaid = totalPaid;
-      order.balanceDue = Math.max(0, order.total - totalPaid);
-      
-    } else if (tx.status === 'pending') {
-      // Pending transaction doesn't change payment status
-      // Keep existing status
     }
 
-    await order.save();
+    const createdOrder = await createOrderFromInvoice(invoice, req.user);
 
-    await createAuditLog(req as any, {
-      action: 'update',
-      resource: 'transaction',
-      resourceId: tx._id.toString(),
-      details: `Transaction updated from ${oldStatus} to ${tx.status} for order ${order.orderNumber}`,
-      skipIfNoUser: false,
+    res.json({
+      success: true,
+      message: 'Order created successfully from invoice',
+      order: createdOrder ? {
+        _id: createdOrder._id,
+        orderNumber: createdOrder.orderNumber,
+        total: createdOrder.total,
+        totalProfit: createdOrder.totalProfit,
+        paymentStatus: createdOrder.paymentStatus,
+        status: createdOrder.status
+      } : null
     });
-
-    res.json({ success: true, transaction: tx, order });
-  } catch (e: any) {
-    console.error(e);
-    res.status(500).json({ error: 'Failed to update transaction' });
-  }
-});
-
-// GET /api/sales/orders/:orderId/transactions
-router.get('/orders/:orderId/transactions', authMiddleware, requireSalesOrAdmin, async (req: Request & { user?: any }, res: Response) => {
-  try {
-    const { orderId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(orderId)) return res.status(400).json({ error: 'Invalid orderId' });
-
-    const order = await OrderModel.findById(orderId);
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-
-    const allowed = await authorizeOrderByQuotationCreator(req as any, order);
-    if (!allowed) return res.status(403).json({ error: 'Not allowed' });
-
-    const transactions = await TransactionModel.find({ orderId: order._id }).sort({ createdAt: -1 }).lean();
-    res.json({ orderNumber: order.orderNumber, transactions });
-  } catch (e: any) {
-    console.error(e);
-    res.status(500).json({ error: 'Failed to fetch transactions' });
+  } catch (error: any) {
+    console.error('Create order from invoice error:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to create order from invoice',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

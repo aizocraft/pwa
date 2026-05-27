@@ -243,7 +243,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       items: order.items.map(item => ({
         name: item.name,
         quantity: item.qty,
-        price: item.price
+        price: item.sellingPrice
       }))
     }).catch(err => console.error('Failed to send payment confirmation:', err));
   }

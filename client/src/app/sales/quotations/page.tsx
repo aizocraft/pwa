@@ -23,19 +23,34 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  Filter,
   Tag,
   Users,
   DollarSign,
   Percent,
   Shield,
-  AlertCircle,
   Download,
-  TrendingUp,
-  Settings,
   EyeOff,
   Eye as EyeIcon,
-  Wallet,
+  Image as ImageIcon,
+  Upload,
+  Link as LinkIcon,
+  Filter,
+  ChevronDown,
+  TrendingUp,
+  TrendingDown,
+  MinusCircle,
+  PlusCircle,
+  AlertCircle,
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  CreditCard,
+  Calendar as CalendarIcon,
+  Receipt,
+  Settings,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react';
 import {
   listSalesQuotations,
@@ -54,7 +69,6 @@ import { useCompanySettings } from '@/lib/use-company-settings';
 import { getLogoUrl, getTaxRate } from '@/lib/company';
 import { toast } from 'react-hot-toast';
 import { generateQuotationPDF } from './components/QuotationPDF';
-import { RecordPaymentModal } from '../../../components/RecordPaymentModal';
 import api from '@/lib/api';
 
 // Types
@@ -69,11 +83,12 @@ interface ProductWithStock {
   name: string;
   slug: string;
   price: number;
+  buyingPrice: number;
   stock: number;
   category?: string;
   categoryId?: string;
   categoryName?: string;
-  images?: Array<{ url: string }>;
+  images?: Array<{ url: string; type?: string; fileId?: string }>;
   description?: string;
   sku?: string;
 }
@@ -85,51 +100,53 @@ interface QuotationItemWithTax {
   taxable: boolean;
 }
 
-// Product creation modal props
-interface CreateProductModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onProductCreated: (product: ProductWithStock) => void;
-  categories: Category[];
-}
-
-function CreateProductModal({ isOpen, onClose, onProductCreated, categories }: CreateProductModalProps) {
+// Product creation modal with full features
+function CreateProductModal({ isOpen, onClose, onProductCreated, categories }: any) {
   const [loading, setLoading] = useState(false);
+  const [imageType, setImageType] = useState<'url' | 'upload'>('url');
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
     category: '',
     price: 0,
+    buyingPrice: 0,
     description: '',
     stock: 0,
+    sku: '',
   });
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [profitDisplay, setProfitDisplay] = useState({ amount: 0, percent: 0 });
 
   const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   };
 
-  const handleNameChange = (name: string) => {
-    setFormData(prev => ({
-      ...prev,
-      name,
-      slug: generateSlug(name)
-    }));
+  const calculateProfit = (price: number, buyingPrice: number) => {
+    const amount = price - buyingPrice;
+    const percent = price > 0 ? (amount / price) * 100 : 0;
+    setProfitDisplay({ amount, percent });
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setImageFiles(prev => [...prev, ...files]);
-    const newPreviews = files.map(file => URL.createObjectURL(file));
-    setImagePreviews(prev => [...prev, ...newPreviews]);
+  useEffect(() => {
+    calculateProfit(formData.price, formData.buyingPrice);
+  }, [formData.price, formData.buyingPrice]);
+
+  const handleImageFiles = (files: FileList | null) => {
+    if (!files) return;
+    const newFiles = Array.from(files);
+    setImageFiles(prev => [...prev, ...newFiles]);
+    newFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const removeImage = (index: number) => {
-    URL.revokeObjectURL(imagePreviews[index]);
     setImageFiles(prev => prev.filter((_, i) => i !== index));
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
@@ -143,48 +160,45 @@ function CreateProductModal({ isOpen, onClose, onProductCreated, categories }: C
 
     setLoading(true);
     try {
-      // Upload images first
       let uploadedImages = [];
-      if (imageFiles.length > 0) {
+      
+      if (imageType === 'url' && imageUrl) {
+        uploadedImages = [{ type: 'url', url: imageUrl }];
+      } else if (imageFiles.length > 0) {
         const formDataImg = new FormData();
         imageFiles.forEach(file => formDataImg.append('images', file));
         const uploadResponse = await api.post('/products/upload-images', formDataImg);
         uploadedImages = uploadResponse.data.images || [];
       }
 
-      // Create product
-      const productData = {
-        name: formData.name,
-        slug: formData.slug,
-        category: formData.category,
-        price: formData.price,
-        description: formData.description,
-        stock: formData.stock,
+      const response = await api.post('/products', {
+        ...formData,
+        slug: formData.slug || generateSlug(formData.name),
         images: uploadedImages,
+      });
+
+      const formattedProduct: ProductWithStock = {
+        _id: response.data._id,
+        name: response.data.name,
+        slug: response.data.slug,
+        price: response.data.price,
+        buyingPrice: response.data.buyingPrice,
+        stock: response.data.stock,
+        category: response.data.category,
+        categoryId: response.data.category,
+        categoryName: categories.find((c: any) => c._id === response.data.category)?.name || response.data.category,
+        description: response.data.description,
+        sku: response.data.sku,
+        images: response.data.images,
       };
 
-      const response = await api.post('/products', productData);
-      const newProduct = response.data;
-      
-      // Format product for the quotation form
-      const formattedProduct: ProductWithStock = {
-        _id: newProduct._id,
-        name: newProduct.name,
-        slug: newProduct.slug,
-        price: newProduct.price,
-        stock: newProduct.stock,
-        category: newProduct.category,
-        categoryId: newProduct.category,
-        categoryName: categories.find(c => c._id === newProduct.category || c.name === newProduct.category)?.name || newProduct.category,
-        description: newProduct.description,
-        sku: newProduct.sku,
-        images: newProduct.images,
-      };
-      
       onProductCreated(formattedProduct);
       toast.success('Product created successfully');
       onClose();
-      resetForm();
+      setFormData({ name: '', slug: '', category: '', price: 0, buyingPrice: 0, description: '', stock: 0, sku: '' });
+      setImageFiles([]);
+      setImagePreviews([]);
+      setImageUrl('');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create product');
     } finally {
@@ -192,154 +206,122 @@ function CreateProductModal({ isOpen, onClose, onProductCreated, categories }: C
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      slug: '',
-      category: '',
-      price: 0,
-      description: '',
-      stock: 0,
-    });
-    imagePreviews.forEach(preview => URL.revokeObjectURL(preview));
-    setImageFiles([]);
-    setImagePreviews([]);
-  };
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Create New Product</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Add a new product to your inventory</p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b sticky top-0 bg-white dark:bg-gray-900 flex justify-between items-center">
+          <h2 className="text-xl font-bold">Create New Product</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+            <X className="w-5 h-5" />
           </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Product Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-              placeholder="e.g., 500W Solar Panel"
-              required
-            />
+            <label className="block text-sm font-medium mb-1">Product Name *</label>
+            <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value, slug: generateSlug(e.target.value) })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" required />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">Slug (SEO Friendly)</label>
+            <input type="text" value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 font-mono text-sm" placeholder="auto-generated-from-name" />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Slug</label>
-            <input
-              type="text"
-              value={formData.slug}
-              onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 font-mono text-sm"
-              placeholder="auto-generated"
-            />
+            <label className="block text-sm font-medium mb-1">SKU</label>
+            <input type="text" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" placeholder="Auto-generated if empty" />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Category <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-              required
-            >
+            <label className="block text-sm font-medium mb-1">Category *</label>
+            <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" required>
               <option value="">Select a category</option>
-              {categories.map(cat => (
-                <option key={cat._id} value={cat._id}>{cat.name}</option>
-              ))}
-              <option value="Solar Panels">Solar Panels</option>
-              <option value="Inverters">Inverters</option>
-              <option value="Batteries">Batteries</option>
-              <option value="Water Pumps">Water Pumps</option>
-              <option value="Cables & Connectors">Cables & Connectors</option>
-              <option value="Solar Lights">Solar Lights</option>
-              <option value="Accessories">Accessories</option>
+              <option value="solar-panels">Solar Panels</option>
+              <option value="inverters">Inverters</option>
+              <option value="batteries">Batteries</option>
+              <option value="water-pumps">Water Pumps</option>
+              <option value="cables-and-connectors">Cables & Connectors</option>
+              <option value="solar-lights">Solar Lights</option>
+              <option value="generators">Generators</option>
+              <option value="accessories">Accessories</option>
             </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Price (KES) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.price}
-                onChange={(e) => setFormData(prev => ({ ...prev, price: Number(e.target.value) }))}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-                required
-              />
+              <label className="block text-sm font-medium mb-1">Selling Price (KES) *</label>
+              <input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Initial Stock</label>
-              <input
-                type="number"
-                min="0"
-                value={formData.stock}
-                onChange={(e) => setFormData(prev => ({ ...prev, stock: Number(e.target.value) }))}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-              />
+              <label className="block text-sm font-medium mb-1">Buying Price (KES)</label>
+              <input type="number" value={formData.buyingPrice} onChange={(e) => setFormData({ ...formData, buyingPrice: Number(e.target.value) })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-            <textarea
-              rows={3}
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-              placeholder="Product description..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Images</label>
-            <div className="flex flex-wrap gap-3">
-              {imagePreviews.map((preview, idx) => (
-                <div key={idx} className="relative">
-                  <img src={preview} alt={`Preview ${idx + 1}`} className="w-20 h-20 object-cover rounded-lg border border-gray-300 dark:border-gray-600" />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(idx)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+          {formData.price > 0 && (
+            <div className={`p-3 rounded-lg ${profitDisplay.amount >= 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Profit</span>
+                <div className="flex items-center gap-3">
+                  <span className={`font-semibold ${profitDisplay.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {profitDisplay.amount >= 0 ? '+' : ''}KES {profitDisplay.amount.toLocaleString()}
+                  </span>
+                  <span className={`text-sm ${profitDisplay.percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    ({profitDisplay.percent.toFixed(1)}% margin)
+                  </span>
                 </div>
-              ))}
-              <label className="w-20 h-20 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-cyan-500 transition-colors">
-                <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
-                <Plus className="w-6 h-6 text-gray-400" />
-              </label>
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Upload up to 5 product images</p>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Stock Quantity</label>
+              <input type="number" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Description</label>
+            <textarea rows={3} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Product Images</label>
+            <div className="flex gap-2 mb-3">
+              <button type="button" onClick={() => setImageType('url')} className={`px-3 py-1 rounded-lg text-sm ${imageType === 'url' ? 'bg-cyan-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}><LinkIcon className="w-4 h-4 inline mr-1" /> URL</button>
+              <button type="button" onClick={() => setImageType('upload')} className={`px-3 py-1 rounded-lg text-sm ${imageType === 'upload' ? 'bg-cyan-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}><Upload className="w-4 h-4 inline mr-1" /> Upload</button>
+            </div>
+            
+            {imageType === 'url' ? (
+              <input type="url" placeholder="https://example.com/image.jpg" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" />
+            ) : (
+              <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                <input type="file" accept="image/*" multiple onChange={(e) => handleImageFiles(e.target.files)} className="hidden" id="product-images" />
+                <label htmlFor="product-images" className="cursor-pointer">
+                  <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-500">Click to upload images</p>
+                </label>
+                {imagePreviews.length > 0 && (
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    {imagePreviews.map((preview, idx) => (
+                      <div key={idx} className="relative w-16 h-16">
+                        <img src={preview} alt="Preview" className="w-full h-full object-cover rounded" />
+                        <button type="button" onClick={() => removeImage(idx)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X className="w-3 h-3" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">
-            <button type="submit" disabled={loading} className="flex-1 py-3 bg-cyan-600 text-white rounded-lg font-medium hover:bg-cyan-700 transition-colors disabled:opacity-50">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : <Save className="w-4 h-4 inline mr-2" />}
-              Create Product
+            <button type="submit" disabled={loading} className="flex-1 py-3 bg-cyan-600 text-white rounded-lg font-medium">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : null} Create Product
             </button>
-            <button type="button" onClick={onClose} className="flex-1 py-3 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300">
-              Cancel
-            </button>
+            <button type="button" onClick={onClose} className="flex-1 py-3 border rounded-lg">Cancel</button>
           </div>
         </form>
       </div>
@@ -352,7 +334,7 @@ export default function QuotationsPage() {
   const { data: settings } = useCompanySettings();
   const logoUrl = getLogoUrl(settings || null);
   
-  const [taxRate, setTaxRate] = useState<number>(0.16); 
+  const [taxRate, setTaxRate] = useState<number>(0.16);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [customers, setCustomers] = useState<SalesCustomer[]>([]);
   const [products, setProducts] = useState<ProductWithStock[]>([]);
@@ -372,41 +354,24 @@ export default function QuotationsPage() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [showTransport, setShowTransport] = useState(false);
+  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportStartDate, setReportStartDate] = useState('');
   const [reportEndDate, setReportEndDate] = useState('');
   const [isExporting, setIsExporting] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<{
-    id: string;
-    number: string;
-    total: number;
-    amountPaid: number;
-    balanceDue: number;
-  } | null>(null);
-  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
-  const itemsPerPage = 10;
   
-  // Debounced search
+  const itemsPerPage = 10;
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const productSearchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Product search/filter states
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
-
-  // Customer search state
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showAddCustomerForm, setShowAddCustomerForm] = useState(false);
-  
-  // New customer form
-  const [newCustomer, setNewCustomer] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    location: '',
-  });
+  const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', location: '' });
+  const [selectedCustomer, setSelectedCustomer] = useState<SalesCustomer | null>(null);
 
   const [formData, setFormData] = useState({
     customerId: '',
@@ -429,7 +394,7 @@ export default function QuotationsPage() {
     taxable: true,
   });
 
-  // Debounced search handler
+  // Debounced search handlers
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -439,15 +404,22 @@ export default function QuotationsPage() {
     }, 500);
   };
 
+  const handleProductSearchChange = (value: string) => {
+    setProductSearchTerm(value);
+    setShowProductDropdown(true);
+    if (productSearchTimeoutRef.current) clearTimeout(productSearchTimeoutRef.current);
+    productSearchTimeoutRef.current = setTimeout(() => {
+      fetchProducts();
+    }, 300);
+  };
+
   useEffect(() => {
     fetchData();
     fetchCategories();
   }, [searchTerm, statusFilter, currentPage]);
 
   useEffect(() => {
-    if (showModal) {
-      fetchProducts();
-    }
+    if (showModal) fetchProducts();
   }, [showModal, productSearchTerm, selectedCategory]);
 
   useEffect(() => {
@@ -465,22 +437,17 @@ export default function QuotationsPage() {
   const fetchCategories = async () => {
     try {
       const response = await api.get('/categories?limit=100');
-      if (response.data.categories) {
-        setCategories(response.data.categories);
-      } else if (response.data.data) {
-        setCategories(response.data.data);
-      }
+      setCategories(response.data.categories || response.data.data || []);
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
-      // Set default categories if API fails
       setCategories([
-        { _id: 'Solar Panels', name: 'Solar Panels', slug: 'solar-panels' },
-        { _id: 'Inverters', name: 'Inverters', slug: 'inverters' },
-        { _id: 'Batteries', name: 'Batteries', slug: 'batteries' },
-        { _id: 'Water Pumps', name: 'Water Pumps', slug: 'water-pumps' },
-        { _id: 'Cables & Connectors', name: 'Cables & Connectors', slug: 'cables-connectors' },
-        { _id: 'Solar Lights', name: 'Solar Lights', slug: 'solar-lights' },
-        { _id: 'Accessories', name: 'Accessories', slug: 'accessories' },
+        { _id: 'solar-panels', name: 'Solar Panels', slug: 'solar-panels' },
+        { _id: 'inverters', name: 'Inverters', slug: 'inverters' },
+        { _id: 'batteries', name: 'Batteries', slug: 'batteries' },
+        { _id: 'water-pumps', name: 'Water Pumps', slug: 'water-pumps' },
+        { _id: 'cables-and-connectors', name: 'Cables & Connectors', slug: 'cables-and-connectors' },
+        { _id: 'solar-lights', name: 'Solar Lights', slug: 'solar-lights' },
+        { _id: 'generators', name: 'Generators', slug: 'generators' },
+        { _id: 'accessories', name: 'Accessories', slug: 'accessories' },
       ]);
     }
   };
@@ -492,10 +459,9 @@ export default function QuotationsPage() {
       if (selectedCategory) params.category = selectedCategory;
       const response = await listProducts(params);
       const productsList = response.products || [];
-      // Enhance products with category name
       const enhancedProducts = productsList.map((p: any) => ({
         ...p,
-        categoryName: p.category ? (categories.find(c => c._id === p.category || c.name === p.category)?.name || p.category) : 'Uncategorized'
+        categoryName: p.category ? (categories.find(c => c._id === p.category)?.name || p.category) : 'Uncategorized'
       }));
       setProducts(enhancedProducts);
     } catch (error) {
@@ -507,12 +473,7 @@ export default function QuotationsPage() {
     try {
       setLoading(true);
       const [quotesRes, customersRes] = await Promise.all([
-        listSalesQuotations({
-          search: searchTerm || undefined,
-          status: statusFilter || undefined,
-          page: currentPage,
-          limit: itemsPerPage,
-        }),
+        listSalesQuotations({ search: searchTerm || undefined, status: statusFilter || undefined, page: currentPage, limit: itemsPerPage }),
         listSalesCustomers({ limit: 100 }),
       ]);
       setQuotations(quotesRes.quotations);
@@ -526,64 +487,32 @@ export default function QuotationsPage() {
     }
   };
 
-  const fetchQuotationPaymentStatus = async (quotationId: string) => {
-    try {
-      const response = await api.get(`/payments/orders/${quotationId}`);
-      return response.data;
-    } catch {
-      return { amountPaid: 0, balanceDue: 0 };
-    }
-  };
-
-  // Export report
   const handleExportReport = async () => {
     if (!reportStartDate || !reportEndDate) {
       toast.error('Please select both start and end dates');
       return;
     }
-
     setIsExporting(true);
     try {
-      const response = await api.get('/sales/quotations', {
-        params: {
-          startDate: reportStartDate,
-          endDate: reportEndDate,
-          limit: 1000,
-        },
-      });
-
+      const response = await api.get('/sales/quotations', { params: { startDate: reportStartDate, endDate: reportEndDate, limit: 1000 } });
       const filteredQuotes = response.data.quotations.filter((q: Quotation) => {
         const createdAt = new Date(q.createdAt);
         return createdAt >= new Date(reportStartDate) && createdAt <= new Date(reportEndDate);
       });
-
-      const csvRows = [
-        ['Quote/Invoice #', 'Customer', 'Date', 'Status', 'Subtotal', 'Transport', 'Tax', 'Total'],
-        ...filteredQuotes.map((q: Quotation) => [
-          q.invoiceNumber || q.quoteNumber,
-          q.customerName,
-          new Date(q.createdAt).toLocaleDateString(),
-          q.status,
-          q.subtotal?.toLocaleString() || '0',
-          (q as any).transportCost?.toLocaleString() || '0',
-          q.tax?.toLocaleString() || '0',
-          q.total?.toLocaleString() || '0',
-        ]),
-      ];
-
-      const csvContent = csvRows.map(row => row.join(',')).join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const csvRows = [['Quote #', 'Customer', 'Date', 'Status', 'Subtotal', 'Transport', 'Tax', 'Total']];
+      filteredQuotes.forEach((q: Quotation) => {
+        csvRows.push([q.quoteNumber, q.customerName, new Date(q.createdAt).toLocaleDateString(), q.status, q.subtotal?.toLocaleString() || '0', (q as any).transportCost?.toLocaleString() || '0', q.tax?.toLocaleString() || '0', q.total?.toLocaleString() || '0']);
+      });
+      const blob = new Blob([csvRows.map(row => row.join(',')).join('\n')], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `quotations-report-${reportStartDate}-to-${reportEndDate}.csv`;
+      link.download = `quotations-${reportStartDate}-to-${reportEndDate}.csv`;
       link.click();
       URL.revokeObjectURL(url);
-      
       toast.success(`Exported ${filteredQuotes.length} records`);
       setShowReportModal(false);
     } catch (error) {
-      console.error('Export error:', error);
       toast.error('Failed to export report');
     } finally {
       setIsExporting(false);
@@ -593,18 +522,13 @@ export default function QuotationsPage() {
   const filteredCustomers = useMemo(() => {
     if (!customerSearchTerm) return customers;
     const term = customerSearchTerm.toLowerCase();
-    return customers.filter(c => 
-      c.name.toLowerCase().includes(term) ||
-      (c.email && c.email.toLowerCase().includes(term)) ||
-      (c.phone && c.phone.includes(term))
-    );
+    return customers.filter(c => c.name.toLowerCase().includes(term) || (c.email?.toLowerCase().includes(term)) || (c.phone?.includes(term)));
   }, [customers, customerSearchTerm]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
-                           (product.sku && product.sku.toLowerCase().includes(productSearchTerm.toLowerCase()));
-      const matchesCategory = !selectedCategory || product.category === selectedCategory || product.categoryId === selectedCategory;
+      const matchesSearch = product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) || (product.sku?.toLowerCase().includes(productSearchTerm.toLowerCase()));
+      const matchesCategory = !selectedCategory || product.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
   }, [products, productSearchTerm, selectedCategory]);
@@ -614,14 +538,14 @@ export default function QuotationsPage() {
       toast.error('Customer name is required');
       return;
     }
-
     setCreatingCustomer(true);
     try {
       const response = await api.post('/sales/customers', newCustomer);
-      const createdCustomer = response.data.customer;
-      setCustomers([createdCustomer, ...customers]);
-      setFormData({ ...formData, customerId: createdCustomer._id });
-      setCustomerSearchTerm(createdCustomer.name);
+      const newCustomerData = response.data.customer;
+      setCustomers([newCustomerData, ...customers]);
+      setFormData({ ...formData, customerId: newCustomerData._id });
+      setSelectedCustomer(newCustomerData);
+      setCustomerSearchTerm(newCustomerData.name);
       setShowAddCustomerForm(false);
       setNewCustomer({ name: '', email: '', phone: '', location: '' });
       toast.success('Customer created successfully');
@@ -633,83 +557,53 @@ export default function QuotationsPage() {
   };
 
   const handleProductCreated = (newProduct: ProductWithStock) => {
-    setProducts(prev => [newProduct, ...prev]);
-    // Auto-select the newly created product
+    setProducts([newProduct, ...products]);
     setTempItem({ ...tempItem, productId: newProduct._id });
     setProductSearchTerm(newProduct.name);
     setShowProductDropdown(false);
-    toast.success('Product added to list');
   };
 
   const calculateTotals = useCallback(() => {
     let subtotal = 0;
     let totalTax = 0;
-    
     for (const item of formData.items) {
       const product = products.find((p) => p._id === item.productId);
       const price = item.customPrice || product?.price || 0;
       const itemTotal = price * item.qty;
       subtotal += itemTotal;
-      if (formData.taxPerItem && item.taxable) {
-        totalTax += itemTotal * taxRate;
-      }
+      if (formData.taxPerItem && item.taxable) totalTax += itemTotal * taxRate;
     }
-
-    const discountAmount = formData.discountType === 'percentage'
-      ? subtotal * (formData.discount / 100)
-      : formData.discount;
-    
+    const discountAmount = formData.discountType === 'percentage' ? subtotal * (formData.discount / 100) : formData.discount;
     let tax = totalTax;
     if (!formData.taxPerItem) {
       const taxableAfterDiscount = Math.max(0, subtotal - discountAmount);
       tax = taxableAfterDiscount * taxRate;
     }
-    
     const total = subtotal - discountAmount + tax + formData.transportCost;
-
     return { subtotal, discountAmount, tax, total };
-  }, [formData.items, formData.discount, formData.discountType, formData.transportCost, formData.taxPerItem, products, taxRate]);
+  }, [formData, products, taxRate]);
 
   const { subtotal, discountAmount, tax, total } = calculateTotals();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.items.length === 0) {
-      toast.error('Please add at least one item');
-      return;
-    }
-    if (!formData.customerId) {
-      toast.error('Please select a customer');
-      return;
-    }
-
+    if (formData.items.length === 0) return toast.error('Please add at least one item');
+    if (!formData.customerId) return toast.error('Please select a customer');
     try {
       const payload = {
         customerId: formData.customerId,
-        items: formData.items.map(item => ({
-          productId: item.productId,
-          qty: item.qty,
-          customPrice: item.customPrice,
-          taxable: item.taxable,
-        })),
+        items: formData.items.map(item => ({ productId: item.productId, qty: item.qty, customPrice: item.customPrice, taxable: item.taxable })),
         discount: formData.discount,
         discountType: formData.discountType,
         notes: formData.notes,
         terms: formData.terms,
         validUntil: formData.validUntil,
         taxPerItem: formData.taxPerItem,
-        transport: {
-          cost: formData.transportCost,
-          description: formData.transportDescription,
-        },
+        transport: { cost: formData.transportCost, description: formData.transportDescription },
         estimatedDelivery: formData.estimatedDelivery,
       };
-
       if (editingQuote) {
-        await updateSalesQuotation(editingQuote._id, {
-          status: editingQuote.status,
-          ...payload,
-        });
+        await updateSalesQuotation(editingQuote._id, { status: editingQuote.status, ...payload });
         toast.success('Quotation updated successfully');
       } else {
         await createSalesQuotation(payload);
@@ -740,7 +634,7 @@ export default function QuotationsPage() {
     setAcceptingId(id);
     try {
       const result = await acceptQuotation(id);
-      toast.success(`Quotation accepted! ${result.invoiceNumber ? `Invoice: ${result.invoiceNumber}` : ''}`);
+      toast.success(`Quotation accepted! Invoice: ${result.invoice.invoiceNumber}`);
       fetchData();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to accept quotation');
@@ -750,11 +644,10 @@ export default function QuotationsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) return;
+    if (!confirm('Are you sure you want to delete this quotation?')) return;
     try {
       await deleteSalesQuotation(id);
-      setQuotations(quotations.filter((q) => q._id !== id));
-      toast.success('Document deleted successfully');
+      toast.success('Quotation deleted successfully');
       fetchData();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Delete failed');
@@ -763,38 +656,26 @@ export default function QuotationsPage() {
 
   const handleView = (quote: Quotation) => {
     setViewingQuote(quote);
-    const customer = customers.find((c) => c._id === quote.customerId);
-    setViewingCustomer(customer || null);
+    setViewingCustomer(customers.find(c => c._id === quote.customerId) || null);
     setShowViewModal(true);
   };
 
   const handlePrintPDF = async (quote: Quotation) => {
-    const customer = customers.find((c) => c._id === quote.customerId);
-    if (!customer) {
-      toast.error('Customer not found');
-      return;
-    }
-
+    const customer = customers.find(c => c._id === quote.customerId);
+    if (!customer) return toast.error('Customer not found');
     setIsGeneratingPDF(true);
-    const loadingToast = toast.loading('Generating PDF...');
-
+    const toastId = toast.loading('Generating PDF...');
     try {
       const pdfBlob = await generateQuotationPDF(quote, customer, settings, logoUrl);
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
-      const filename = quote.invoiceNumber 
-        ? `Invoice-${quote.invoiceNumber}.pdf` 
-        : `Quotation-${quote.quoteNumber}.pdf`;
       link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
+      link.download = `Quotation-${quote.quoteNumber}.pdf`;
       link.click();
-      document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      toast.success('PDF generated!', { id: loadingToast });
+      toast.success('PDF generated!', { id: toastId });
     } catch (error) {
-      console.error('PDF generation failed:', error);
-      toast.error('Failed to generate PDF', { id: loadingToast });
+      toast.error('Failed to generate PDF', { id: toastId });
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -805,8 +686,8 @@ export default function QuotationsPage() {
     setProductSearchTerm('');
     setSelectedCategory('');
     setCustomerSearchTerm('');
+    setSelectedCustomer(null);
     setShowAddCustomerForm(false);
-    // Set valid until to 7 days from now (1 week)
     const validUntilDate = new Date();
     validUntilDate.setDate(validUntilDate.getDate() + 7);
     setFormData({
@@ -828,19 +709,11 @@ export default function QuotationsPage() {
 
   const addItem = () => {
     if (!tempItem.productId || tempItem.qty <= 0) return;
-    const product = products.find((p) => p._id === tempItem.productId);
+    const product = products.find(p => p._id === tempItem.productId);
     if (product) {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
-        items: [
-          ...prev.items,
-          {
-            productId: tempItem.productId,
-            qty: tempItem.qty,
-            customPrice: tempItem.customPrice || undefined,
-            taxable: tempItem.taxable,
-          },
-        ],
+        items: [...prev.items, { productId: tempItem.productId, qty: tempItem.qty, customPrice: tempItem.customPrice || undefined, taxable: tempItem.taxable }],
       }));
       setTempItem({ productId: '', qty: 1, customPrice: null, taxable: true });
       setProductSearchTerm('');
@@ -848,29 +721,21 @@ export default function QuotationsPage() {
     }
   };
 
-  const removeItem = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index),
-    }));
-  };
-
+  const removeItem = (index: number) => setFormData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
   const updateItemQty = (index: number, qty: number) => {
     const newItems = [...formData.items];
     newItems[index].qty = qty;
-    setFormData((prev) => ({ ...prev, items: newItems }));
+    setFormData(prev => ({ ...prev, items: newItems }));
   };
-
   const updateItemPrice = (index: number, price: number) => {
     const newItems = [...formData.items];
     newItems[index].customPrice = price;
-    setFormData((prev) => ({ ...prev, items: newItems }));
+    setFormData(prev => ({ ...prev, items: newItems }));
   };
-
   const toggleItemTax = (index: number) => {
     const newItems = [...formData.items];
     newItems[index].taxable = !newItems[index].taxable;
-    setFormData((prev) => ({ ...prev, items: newItems }));
+    setFormData(prev => ({ ...prev, items: newItems }));
   };
 
   const getStatusColor = (status: string) => {
@@ -880,34 +745,22 @@ export default function QuotationsPage() {
       accepted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
       rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
       expired: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-      converted: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
     };
-    return colors[status] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+    return colors[status] || 'bg-gray-100 text-gray-700';
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'accepted':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'rejected':
-        return <XCircle className="w-4 h-4" />;
-      case 'expired':
-        return <Clock className="w-4 h-4" />;
-      case 'sent':
-        return <Send className="w-4 h-4" />;
-      case 'converted':
-        return <CheckCircle className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
+      case 'accepted': return <CheckCircle className="w-4 h-4" />;
+      case 'rejected': return <XCircle className="w-4 h-4" />;
+      case 'expired': return <Clock className="w-4 h-4" />;
+      case 'sent': return <Send className="w-4 h-4" />;
+      default: return <FileText className="w-4 h-4" />;
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-12 h-12 animate-spin text-cyan-600" />
-      </div>
-    );
+    return <div className="flex items-center justify-center h-96"><Loader2 className="w-12 h-12 animate-spin text-cyan-600" /></div>;
   }
 
   return (
@@ -916,28 +769,15 @@ export default function QuotationsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Quotations & Invoices</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Create and manage quotes. Quotes become invoices when accepted
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Quotations</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Create and manage customer quotations</p>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={() => setShowReportModal(true)}
-              className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-medium flex items-center gap-2 transition-all duration-300 shadow-md"
-            >
-              <Download className="w-4 h-4" />
-              Export Report
+            <button onClick={() => setShowReportModal(true)} className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium flex items-center gap-2">
+              <Download className="w-4 h-4" /> Export Report
             </button>
-            <button
-              onClick={() => {
-                resetForm();
-                setShowModal(true);
-              }}
-              className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg font-medium flex items-center gap-2 transition-all duration-300 shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              Create Quotation
+            <button onClick={() => { resetForm(); setShowModal(true); }} className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg font-medium flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Create Quotation
             </button>
           </div>
         </div>
@@ -945,49 +785,33 @@ export default function QuotationsPage() {
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            <input
-              type="text"
-              placeholder="Search by quote/invoice # or customer..."
-              value={searchTerm}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
-            />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input type="text" placeholder="Search by quote # or customer..." value={searchTerm} onChange={(e) => handleSearchChange(e.target.value)} className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg bg-white dark:bg-gray-900" />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-          >
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-900">
             <option value="">All Status</option>
             <option value="draft">Draft</option>
             <option value="sent">Sent</option>
             <option value="accepted">Accepted</option>
             <option value="rejected">Rejected</option>
             <option value="expired">Expired</option>
-            <option value="converted">Converted/Invoiced</option>
           </select>
-          <button
-            onClick={fetchData}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-          </button>
+          <button onClick={fetchData} className="px-3 py-2 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><RefreshCw className="w-4 h-4" /></button>
         </div>
 
         {/* Quotations Table */}
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-800/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Document #</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Quote #</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Customer</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Items</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Total</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -995,135 +819,35 @@ export default function QuotationsPage() {
                   <tr key={quote._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        {quote.status === 'converted' ? (
-                          <FileText className="w-4 h-4 text-purple-500" />
-                        ) : (
-                          <FileText className="w-4 h-4 text-gray-400" />
-                        )}
-                        <div>
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">
-                            {quote.status === 'converted' && quote.invoiceNumber ? quote.invoiceNumber : quote.quoteNumber}
-                          </span>
-                          {quote.status === 'converted' && quote.invoiceNumber && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500">Quote: {quote.quoteNumber}</div>
-                          )}
-                        </div>
+                        <FileText className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm font-medium">{quote.quoteNumber}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{quote.customerName}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{quote.customerEmail}</p>
+                      <p className="text-sm font-medium">{quote.customerName}</p>
+                      <p className="text-xs text-gray-500">{quote.customerEmail}</p>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{quote.items.length} items</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">KES {quote.total?.toLocaleString() || 0}</td>
+                    <td className="px-6 py-4 text-sm">{quote.items.length} items</td>
+                    <td className="px-6 py-4 text-sm font-semibold">KES {quote.total?.toLocaleString() || 0}</td>
                     <td className="px-6 py-4">
-                      <div>
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(quote.status)}`}>
-                          {getStatusIcon(quote.status)}
-                          {quote.status === 'converted' ? 'Invoiced' : quote.status}
-                        </span>
-                        {quote.status === 'converted' && (
-                          <div className="text-xs mt-1">
-                            {quote.paymentStatus === 'paid' ? (
-                              <span className="text-green-600 dark:text-green-400">✓ Paid</span>
-                            ) : quote.paymentStatus === 'partially_paid' ? (
-                              <span className="text-amber-600 dark:text-amber-400">
-                                Partially Paid (Balance: KES {quote.balanceDue?.toLocaleString()})
-                              </span>
-                            ) : (
-                              <span className="text-red-600 dark:text-red-400">⚠ Unpaid</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(quote.status)}`}>
+                        {getStatusIcon(quote.status)} {quote.status}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{new Date(quote.createdAt).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-sm">{new Date(quote.createdAt).toLocaleDateString()}</td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        <button onClick={() => handleView(quote)} className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="View">
-                          <Eye className="w-4 h-4 text-blue-500" />
-                        </button>
-                        <button
-                          onClick={() => handleSendEmail(quote._id)}
-                          disabled={quote.status === 'converted' || sendingId === quote._id}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            quote.status !== 'converted' ? 'hover:bg-green-100 dark:hover:bg-green-900/30' : 'opacity-50 cursor-not-allowed'
-                          }`}
-                          title="Send Email"
-                        >
+                        <button onClick={() => handleView(quote)} className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="View"><Eye className="w-4 h-4 text-blue-500" /></button>
+                        <button onClick={() => handleSendEmail(quote._id)} disabled={sendingId === quote._id} className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="Send Email">
                           {sendingId === quote._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 text-green-500" />}
                         </button>
-                        <button
-                          onClick={() => handlePrintPDF(quote)}
-                          disabled={isGeneratingPDF}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                          title={quote.status === 'converted' ? "Download Invoice" : "Download Quotation"}
-                        >
+                        <button onClick={() => handlePrintPDF(quote)} disabled={isGeneratingPDF} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Download PDF">
                           <Printer className="w-4 h-4 text-gray-500" />
                         </button>
-                        {quote.status !== 'converted' && (
-                          <button
-                            onClick={() => {
-                              setEditingQuote(quote);
-                              setFormData({
-                                customerId: quote.customerId,
-                                items: quote.items.map((i: any) => ({
-                                  productId: i.productId,
-                                  qty: i.qty,
-                                  customPrice: i.customPrice ? i.price : undefined,
-                                  taxable: i.taxable !== false,
-                                })),
-                                discount: quote.discount,
-                                discountType: quote.discountType,
-                                notes: quote.notes || '',
-                                terms: quote.terms || '',
-                                validUntil: quote.validUntil.split('T')[0],
-                                transportCost: (quote as any).transportCost || 0,
-                                transportDescription: (quote as any).transportDescription || '',
-                                estimatedDelivery: (quote as any).estimatedDelivery || '',
-                                taxPerItem: (quote as any).taxPerItem || false,
-                              });
-                              setShowModal(true);
-                            }}
-                            className="p-1.5 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4 text-yellow-500" />
-                          </button>
-                        )}
-                        {quote.status === 'converted' && (
-                          <button
-                            onClick={async () => {
-                              const paymentInfo = await fetchQuotationPaymentStatus(quote._id);
-                              setSelectedOrderForPayment({
-                                id: quote._id,
-                                number: quote.invoiceNumber || quote.quoteNumber,
-                                total: quote.total,
-                                amountPaid: paymentInfo.amountPaid || 0,
-                                balanceDue: paymentInfo.balanceDue || quote.total,
-                              });
-                              setShowPaymentModal(true);
-                            }}
-                            className="p-1.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
-                            title="Record Payment"
-                          >
-                            <Wallet className="w-4 h-4 text-amber-500" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(quote._id)}
-                          className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </button>
+                        <button onClick={() => { setEditingQuote(quote); setFormData({ customerId: quote.customerId, items: quote.items.map((i: any) => ({ productId: i.productId, qty: i.qty, customPrice: i.customPrice ? i.price : undefined, taxable: i.taxable !== false })), discount: quote.discount, discountType: quote.discountType, notes: quote.notes || '', terms: quote.terms || '', validUntil: quote.validUntil?.split('T')[0] || '', transportCost: (quote as any).transportCost || 0, transportDescription: (quote as any).transportDescription || '', estimatedDelivery: (quote as any).estimatedDelivery || '', taxPerItem: (quote as any).taxPerItem || false }); setShowModal(true); }} className="p-1.5 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-lg transition-colors" title="Edit"><Edit className="w-4 h-4 text-yellow-500" /></button>
+                        <button onClick={() => handleDelete(quote._id)} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4 text-red-500" /></button>
                         {(quote.status === 'sent' || quote.status === 'draft') && (
-                          <button
-                            onClick={() => handleAccept(quote._id)}
-                            disabled={acceptingId === quote._id}
-                            className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors"
-                            title="Accept & Convert to Invoice"
-                          >
+                          <button onClick={() => handleAccept(quote._id)} disabled={acceptingId === quote._id} className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="Accept">
                             {acceptingId === quote._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4 text-green-500" />}
                           </button>
                         )}
@@ -1134,327 +858,159 @@ export default function QuotationsPage() {
               </tbody>
             </table>
           </div>
-
-          {/* Pagination */}
           {totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border border-gray-300 dark:border-gray-700 rounded-lg disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 border border-gray-300 dark:border-gray-700 rounded-lg disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+            <div className="px-6 py-4 border-t flex items-center justify-between">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border rounded-lg disabled:opacity-50"><ChevronLeft className="w-4 h-4" /></button>
+              <span className="text-sm">Page {currentPage} of {totalPages}</span>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border rounded-lg disabled:opacity-50"><ChevronRight className="w-4 h-4" /></button>
             </div>
           )}
         </div>
 
         {/* Create/Edit Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white dark:bg-gray-900 rounded-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-              <div className="p-6 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 flex justify-between items-center">
+              <div className="p-6 border-b dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10 flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {editingQuote ? 'Edit Document' : 'Create New Document'}
-                  </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {editingQuote ? 'Update quotation details' : 'Fill in the details to create a new quotation'}
-                  </p>
+                  <h2 className="text-xl font-bold">{editingQuote ? 'Edit Quotation' : 'Create Quotation'}</h2>
+                  <p className="text-sm text-gray-500 mt-1">Fill in the details below to create a quotation for your customer</p>
                 </div>
-                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                  <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                </button>
+                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
               </div>
-
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
                 {/* Customer Selection */}
-                <div className="bg-gradient-to-r from-indigo-50/50 to-purple-50/50 dark:from-gray-800/30 dark:to-gray-800/30 rounded-xl p-5 border border-gray-200 dark:border-gray-700">
-                  <h3 className="font-semibold flex items-center gap-2 mb-4 text-gray-900 dark:text-white">
-                    <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                    Customer Information
-                  </h3>
-                  
+                <div className="bg-gradient-to-r from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/20 dark:to-purple-950/20 rounded-xl p-5 border border-indigo-100 dark:border-indigo-900/30">
+                  <h3 className="font-semibold flex items-center gap-2 mb-4"><Users className="w-5 h-5 text-indigo-600" /> Customer Information</h3>
                   {!showAddCustomerForm ? (
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-                      <input
-                        type="text"
-                        placeholder="Search or select customer..."
-                        value={customerSearchTerm}
-                        onChange={(e) => {
-                          setCustomerSearchTerm(e.target.value);
-                          setShowCustomerDropdown(true);
-                        }}
-                        onFocus={() => setShowCustomerDropdown(true)}
-                        className="w-full pl-9 pr-4 py-3 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      />
-                      
+                      <input type="text" placeholder="Search or select customer..." value={customerSearchTerm} onChange={(e) => { setCustomerSearchTerm(e.target.value); setShowCustomerDropdown(true); }} className="w-full pl-4 pr-4 py-3 text-sm border rounded-lg dark:bg-gray-800" />
                       {showCustomerDropdown && (
-                        <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {filteredCustomers.length > 0 ? (
-                            <>
-                              {filteredCustomers.map((customer) => (
-                                <button
-                                  key={customer._id}
-                                  type="button"
-                                  onClick={() => {
-                                    setFormData({ ...formData, customerId: customer._id });
-                                    setCustomerSearchTerm(customer.name);
-                                    setShowCustomerDropdown(false);
-                                  }}
-                                  className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                >
-                                  <div className="flex justify-between items-center">
-                                    <div>
-                                      <p className="text-sm font-medium text-gray-900 dark:text-white">{customer.name}</p>
-                                      <div className="flex gap-3 text-xs text-gray-500 dark:text-gray-400">
-                                        {customer.email && <span>{customer.email}</span>}
-                                        {customer.phone && <span>{customer.phone}</span>}
-                                      </div>
-                                    </div>
-                                    {formData.customerId === customer._id && (
-                                      <CheckCircle className="w-4 h-4 text-green-500" />
-                                    )}
-                                  </div>
-                                </button>
-                              ))}
-                              <button
-                                type="button"
-                                onClick={() => setShowAddCustomerForm(true)}
-                                className="w-full text-left px-4 py-2 border-t border-gray-200 dark:border-gray-700 text-indigo-600 dark:text-indigo-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                              >
-                                <Plus className="w-4 h-4 inline mr-2" /> Add New Customer
-                              </button>
-                            </>
-                          ) : (
-                            <div className="px-4 py-3 text-center">
-                              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">No customers found</p>
-                              <button
-                                type="button"
-                                onClick={() => setShowAddCustomerForm(true)}
-                                className="text-indigo-600 dark:text-indigo-400 text-sm font-medium"
-                              >
-                                + Create New Customer
-                              </button>
+                        <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {filteredCustomers.map(customer => (
+                            <button key={customer._id} type="button" onClick={() => { setFormData({ ...formData, customerId: customer._id }); setSelectedCustomer(customer); setCustomerSearchTerm(customer.name); setShowCustomerDropdown(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium">{customer.name}</p>
+                                {selectedCustomer?._id === customer._id && <CheckCircle className="w-4 h-4 text-green-500" />}
+                              </div>
+                              <div className="flex gap-3 text-xs text-gray-500">
+                                {customer.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {customer.email}</span>}
+                                {customer.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {customer.phone}</span>}
+                              </div>
+                            </button>
+                          ))}
+                          <button type="button" onClick={() => setShowAddCustomerForm(true)} className="w-full text-left px-4 py-2 border-t text-indigo-600 hover:bg-gray-50 dark:hover:bg-gray-700"><Plus className="w-4 h-4 inline mr-2" /> Add New Customer</button>
+                        </div>
+                      )}
+                      {selectedCustomer && (
+                        <div className="mt-3 p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" /> Selected: {selectedCustomer.name}</p>
+                            <div className="flex gap-3 text-xs text-gray-600 mt-1">
+                              {selectedCustomer.email && <span>{selectedCustomer.email}</span>}
+                              {selectedCustomer.phone && <span>{selectedCustomer.phone}</span>}
                             </div>
-                          )}
+                          </div>
+                          <button type="button" onClick={() => { setSelectedCustomer(null); setFormData({ ...formData, customerId: '' }); setCustomerSearchTerm(''); }} className="text-red-500 text-sm">Change</button>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
-                      <h4 className="font-medium text-gray-900 dark:text-white mb-3">New Customer</h4>
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-3">New Customer</h4>
                       <div className="space-y-3">
-                        <input
-                          type="text"
-                          placeholder="Full Name *"
-                          value={newCustomer.name}
-                          onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                        />
+                        <input type="text" placeholder="Full Name *" value={newCustomer.name} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-gray-800" />
                         <div className="grid grid-cols-2 gap-3">
-                          <input
-                            type="email"
-                            placeholder="Email"
-                            value={newCustomer.email}
-                            onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
-                            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                          />
-                          <input
-                            type="tel"
-                            placeholder="Phone"
-                            value={newCustomer.phone}
-                            onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                          />
+                          <input type="email" placeholder="Email" value={newCustomer.email} onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })} className="px-3 py-2 text-sm border rounded-lg dark:bg-gray-800" />
+                          <input type="tel" placeholder="Phone" value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} className="px-3 py-2 text-sm border rounded-lg dark:bg-gray-800" />
                         </div>
-                        <input
-                          type="text"
-                          placeholder="Location"
-                          value={newCustomer.location}
-                          onChange={(e) => setNewCustomer({ ...newCustomer, location: e.target.value })}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                        />
+                        <input type="text" placeholder="Location" value={newCustomer.location} onChange={(e) => setNewCustomer({ ...newCustomer, location: e.target.value })} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-gray-800" />
                         <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={handleCreateCustomer}
-                            disabled={creatingCustomer || !newCustomer.name}
-                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                          >
-                            {creatingCustomer ? <Loader2 className="w-4 h-4 animate-spin inline" /> : 'Create Customer'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowAddCustomerForm(false);
-                              setNewCustomer({ name: '', email: '', phone: '', location: '' });
-                            }}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
-                          >
-                            Cancel
-                          </button>
+                          <button type="button" onClick={handleCreateCustomer} disabled={creatingCustomer} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Create Customer</button>
+                          <button type="button" onClick={() => { setShowAddCustomerForm(false); setNewCustomer({ name: '', email: '', phone: '', location: '' }); }} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
                         </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {formData.customerId && !showAddCustomerForm && (
-                    <div className="mt-3 bg-green-50 dark:bg-green-900/20 rounded-lg p-2 px-3">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                        <span className="text-sm text-green-700 dark:text-green-400">
-                          Customer: {customers.find(c => c._id === formData.customerId)?.name}
-                        </span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Product Selection with Category Filter */}
-                <div className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50 dark:from-gray-800/30 dark:to-gray-800/30 rounded-xl p-5 border border-gray-200 dark:border-gray-700">
-                  <h3 className="font-semibold flex items-center gap-2 mb-4 text-gray-900 dark:text-white">
-                    <Package className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-                    Add Products
-                  </h3>
-                  
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative flex-1 min-w-[200px]">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-                      <input
-                        type="text"
-                        placeholder="Search products..."
-                        value={productSearchTerm}
-                        onChange={(e) => {
-                          setProductSearchTerm(e.target.value);
-                          setShowProductDropdown(true);
-                        }}
-                        onFocus={() => setShowProductDropdown(true)}
-                        className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                      />
-                      {showProductDropdown && (
-                        <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {filteredProducts.length > 0 ? (
-                            <>
-                              {filteredProducts.slice(0, 10).map((product) => (
-                                <button
-                                  key={product._id}
-                                  type="button"
-                                  onClick={() => {
-                                    setTempItem({ ...tempItem, productId: product._id });
-                                    setProductSearchTerm(product.name);
-                                    setShowProductDropdown(false);
-                                  }}
-                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-white"
-                                >
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-medium">{product.name}</span>
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">KES {product.price.toLocaleString()}</span>
-                                  </div>
-                                  <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                    Category: {product.categoryName || product.category || 'Uncategorized'}
-                                  </div>
-                                </button>
-                              ))}
-                              {/* Add Product Button */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowProductDropdown(false);
-                                  setShowCreateProductModal(true);
-                                }}
-                                className="w-full text-left px-3 py-2 border-t border-gray-200 dark:border-gray-700 text-cyan-600 dark:text-cyan-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
-                              >
-                                <Plus className="w-4 h-4 inline mr-2" /> Create New Product
-                              </button>
-                            </>
-                          ) : (
-                            <div className="px-3 py-2 text-center">
-                              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">No products found</p>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowProductDropdown(false);
-                                  setShowCreateProductModal(true);
-                                }}
-                                className="text-cyan-600 dark:text-cyan-400 text-sm font-medium"
-                              >
-                                + Create New Product
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                {/* Tax Per Item Toggle */}
+                <div className="bg-gradient-to-r from-amber-50/50 to-orange-50/50 dark:from-amber-950/20 dark:to-orange-950/20 rounded-xl p-5 border border-amber-100 dark:border-amber-900/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-5 h-5 text-amber-600" />
+                      <span className="font-semibold">Tax Calculation</span>
+                      <span className="text-sm text-gray-500">({taxRate * 100}% tax rate)</span>
                     </div>
-                    
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => {
-                        setSelectedCategory(e.target.value);
-                        setProductSearchTerm('');
-                      }}
-                      className="w-48 px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, taxPerItem: !formData.taxPerItem })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.taxPerItem ? 'bg-amber-600' : 'bg-gray-300 dark:bg-gray-600'}`}
                     >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.taxPerItem ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {formData.taxPerItem ? 'Tax calculated per item (only taxable items)' : 'Tax calculated on subtotal after discount'}
+                  </p>
+                </div>
+
+                {/* Product Selection */}
+                <div className="bg-gradient-to-r from-cyan-50/50 to-blue-50/50 dark:from-cyan-950/20 dark:to-blue-950/20 rounded-xl p-5 border border-cyan-100 dark:border-cyan-900/30">
+                  <h3 className="font-semibold flex items-center gap-2 mb-4"><Package className="w-5 h-5 text-cyan-600" /> Add Products</h3>
+                  
+                  {/* Category Filter */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Filter className="w-4 h-4 text-gray-400" />
+                    <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="text-sm border rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800">
                       <option value="">All Categories</option>
-                      {categories.map((cat) => (
+                      {categories.map(cat => (
                         <option key={cat._id} value={cat._id}>{cat.name}</option>
                       ))}
                     </select>
-                    
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      className="w-20 px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-center"
-                      value={tempItem.qty}
-                      onChange={(e) => setTempItem({ ...tempItem, qty: Number(e.target.value) })}
-                      min="1"
-                    />
-                    
-                    <input
-                      type="number"
-                      placeholder="Custom price"
-                      className="w-32 px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                      value={tempItem.customPrice || ''}
-                      onChange={(e) => setTempItem({ ...tempItem, customPrice: e.target.value ? Number(e.target.value) : null })}
-                    />
-                    
-                    <div className="flex flex-col items-center">
-                      <span className="text-xs text-gray-500 dark:text-gray-400 mb-1">Taxable</span>
-                      <button
-                        type="button"
-                        onClick={() => setTempItem({ ...tempItem, taxable: !tempItem.taxable })}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          tempItem.taxable ? 'bg-cyan-600' : 'bg-gray-300 dark:bg-gray-600'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            tempItem.taxable ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative flex-1 min-w-[200px]">
+                      <input type="text" placeholder="Search products..." value={productSearchTerm} onChange={(e) => handleProductSearchChange(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-gray-800" />
+                      {showProductDropdown && filteredProducts.length > 0 && (
+                        <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {filteredProducts.slice(0, 10).map(product => (
+                            <button key={product._id} type="button" onClick={() => { setTempItem({ ...tempItem, productId: product._id }); setProductSearchTerm(product.name); setShowProductDropdown(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <span className="font-medium">{product.name}</span>
+                                  {product.sku && <span className="text-xs text-gray-500 ml-2">({product.sku})</span>}
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-sm">KES {product.price.toLocaleString()}</span>
+                                  {product.buyingPrice > 0 && (
+                                    <span className="text-xs text-green-600 ml-2">
+                                      +{((product.price - product.buyingPrice) / product.price * 100).toFixed(0)}%
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {product.stock !== undefined && (
+                                <p className="text-xs text-gray-500">Stock: {product.stock}</p>
+                              )}
+                            </button>
+                          ))}
+                          <button type="button" onClick={() => { setShowProductDropdown(false); setShowCreateProductModal(true); }} className="w-full text-left px-3 py-2 border-t text-cyan-600 hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <Plus className="w-4 h-4 inline mr-2" /> Create New Product
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <input type="number" placeholder="Qty" className="w-20 px-3 py-2 text-sm border rounded-lg dark:bg-gray-800 text-center" value={tempItem.qty} onChange={(e) => setTempItem({ ...tempItem, qty: Number(e.target.value) })} min="1" />
+                    <input type="number" placeholder="Custom price" className="w-32 px-3 py-2 text-sm border rounded-lg dark:bg-gray-800" value={tempItem.customPrice || ''} onChange={(e) => setTempItem({ ...tempItem, customPrice: e.target.value ? Number(e.target.value) : null })} />
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs">Taxable</span>
+                      <button type="button" onClick={() => setTempItem({ ...tempItem, taxable: !tempItem.taxable })} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${tempItem.taxable ? 'bg-cyan-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${tempItem.taxable ? 'translate-x-6' : 'translate-x-1'}`} />
                       </button>
                     </div>
-                    
-                    <button
-                      type="button"
-                      onClick={addItem}
-                      disabled={!tempItem.productId}
-                      className="p-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50"
-                      title="Add Item"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </button>
+                    <button type="button" onClick={addItem} disabled={!tempItem.productId} className="p-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors"><Plus className="w-5 h-5" /></button>
                   </div>
                 </div>
 
@@ -1462,62 +1018,37 @@ export default function QuotationsPage() {
                 {formData.items.length > 0 && (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 dark:bg-gray-800">
+                      <thead className="bg-gray-50 dark:bg-gray-800/50">
                         <tr>
-                          <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Product</th>
-                          <th className="px-3 py-2 text-center w-16 text-gray-700 dark:text-gray-300">Qty</th>
-                          <th className="px-3 py-2 text-right w-24 text-gray-700 dark:text-gray-300">Price</th>
-                          {formData.taxPerItem && <th className="px-3 py-2 text-center w-20 text-gray-700 dark:text-gray-300">Tax</th>}
-                          <th className="px-3 py-2 text-right w-28 text-gray-700 dark:text-gray-300">Total</th>
+                          <th className="px-3 py-2 text-left">Product</th>
+                          <th className="px-3 py-2 text-center w-16">Qty</th>
+                          <th className="px-3 py-2 text-right w-24">Price</th>
+                          <th className="px-3 py-2 text-right w-28">Total</th>
+                          <th className="px-3 py-2 text-center w-20">Taxable</th>
                           <th className="px-3 py-2 text-center w-10"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {formData.items.map((item, idx) => {
-                          const product = products.find((p) => p._id === item.productId);
+                          const product = products.find(p => p._id === item.productId);
                           const price = item.customPrice || product?.price || 0;
                           const itemTotal = price * item.qty;
+                          const itemTax = formData.taxPerItem && item.taxable ? itemTotal * taxRate : 0;
                           return (
                             <tr key={idx} className="border-t dark:border-gray-800">
                               <td className="px-3 py-2">
-                                <div className="text-gray-900 dark:text-white">{product?.name}</div>
-                                {product?.categoryName && <div className="text-xs text-gray-400">Category: {product.categoryName}</div>}
-                               </td>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="number"
-                                  value={item.qty}
-                                  onChange={(e) => updateItemQty(idx, Number(e.target.value))}
-                                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded text-center bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                  min="1"
-                                />
-                               </td>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="number"
-                                  value={price}
-                                  onChange={(e) => updateItemPrice(idx, Number(e.target.value))}
-                                  className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                  min="0"
-                                />
-                                </td>
-                              {formData.taxPerItem && (
-                                <td className="px-3 py-2 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleItemTax(idx)}
-                                    className={`px-2 py-1 text-xs rounded ${item.taxable ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}
-                                  >
-                                    {item.taxable ? `${Math.round(taxRate * 100)}%` : '0%'}
-                                  </button>
-                                 </td>
-                              )}
-                              <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">KES {itemTotal.toLocaleString()}</td>
+                                <div className="font-medium">{product?.name}</div>
+                                {product?.sku && <div className="text-xs text-gray-500">{product.sku}</div>}
+                              </td>
+                              <td className="px-3 py-2"><input type="number" value={item.qty} onChange={(e) => updateItemQty(idx, Number(e.target.value))} className="w-16 px-2 py-1 border rounded dark:bg-gray-800 text-center" min="1" /></td>
+                              <td className="px-3 py-2"><input type="number" value={price} onChange={(e) => updateItemPrice(idx, Number(e.target.value))} className="w-24 px-2 py-1 border rounded dark:bg-gray-800 text-right" /></td>
+                              <td className="px-3 py-2 text-right font-medium">KES {itemTotal.toLocaleString()}</td>
                               <td className="px-3 py-2 text-center">
-                                <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">
-                                  <Trash2 className="w-4 h-4" />
+                                <button type="button" onClick={() => toggleItemTax(idx)} className={`px-2 py-1 text-xs rounded ${item.taxable ? 'bg-green-100 text-green-700 dark:bg-green-900/30' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                                  {item.taxable ? 'Yes' : 'No'}
                                 </button>
-                               </td>
+                              </td>
+                              <td className="px-3 py-2 text-center"><button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button></td>
                             </tr>
                           );
                         })}
@@ -1526,197 +1057,66 @@ export default function QuotationsPage() {
                   </div>
                 )}
 
-                {/* Tax Method Toggle */}
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">Tax Calculation Method</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Apply tax per item or on total after discount</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Tax per item</span>
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, taxPerItem: !formData.taxPerItem })}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          formData.taxPerItem ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-                        }`}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.taxPerItem ? 'translate-x-6' : 'translate-x-1'}`} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Transport Section */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setShowTransport(!showTransport)}
-                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-amber-50/50 to-orange-50/50 dark:from-gray-800/30 dark:to-gray-800/30 hover:bg-amber-50 dark:hover:bg-gray-800/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Truck className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                      <span className="font-semibold text-gray-900 dark:text-white">Transport & Delivery</span>
-                    </div>
-                    {showTransport ? <EyeOff className="w-5 h-5 text-gray-500 dark:text-gray-400" /> : <EyeIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />}
+                <div className="border rounded-xl overflow-hidden">
+                  <button type="button" onClick={() => setShowTransport(!showTransport)} className="w-full flex items-center justify-between p-4 bg-amber-50/30 dark:bg-amber-950/20 hover:bg-amber-50/50 transition-colors">
+                    <div className="flex items-center gap-2"><Truck className="w-5 h-5 text-amber-600" /><span className="font-semibold">Transport & Delivery</span></div>
+                    {showTransport ? <EyeOff className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                   </button>
-                  
                   {showTransport && (
-                    <div className="p-5 space-y-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="p-5 space-y-4 border-t">
                       <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Transport Cost (KES)</label>
-                          <input
-                            type="number"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                            value={formData.transportCost}
-                            onChange={(e) => setFormData({ ...formData, transportCost: Number(e.target.value) })}
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                          <input
-                            type="text"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                            placeholder="e.g., Door delivery"
-                            value={formData.transportDescription}
-                            onChange={(e) => setFormData({ ...formData, transportDescription: e.target.value })}
-                          />
-                        </div>
+                        <div><label className="block text-sm font-medium mb-1">Transport Cost (KES)</label><input type="number" className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800" value={formData.transportCost} onChange={(e) => setFormData({ ...formData, transportCost: Number(e.target.value) })} /></div>
+                        <div><label className="block text-sm font-medium mb-1">Description</label><input type="text" className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800" placeholder="e.g., Door delivery" value={formData.transportDescription} onChange={(e) => setFormData({ ...formData, transportDescription: e.target.value })} /></div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estimated Delivery</label>
-                        <input
-                          type="text"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                          placeholder="e.g., 3-5 business days"
-                          value={formData.estimatedDelivery}
-                          onChange={(e) => setFormData({ ...formData, estimatedDelivery: e.target.value })}
-                        />
-                      </div>
+                      <div><label className="block text-sm font-medium mb-1">Estimated Delivery</label><input type="text" className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800" placeholder="e.g., 3-5 business days" value={formData.estimatedDelivery} onChange={(e) => setFormData({ ...formData, estimatedDelivery: e.target.value })} /></div>
                     </div>
                   )}
                 </div>
 
                 {/* Discount Section */}
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700">
-                  <h3 className="font-semibold flex items-center gap-2 mb-3 text-gray-900 dark:text-white">
-                    <Tag className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    Discount
-                  </h3>
+                <div className="bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl p-5 border border-green-100 dark:border-green-900/30">
+                  <h3 className="font-semibold flex items-center gap-2 mb-3"><Tag className="w-5 h-5 text-green-600" /> Discount</h3>
                   <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      value={formData.discount}
-                      onChange={(e) => setFormData({ ...formData, discount: Number(e.target.value) })}
-                      className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      min="0"
-                      placeholder="0"
-                    />
+                    <input type="number" value={formData.discount} onChange={(e) => setFormData({ ...formData, discount: Number(e.target.value) })} className="w-32 px-3 py-2 border rounded-lg dark:bg-gray-800" placeholder="0" />
                     <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, discountType: 'percentage' })}
-                        className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                          formData.discountType === 'percentage' 
-                            ? 'bg-green-600 text-white' 
-                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                        }`}
-                      >
-                        <Percent className="w-4 h-4 inline" /> %
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, discountType: 'fixed' })}
-                        className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                          formData.discountType === 'fixed' 
-                            ? 'bg-green-600 text-white' 
-                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                        }`}
-                      >
-                        <DollarSign className="w-4 h-4 inline" /> KES
-                      </button>
+                      <button type="button" onClick={() => setFormData({ ...formData, discountType: 'percentage' })} className={`px-4 py-2 rounded-lg text-sm transition-colors ${formData.discountType === 'percentage' ? 'bg-green-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}><Percent className="w-4 h-4 inline" /> %</button>
+                      <button type="button" onClick={() => setFormData({ ...formData, discountType: 'fixed' })} className={`px-4 py-2 rounded-lg text-sm transition-colors ${formData.discountType === 'fixed' ? 'bg-green-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}><DollarSign className="w-4 h-4 inline" /> KES</button>
                     </div>
                   </div>
                 </div>
 
                 {/* Totals */}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
-                  <div className="flex justify-between py-1">
-                    <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">KES {subtotal.toLocaleString()}</span>
-                  </div>
-                  {formData.transportCost > 0 && (
-                    <div className="flex justify-between py-1">
-                      <span className="text-gray-600 dark:text-gray-400">Transport:</span>
-                      <span className="text-amber-600 dark:text-amber-400">KES {formData.transportCost.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {discountAmount > 0 && (
-                    <div className="flex justify-between py-1 text-green-600 dark:text-green-400">
-                      <span>Discount:</span>
-                      <span>-KES {discountAmount.toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between py-1">
-                    <span className="text-gray-600 dark:text-gray-400">Tax ({Math.round(taxRate * 100)}%):</span>
-                    <span className="text-gray-900 dark:text-white">KES {tax.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t-2 border-gray-200 dark:border-gray-700">
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">Total:</span>
-                    <span className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">KES {total.toLocaleString()}</span>
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 rounded-xl p-5">
+                  <div className="space-y-2">
+                    <div className="flex justify-between"><span>Subtotal:</span><span className="font-semibold">KES {subtotal.toLocaleString()}</span></div>
+                    {formData.transportCost > 0 && <div className="flex justify-between"><span>Transport:</span><span className="text-amber-600">KES {formData.transportCost.toLocaleString()}</span></div>}
+                    {discountAmount > 0 && <div className="flex justify-between text-green-600"><span>Discount:</span><span>-KES {discountAmount.toLocaleString()}</span></div>}
+                    <div className="flex justify-between"><span>Tax ({taxRate * 100}%):</span><span>KES {tax.toLocaleString()}</span></div>
+                    <div className="flex justify-between pt-2 border-t-2"><span className="text-lg font-bold">Total:</span><span className="text-2xl font-bold text-cyan-600">KES {total.toLocaleString()}</span></div>
                   </div>
                 </div>
 
                 {/* Notes & Terms */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
-                    <textarea 
-                      rows={3} 
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400" 
-                      value={formData.notes} 
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      placeholder="Additional notes..."
-                    />
+                    <label className="block text-sm font-medium mb-1">Notes</label>
+                    <textarea rows={3} placeholder="Additional notes..." value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Terms & Conditions</label>
-                    <textarea 
-                      rows={3} 
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400" 
-                      value={formData.terms} 
-                      onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
-                      placeholder="Payment terms, delivery policy..."
-                    />
+                    <label className="block text-sm font-medium mb-1">Terms & Conditions</label>
+                    <textarea rows={3} placeholder="Terms and conditions..." value={formData.terms} onChange={(e) => setFormData({ ...formData, terms: e.target.value })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valid Until</label>
-                  <input 
-                    type="date" 
-                    required 
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white" 
-                    value={formData.validUntil} 
-                    onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })} 
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Default: 1 week from today</p>
+                  <label className="block text-sm font-medium mb-1">Valid Until</label>
+                  <input type="date" required className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800" value={formData.validUntil} onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })} />
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button type="submit" className="flex-1 py-3 bg-cyan-600 text-white rounded-lg font-medium hover:bg-cyan-700 transition-colors">
-                    <Save className="w-4 h-4 inline mr-2" />
-                    {editingQuote ? 'Update Document' : 'Create Document'}
-                  </button>
-                  <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300">
-                    Cancel
-                  </button>
+                  <button type="submit" className="flex-1 py-3 bg-cyan-600 text-white rounded-lg font-medium hover:bg-cyan-700 transition-colors"><Save className="w-4 h-4 inline mr-2" /> {editingQuote ? 'Update Quotation' : 'Create Quotation'}</button>
+                  <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
                 </div>
               </form>
             </div>
@@ -1724,146 +1124,66 @@ export default function QuotationsPage() {
         )}
 
         {/* View Modal */}
-        {showViewModal && viewingQuote && viewingCustomer && (
-          <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+        {showViewModal && viewingQuote && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-              <div className="p-6 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 flex justify-between items-center">
+              <div className="p-6 border-b dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {viewingQuote.status === 'converted' ? 'Invoice Details' : 'Quotation Details'}
-                  </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {viewingQuote.status === 'converted' && viewingQuote.invoiceNumber ? viewingQuote.invoiceNumber : viewingQuote.quoteNumber}
-                  </p>
+                  <h2 className="text-xl font-bold">Quotation Details</h2>
+                  <p className="text-sm text-gray-500">{viewingQuote.quoteNumber}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => handlePrintPDF(viewingQuote)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Download PDF">
-                    <Printer className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                  </button>
-                  <button onClick={() => handleSendEmail(viewingQuote._id)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Send Email">
-                    <Send className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                  </button>
-                  <button onClick={() => setShowViewModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                    <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                  </button>
+                  <button onClick={() => handlePrintPDF(viewingQuote)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"><Printer className="w-5 h-5" /></button>
+                  <button onClick={() => handleSendEmail(viewingQuote._id)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"><Send className="w-5 h-5" /></button>
+                  <button onClick={() => setShowViewModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
                 </div>
               </div>
-              
               <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-6">
                   <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
-                    <h3 className="font-semibold flex items-center gap-2 mb-3 text-gray-900 dark:text-white">
-                      <User className="w-4 h-4" /> Customer Information
-                    </h3>
-                    <div className="space-y-2 text-sm">
-                      <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Name:</strong> {viewingQuote.customerName}</p>
-                      {viewingQuote.customerEmail && <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Email:</strong> {viewingQuote.customerEmail}</p>}
-                      {viewingQuote.customerPhone && <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Phone:</strong> {viewingQuote.customerPhone}</p>}
-                      {viewingCustomer?.location && <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Location:</strong> {viewingCustomer.location}</p>}
-                    </div>
+                    <h3 className="font-semibold flex items-center gap-2 mb-3"><User className="w-4 h-4" /> Customer</h3>
+                    <p><strong>Name:</strong> {viewingQuote.customerName}</p>
+                    {viewingQuote.customerEmail && <p><strong>Email:</strong> {viewingQuote.customerEmail}</p>}
+                    {viewingQuote.customerPhone && <p><strong>Phone:</strong> {viewingQuote.customerPhone}</p>}
                   </div>
-                  
                   <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
-                    <h3 className="font-semibold flex items-center gap-2 mb-3 text-gray-900 dark:text-white">
-                      <Calendar className="w-4 h-4" /> Document Information
-                    </h3>
-                    <div className="space-y-2 text-sm">
-                      <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Status:</strong> 
-                        <span className={`inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs ${getStatusColor(viewingQuote.status)}`}>
-                          {getStatusIcon(viewingQuote.status)}
-                          {viewingQuote.status === 'converted' ? 'Invoiced' : viewingQuote.status}
-                        </span>
-                      </p>
-                      <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Created:</strong> {new Date(viewingQuote.createdAt).toLocaleString()}</p>
-                      <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Valid Until:</strong> {new Date(viewingQuote.validUntil).toLocaleDateString()}</p>
-                      {viewingQuote.convertedAt && (
-                        <p className="text-gray-700 dark:text-gray-300"><strong className="text-gray-900 dark:text-white">Converted:</strong> {new Date(viewingQuote.convertedAt).toLocaleString()}</p>
-                      )}
-                    </div>
+                    <h3 className="font-semibold flex items-center gap-2 mb-3"><Calendar className="w-4 h-4" /> Information</h3>
+                    <p><strong>Status:</strong> {viewingQuote.status}</p>
+                    <p><strong>Created:</strong> {new Date(viewingQuote.createdAt).toLocaleDateString()}</p>
+                    <p><strong>Valid Until:</strong> {new Date(viewingQuote.validUntil).toLocaleDateString()}</p>
                   </div>
                 </div>
-
-                {(viewingQuote as any).transportCost > 0 && (
-                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
-                    <h3 className="font-semibold flex items-center gap-2 mb-3 text-gray-900 dark:text-white">
-                      <Truck className="w-4 h-4 text-amber-600 dark:text-amber-400" /> Transport Information
-                    </h3>
-                    <div className="space-y-1 text-sm">
-                      <p className="text-gray-700 dark:text-gray-300"><strong>Cost:</strong> KES {(viewingQuote as any).transportCost?.toLocaleString() || 0}</p>
-                      {(viewingQuote as any).transportDescription && <p className="text-gray-700 dark:text-gray-300"><strong>Description:</strong> {(viewingQuote as any).transportDescription}</p>}
-                      {(viewingQuote as any).estimatedDelivery && <p className="text-gray-700 dark:text-gray-300"><strong>Estimated Delivery:</strong> {(viewingQuote as any).estimatedDelivery}</p>}
-                    </div>
-                  </div>
-                )}
-
                 <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
-                    <Package className="w-4 h-4" /> Items
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 dark:bg-gray-800">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300">Item</th>
-                          <th className="px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300">Description</th>
-                          <th className="px-4 py-2 text-center text-sm text-gray-700 dark:text-gray-300">Qty</th>
-                          <th className="px-4 py-2 text-right text-sm text-gray-700 dark:text-gray-300">Unit Price</th>
-                          <th className="px-4 py-2 text-right text-sm text-gray-700 dark:text-gray-300">Total</th>
+                  <h3 className="font-semibold mb-3">Items</h3>
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-800/50">
+                      <tr>
+                        <th className="px-4 py-2 text-left">Item</th>
+                        <th className="px-4 py-2 text-center">Qty</th>
+                        <th className="px-4 py-2 text-right">Unit Price</th>
+                        <th className="px-4 py-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewingQuote.items.map((item, idx) => (
+                        <tr key={idx} className="border-t dark:border-gray-800">
+                          <td className="px-4 py-2">{item.name}</td>
+                          <td className="px-4 py-2 text-center">{item.qty}</td>
+                          <td className="px-4 py-2 text-right">KES {item.price.toLocaleString()}</td>
+                          <td className="px-4 py-2 text-right font-semibold">KES {(item.price * item.qty).toLocaleString()}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {viewingQuote.items.map((item, idx) => {
-                          const itemTotal = item.price * item.qty;
-                          return (
-                            <tr key={idx} className="border-t dark:border-gray-800">
-                              <td className="px-4 py-2 text-gray-900 dark:text-white">{item.name}</td>
-                              <td className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{item.description || '-'}</td>
-                              <td className="px-4 py-2 text-center text-gray-900 dark:text-white">{item.qty}</td>
-                              <td className="px-4 py-2 text-right text-gray-900 dark:text-white">KES {item.price.toLocaleString()}</td>
-                              <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-white">KES {itemTotal.toLocaleString()}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="border-t pt-4">
                   <div className="space-y-2 text-right max-w-md ml-auto">
-                    <div className="flex justify-between py-1">
-                      <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">KES {viewingQuote.subtotal?.toLocaleString() || 0}</span>
-                    </div>
-                    {viewingQuote.discount > 0 && (
-                      <div className="flex justify-between py-1 text-green-600 dark:text-green-400">
-                        <span>Discount:</span>
-                        <span>-KES {viewingQuote.discount.toLocaleString()}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between py-1">
-                      <span className="text-gray-600 dark:text-gray-400">Tax ({Math.round(viewingQuote.taxRate * 100)}%):</span>
-                      <span className="text-gray-900 dark:text-white">KES {viewingQuote.tax?.toLocaleString() || 0}</span>
-                    </div>
-                    <div className="flex justify-between pt-2 mt-2 border-t-2 border-gray-200 dark:border-gray-700">
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">Total Amount:</span>
-                      <span className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">KES {viewingQuote.total?.toLocaleString() || 0}</span>
-                    </div>
+                    <div className="flex justify-between"><span>Subtotal:</span><span>KES {viewingQuote.subtotal?.toLocaleString() || 0}</span></div>
+                    {(viewingQuote as any).transportCost > 0 && <div className="flex justify-between"><span>Transport:</span><span>KES {(viewingQuote as any).transportCost.toLocaleString()}</span></div>}
+                    <div className="flex justify-between"><span>Tax (16%):</span><span>KES {viewingQuote.tax?.toLocaleString() || 0}</span></div>
+                    <div className="flex justify-between pt-2 border-t-2"><span className="text-lg font-bold">Total:</span><span className="text-2xl font-bold text-cyan-600">KES {viewingQuote.total?.toLocaleString() || 0}</span></div>
                   </div>
                 </div>
-
-                {viewingQuote.notes && (
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 border-l-4 border-yellow-500">
-                    <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Notes</h3>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">{viewingQuote.notes}</p>
-                  </div>
-                )}
-                {viewingQuote.terms && (
-                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border-l-4 border-gray-500">
-                    <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Terms & Conditions</h3>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">{viewingQuote.terms}</p>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -1871,73 +1191,24 @@ export default function QuotationsPage() {
 
         {/* Report Modal */}
         {showReportModal && (
-          <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-xl max-w-md w-full p-6">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl max-w-md w-full p-6 shadow-2xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Export Report</h2>
-                <button onClick={() => setShowReportModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
-                  <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                </button>
+                <h2 className="text-xl font-bold">Export Report</h2>
+                <button onClick={() => setShowReportModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
-                  <input 
-                    type="date" 
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white" 
-                    value={reportStartDate} 
-                    onChange={(e) => setReportStartDate(e.target.value)} 
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
-                  <input 
-                    type="date" 
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white" 
-                    value={reportEndDate} 
-                    onChange={(e) => setReportEndDate(e.target.value)} 
-                  />
-                </div>
-                <button 
-                  onClick={handleExportReport} 
-                  disabled={isExporting} 
-                  className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
-                >
-                  {isExporting ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : <Download className="w-4 h-4 inline mr-2" />}
-                  Export to CSV
+                <div><label className="block text-sm font-medium mb-1">Start Date</label><input type="date" className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800" value={reportStartDate} onChange={(e) => setReportStartDate(e.target.value)} /></div>
+                <div><label className="block text-sm font-medium mb-1">End Date</label><input type="date" className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800" value={reportEndDate} onChange={(e) => setReportEndDate(e.target.value)} /></div>
+                <button onClick={handleExportReport} disabled={isExporting} className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+                  {isExporting ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : <Download className="w-4 h-4 inline mr-2" />} Export to CSV
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Payment Modal */}
-        {showPaymentModal && selectedOrderForPayment && (
-          <RecordPaymentModal
-            isOpen={showPaymentModal}
-            onClose={() => {
-              setShowPaymentModal(false);
-              setSelectedOrderForPayment(null);
-            }}
-            onSuccess={() => {
-              fetchData();
-            }}
-            orderId={selectedOrderForPayment.id}
-            orderNumber={selectedOrderForPayment.number}
-            totalAmount={selectedOrderForPayment.total}
-            amountPaid={selectedOrderForPayment.amountPaid}
-            balanceDue={selectedOrderForPayment.balanceDue}
-            isQuotation={true} 
-          />
-        )}
-
-        {/* Create Product Modal */}
-        <CreateProductModal
-          isOpen={showCreateProductModal}
-          onClose={() => setShowCreateProductModal(false)}
-          onProductCreated={handleProductCreated}
-          categories={categories}
-        />
+        <CreateProductModal isOpen={showCreateProductModal} onClose={() => setShowCreateProductModal(false)} onProductCreated={handleProductCreated} categories={categories} />
       </div>
     </div>
   );

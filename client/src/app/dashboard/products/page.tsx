@@ -1,14 +1,15 @@
 // src/app/dashboard/products/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { 
   Plus, Eye, Edit, Trash2, Search, Filter, ChevronDown, Package, RefreshCw, 
   X, AlertTriangle, CheckCircle, XCircle, Star, TrendingUp, Clock, 
-  DollarSign, ShoppingBag, Zap, Grid, List, ChevronLeft, ChevronRight
+  DollarSign, ShoppingBag, Zap, Grid, List, ChevronLeft, ChevronRight,
+  TrendingDown, Tag, Building2, Layers, Settings, Percent
 } from 'lucide-react'
 import { getImageUrl } from '@/lib/api'
 import Link from 'next/link'
@@ -31,6 +32,7 @@ export default function DashboardProductsPage() {
   const [brand, setBrand] = useState('')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
+  const [minProfit, setMinProfit] = useState('')
   const [stockStatus, setStockStatus] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all')
   const [featured, setFeatured] = useState<'all' | 'featured' | 'non-featured'>('all')
   const [page, setPage] = useState(1)
@@ -58,8 +60,10 @@ export default function DashboardProductsPage() {
       params.minStock = 1
       params.maxStock = 10
     }
-    if (stockStatus === 'out-of-stock') params.minStock = 0
-    if (stockStatus === 'out-of-stock') params.maxStock = 0
+    if (stockStatus === 'out-of-stock') {
+      params.minStock = 0
+      params.maxStock = 0
+    }
     
     // Featured filter
     if (featured === 'featured') params.featured = true
@@ -102,13 +106,11 @@ export default function DashboardProductsPage() {
     onSuccess: () => {
       setDeleteModalOpen(false)
       setProductToDelete(null)
+      toast.success('Product deleted successfully')
     },
     onError: (err, variables, context) => {
       queryClient.setQueryData(['dashboard-products', buildQueryParams()], context?.previousData)
-      toast.error('Failed to delete product', {
-        icon: '❌',
-        duration: 4000
-      })
+      toast.error('Failed to delete product')
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard-products'] })
@@ -135,9 +137,6 @@ export default function DashboardProductsPage() {
       
       return { previousData }
     },
-    onSuccess: (_, { featured }) => {
-    //  toast.success(`Product ${featured ? 'featured' : 'unfeatured'} successfully!`)
-    },
     onError: (err, variables, context) => {
       queryClient.setQueryData(['dashboard-products', buildQueryParams()], context?.previousData)
       toast.error('Failed to update featured status')
@@ -146,6 +145,22 @@ export default function DashboardProductsPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-products'] })
     },
   })
+
+  // Filter products client-side for additional filters not supported by API
+  const filteredProducts = useMemo(() => {
+    let products = data?.products || []
+    
+    // Apply client-side profit filter
+    if (minProfit) {
+      const minProfitValue = parseFloat(minProfit)
+      products = products.filter(p => {
+        const profitMargin = p.profitMargin || ((p.price - (p.buyingPrice || 0)) / p.price) * 100
+        return profitMargin >= minProfitValue
+      })
+    }
+    
+    return products
+  }, [data?.products, minProfit])
 
   // Open delete confirmation modal
   const openDeleteModal = (product: Product) => {
@@ -173,6 +188,7 @@ export default function DashboardProductsPage() {
     setBrand('')
     setMinPrice('')
     setMaxPrice('')
+    setMinProfit('')
     setStockStatus('all')
     setFeatured('all')
     setPage(1)
@@ -185,9 +201,17 @@ export default function DashboardProductsPage() {
     return { label: 'Out of Stock', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle }
   }
 
-  const products: Product[] = data?.products || []
+  // Get profit color
+  const getProfitColor = (profitMargin: number) => {
+    if (profitMargin >= 30) return 'text-emerald-600 dark:text-emerald-400'
+    if (profitMargin >= 15) return 'text-blue-600 dark:text-blue-400'
+    if (profitMargin >= 0) return 'text-amber-600 dark:text-amber-400'
+    return 'text-red-600 dark:text-red-400'
+  }
+
+  const products = filteredProducts
   const pagination = data?.pagination
-  const activeFiltersCount = [search, category, brand, minPrice, maxPrice, stockStatus !== 'all', featured !== 'all'].filter(Boolean).length
+  const activeFiltersCount = [search, category, brand, minPrice, maxPrice, minProfit, stockStatus !== 'all', featured !== 'all'].filter(Boolean).length
 
   if (error) {
     return (
@@ -242,7 +266,7 @@ export default function DashboardProductsPage() {
                 )}
                 <div>
                   <p className="font-semibold text-gray-900 dark:text-white">{productToDelete?.name || ''}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Price: {productToDelete?.price ? `KSh ${productToDelete?.price.toLocaleString()}` : ''}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">SKU: {productToDelete?.sku || 'N/A'}</p>
                 </div>
               </div>
             </div>
@@ -301,7 +325,7 @@ export default function DashboardProductsPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
           <input
             type="text"
-            placeholder="Search products by name, brand, or type..."
+            placeholder="Search by name, SKU, brand, or category..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
@@ -368,7 +392,7 @@ export default function DashboardProductsPage() {
             )}
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
               <select
@@ -380,30 +404,29 @@ export default function DashboardProductsPage() {
                 className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 transition-all"
               >
                 <option value="">All Categories</option>
-                <option value="Pumps">Pumps</option>
+                <option value="Solar Panels">Solar Panels</option>
+                <option value="Inverters">Inverters</option>
+                <option value="Batteries">Batteries</option>
+                <option value="Water Pumps">Water Pumps</option>
+                <option value="Cables & Connectors">Cables & Connectors</option>
+                <option value="Solar Lights">Solar Lights</option>
                 <option value="Generators">Generators</option>
-                <option value="Compressors">Compressors</option>
-                <option value="Solar">Solar Equipment</option>
+                <option value="Accessories">Accessories</option>
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Brand</label>
-              <select
+              <input
+                type="text"
                 value={brand}
                 onChange={(e) => {
                   setBrand(e.target.value)
                   setPage(1)
                 }}
+                placeholder="Filter by brand..."
                 className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 transition-all"
-              >
-                <option value="">All Brands</option>
-                <option value="Pedrollo">Pedrollo</option>
-                <option value="Grundfos">Grundfos</option>
-                <option value="Yamaha">Yamaha</option>
-                <option value="Honda">Honda</option>
-                <option value="Karcher">Karcher</option>
-              </select>
+              />
             </div>
 
             <div className="flex gap-2">
@@ -425,6 +448,20 @@ export default function DashboardProductsPage() {
                   onChange={(e) => setMaxPrice(e.target.value)}
                   placeholder="Any"
                   className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Min Profit Margin (%)</label>
+              <div className="relative">
+                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="number"
+                  value={minProfit}
+                  onChange={(e) => setMinProfit(e.target.value)}
+                  placeholder="Minimum profit %"
+                  className="w-full pl-10 p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
             </div>
@@ -476,11 +513,11 @@ export default function DashboardProductsPage() {
           </div>
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No products found</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-            {search || category || brand || minPrice || maxPrice || stockStatus !== 'all' || featured !== 'all'
+            {activeFiltersCount > 0
               ? 'Try adjusting your search or filters to find what you\'re looking for.'
               : 'Get started by adding your first product to the catalog.'}
           </p>
-          {(search || category || brand || minPrice || maxPrice || stockStatus !== 'all' || featured !== 'all') ? (
+          {activeFiltersCount > 0 ? (
             <button
               onClick={clearFilters}
               className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-all"
@@ -498,11 +535,14 @@ export default function DashboardProductsPage() {
           )}
         </div>
       ) : viewMode === 'grid' ? (
-        // Grid View
+        // Grid View with Profit Display
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {products.map((product, index) => {
             const stockConfig = getStockConfig(product.stock)
             const StockIcon = stockConfig.icon
+            const profitMargin = product.profitMargin || ((product.price - (product.buyingPrice || 0)) / product.price) * 100
+            const profitAmount = product.profitAmount || product.price - (product.buyingPrice || 0)
+            
             return (
               <div 
                 key={product._id} 
@@ -536,23 +576,55 @@ export default function DashboardProductsPage() {
                     </div>
                   )}
                   <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-xs font-semibold rounded-lg">
-                    {product.category}
+                    {product.category || 'Uncategorized'}
                   </div>
                 </div>
 
                 {/* Product Info */}
                 <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1">{product.name}</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">{product.brand}</p>
-                  
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                      KSh {product.price.toLocaleString()}
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-1 flex-1">{product.name}</h3>
+                    <span className={`text-xs font-mono px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded`}>
+                      {product.sku || 'No SKU'}
                     </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{product.brand}</p>
+                  
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                        KSh {product.price.toLocaleString()}
+                      </span>
+                      {product.buyingPrice > 0 && (
+                        <span className="text-xs text-gray-400 line-through ml-2">
+                          KSh {product.buyingPrice.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
                     <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg ${stockConfig.color}`}>
                       <StockIcon className="w-3 h-3" />
-                      {stockConfig.label} ({product.stock})
+                      {stockConfig.label}
                     </span>
+                  </div>
+
+                  {/* Profit Display */}
+                  <div className={`mb-3 p-2 rounded-lg flex items-center justify-between ${profitMargin >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+                    <div className="flex items-center gap-1">
+                      {profitMargin >= 0 ? (
+                        <TrendingUp className="w-3 h-3 text-emerald-600" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3 text-red-600" />
+                      )}
+                      <span className="text-xs font-medium">Profit:</span>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-xs font-semibold ${getProfitColor(profitMargin)}`}>
+                        {profitMargin >= 0 ? '+' : ''}{profitMargin.toFixed(1)}%
+                      </span>
+                      <span className="text-xs text-gray-500 ml-2">
+                        (KSh {profitAmount.toLocaleString()})
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex gap-2">
@@ -586,30 +658,35 @@ export default function DashboardProductsPage() {
           })}
         </div>
       ) : (
-        // Table View
+        // Table View with SKU and Profit Columns
         <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-800/50 border-b border-gray-200/50 dark:border-gray-700">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Product</th>
-                  <th className="px-4 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Category</th>
-                  <th className="px-4 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Price</th>
-                  <th className="px-4 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Stock</th>
-                  <th className="px-4 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-center text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Featured</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Product</th>
+                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">SKU</th>
+                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Category</th>
+                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Selling Price</th>
+                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Buying Price</th>
+                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Profit</th>
+                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Stock</th>
+                  <th className="px-3 py-4 text-center text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Featured</th>
+                  <th className="px-4 py-4 text-right text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {products.map((product, index) => {
                   const stockConfig = getStockConfig(product.stock)
                   const StockIcon = stockConfig.icon
+                  const profitMargin = product.profitMargin || ((product.price - (product.buyingPrice || 0)) / product.price) * 100
+                  const profitAmount = product.profitAmount || product.price - (product.buyingPrice || 0)
+                  
                   return (
                     <tr key={product._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group animate-fade-in-up" style={{ animationDelay: `${index * 30}ms` }}>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-4">
-                          <div className="relative flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
                             {product.images?.[0] ? (
                               <div className="relative w-full h-full">
                                 <Image 
@@ -625,62 +702,79 @@ export default function DashboardProductsPage() {
                               </div>
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Package className="w-6 h-6 text-gray-400" />
+                                <Package className="w-5 h-5 text-gray-400" />
                               </div>
                             )}
                           </div>
                           <div>
-                            <div className="font-semibold text-gray-900 dark:text-white text-sm">{product.name}</div>
+                            <div className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-1">{product.name}</div>
                             <div className="text-xs text-gray-500 dark:text-gray-400">{product.brand}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-3 py-3">
+                        <code className="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                          {product.sku || 'N/A'}
+                        </code>
+                      </td>
+                      <td className="px-3 py-3">
                         <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg text-xs font-medium">
-                          {product.category}
+                          {product.category || 'Uncategorized'}
                         </span>
                       </td>
-                      <td className="px-4 py-4">
-                        <span className="font-semibold text-gray-900 dark:text-white">KSh {product.price.toLocaleString()}</span>
-                      </td>
-                      <td className="px-4 py-4">
+                      <td className="px-3 py-3">
+                        <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                          KSh {product.price.toLocaleString()}
+                        </span>
+                       </td>
+                      <td className="px-3 py-3">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          KSh {(product.buyingPrice || 0).toLocaleString()}
+                        </span>
+                       </td>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col">
+                          <span className={`text-sm font-semibold ${getProfitColor(profitMargin)}`}>
+                            {profitMargin >= 0 ? '+' : ''}{profitMargin.toFixed(1)}%
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            +KSh {profitAmount.toLocaleString()}
+                          </span>
+                        </div>
+                       </td>
+                      <td className="px-3 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg ${stockConfig.color}`}>
                           <StockIcon className="w-3 h-3" />
                           {product.stock}
                         </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="px-2 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg text-xs font-medium">
-                          Active
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
+                       </td>
+                      <td className="px-3 py-3 text-center">
                         <button
-                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          className="relative inline-flex h-5 w-10 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                           style={{ backgroundColor: product.featured ? '#3B82F6' : '#CBD5E1' }}
                           onClick={() => toggleFeaturedMutation.mutate({ id: product.slug, featured: !product.featured })}
                           disabled={toggleFeaturedMutation.isPending}
                         >
                           <span className="sr-only">Toggle featured</span>
                           <span
-                            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-all duration-300 ${
-                              product.featured ? 'translate-x-6' : 'translate-x-1'
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-all duration-300 ${
+                              product.featured ? 'translate-x-5' : 'translate-x-1'
                             } ${toggleFeaturedMutation.isPending ? 'opacity-50' : ''}`}
                           />
                         </button>
-                      </td>
-                      <td className="px-6 py-4 text-right space-x-2">
+                       </td>
+                      <td className="px-4 py-3 text-right space-x-1">
                         <Link 
                           href={`/products/${product.slug}`}
                           target="_blank"
-                          className="inline-flex p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all hover:scale-110"
+                          className="inline-flex p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all hover:scale-110"
                           title="View"
                         >
                           <Eye className="w-4 h-4" />
                         </Link>
                         <Link 
                           href={`/dashboard/products/edit/${product.slug}`}
-                          className="inline-flex p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all hover:scale-110"
+                          className="inline-flex p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all hover:scale-110"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
@@ -688,13 +782,13 @@ export default function DashboardProductsPage() {
                         <button
                           onClick={() => openDeleteModal(product)}
                           disabled={deleteMutation.isPending}
-                          className="inline-flex p-2 text-red-600 hover:bg-red-50 rounded-xl transition-all hover:scale-110 disabled:opacity-50"
+                          className="inline-flex p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-all hover:scale-110 disabled:opacity-50"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                      </td>
-                    </tr>
+                       </td>
+                     </tr>
                   )
                 })}
               </tbody>

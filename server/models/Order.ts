@@ -1,3 +1,4 @@
+// src/models/Order.ts
 import mongoose, { Document, Model, Schema, SchemaTypes } from 'mongoose';
 
 export interface IOrderItem {
@@ -5,7 +6,9 @@ export interface IOrderItem {
   name: string;
   slug: string;
   image: string;
-  price: number;
+  sellingPrice: number;
+  buyingPrice: number;
+  profit: number;
   qty: number;
   description?: string;
 }
@@ -15,6 +18,8 @@ export interface IOrder extends Document {
   guestInfo?: { email: string; phone: string; name?: string; };
   items: IOrderItem[];
   subtotal: number;
+  totalCost: number; // Add this
+  totalProfit: number; // Add this
   shippingCost: number;
   tax: number;
   discount: number;
@@ -22,12 +27,10 @@ export interface IOrder extends Document {
   status: 'pending' | 'processing' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   paymentMethod: 'cod' | 'mpesa' | 'card' | 'cash' | 'bank_transfer' | 'cheque';
   
-  // Payment summary (denormalized from Transaction model)
   paymentStatus: 'unpaid' | 'partially_paid' | 'paid' | 'overpaid' | 'refunded';
   amountPaid: number;
   balanceDue: number;
   
-  // Quick reference for latest payment
   paymentDetails?: {
     transactionId?: string;
     mpesaReceipt?: string;
@@ -37,7 +40,6 @@ export interface IOrder extends Document {
     phoneNumber?: string;
   };
   
-  // Invoice fields
   invoiceNumber?: string;
   quotationNumber?: string;
   invoiceDate?: Date;
@@ -50,6 +52,7 @@ export interface IOrder extends Document {
   appliedPromoCode?: mongoose.Types.ObjectId;
   salesCustomerId?: mongoose.Types.ObjectId;
   quotationId?: mongoose.Types.ObjectId;
+  invoiceId?: mongoose.Types.ObjectId;
   
   shippingAddress: {
     fullName: string;
@@ -81,7 +84,9 @@ const orderItemSchema = new Schema({
   name: { type: String, required: true },
   slug: { type: String, required: true },
   image: { type: String, required: true },
-  price: { type: Number, required: true },
+  sellingPrice: { type: Number, required: true },
+  buyingPrice: { type: Number, default: 0 },
+  profit: { type: Number, default: 0 },
   qty: { type: Number, required: true, min: 1 },
   description: { type: String }
 }, { _id: false });
@@ -95,6 +100,8 @@ const orderSchema = new Schema<IOrder, IOrderModel>({
   },
   items: [orderItemSchema],
   subtotal: { type: Number, required: true },
+  totalCost: { type: Number, default: 0 }, // Add this
+  totalProfit: { type: Number, default: 0 }, // Add this
   shippingCost: { type: Number, default: 0 },
   tax: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },
@@ -106,7 +113,6 @@ const orderSchema = new Schema<IOrder, IOrderModel>({
   },
   paymentMethod: { type: String, enum: ['cod', 'mpesa', 'card', 'cash', 'bank_transfer', 'cheque'], required: true },
   
-  // Payment summary (denormalized)
   paymentStatus: {
     type: String,
     enum: ['unpaid', 'partially_paid', 'paid', 'overpaid', 'refunded'],
@@ -136,6 +142,7 @@ const orderSchema = new Schema<IOrder, IOrderModel>({
   appliedPromoCode: { type: SchemaTypes.ObjectId, ref: 'PromoCode' },
   salesCustomerId: { type: SchemaTypes.ObjectId, ref: 'SalesCustomer' },
   quotationId: { type: SchemaTypes.ObjectId, ref: 'Quotation' },
+  invoiceId: { type: SchemaTypes.ObjectId, ref: 'Invoice' },
   
   shippingAddress: {
     fullName: { type: String, required: true },
@@ -167,6 +174,14 @@ orderSchema.index({ quotationNumber: 1 });
 // Virtual for order number
 orderSchema.virtual('orderNumber').get(function() {
   return `ORD-${this._id.toString().slice(-8).toUpperCase()}`;
+});
+
+// Virtual for profit margin
+orderSchema.virtual('profitMargin').get(function(this: IOrder) {
+  if (this.total && this.totalCost) {
+    return ((this.total - this.totalCost) / this.total) * 100;
+  }
+  return 0;
 });
 
 // Methods

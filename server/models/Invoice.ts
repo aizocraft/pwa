@@ -1,11 +1,11 @@
-// models/Quotation.ts - Updated with profit tracking
+// models/Invoice.ts - Updated with profit tracking
 import mongoose, { Document, Schema } from 'mongoose';
 import QuoteNumberCounterModel from './QuoteNumberCounter';
 
-export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
-export type DiscountType = 'percentage' | 'fixed';
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
+export type PaymentStatus = 'unpaid' | 'partially_paid' | 'paid' | 'overpaid';
 
-export interface IQuotationItem {
+export interface IInvoiceItem {
   productId: mongoose.Types.ObjectId;
   name: string;
   slug?: string;
@@ -16,9 +16,7 @@ export interface IQuotationItem {
   totalProfit: number; // Total profit for this line item
   total: number;
   tax?: number;
-  customPrice?: boolean;
   taxable?: boolean;
-  image?: string;
   description?: string;
 }
 
@@ -27,7 +25,13 @@ export interface ITransportInfo {
   description: string;
 }
 
-export interface IQuotation extends Document {
+export interface IInvoice extends Document {
+  quotationId: mongoose.Types.ObjectId;
+  quotationNumber: string;
+  
+  orderId?: mongoose.Types.ObjectId;
+  orderCreatedAt?: Date;
+  
   customerId: mongoose.Types.ObjectId;
   customerName: string;
   customerEmail?: string;
@@ -37,41 +41,49 @@ export interface IQuotation extends Document {
   createdBy: mongoose.Types.ObjectId;
   createdByName?: string;
 
-  items: IQuotationItem[];
+  items: IInvoiceItem[];
 
   subtotal: number;
   totalCost: number; // Total cost of goods
-  totalProfit: number; // Total profit for quotation
+  totalProfit: number; // Total profit for invoice
   taxRate: number;
   tax: number;
   taxPerItem?: boolean;
   discount: number;
-  discountType: DiscountType;
-  discountReason?: string;
+  discountType: 'percentage' | 'fixed';
   transportInfo?: ITransportInfo;
   transportCost?: number;
   transportDescription?: string;
-  estimatedDelivery?: string;
   total: number;
 
-  quoteNumber: string;
-
-  status: QuotationStatus;
-  validUntil: Date;
-
+  invoiceNumber: string;
+  
+  status: InvoiceStatus;
+  paymentStatus: PaymentStatus;
+  amountPaid: number;
+  balanceDue: number;
+  
+  issueDate: Date;
+  dueDate: Date;
+  
   notes?: string;
   terms?: string;
-
-  acceptedAt?: Date;
+  
+  payments: Array<{
+    amount: number;
+    method: string;
+    reference?: string;
+    date: Date;
+    recordedBy: mongoose.Types.ObjectId;
+    transactionId?: string;
+  }>;
+  
   sentAt?: Date;
-  rejectedAt?: Date;
-  rejectedReason?: string;
-
   createdAt: Date;
   updatedAt: Date;
 }
 
-const quotationItemSchema = new Schema<IQuotationItem>(
+const invoiceItemSchema = new Schema<IInvoiceItem>(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
     name: { type: String, required: true },
@@ -82,10 +94,8 @@ const quotationItemSchema = new Schema<IQuotationItem>(
     profitPerItem: { type: Number, default: 0 },
     totalProfit: { type: Number, default: 0 },
     total: { type: Number, required: true, min: 0 },
-    tax: { type: Number, default: 0, min: 0 },
-    customPrice: { type: Boolean, default: false },
+    tax: { type: Number, default: 0 },
     taxable: { type: Boolean, default: true },
-    image: { type: String },
     description: { type: String }
   },
   { _id: false }
@@ -99,23 +109,33 @@ const transportInfoSchema = new Schema<ITransportInfo>(
   { _id: false }
 );
 
-const quotationSchema = new Schema<IQuotation>(
+const paymentSchema = new Schema({
+  amount: { type: Number, required: true, min: 0 },
+  method: { type: String, required: true },
+  reference: { type: String },
+  date: { type: Date, default: Date.now },
+  recordedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  transactionId: { type: String }
+});
+
+const invoiceSchema = new Schema<IInvoice>(
   {
+    quotationId: { type: Schema.Types.ObjectId, ref: 'Quotation', required: true, index: true },
+    quotationNumber: { type: String, required: true },
+    
+    orderId: { type: Schema.Types.ObjectId, ref: 'Order', index: true },
+    orderCreatedAt: { type: Date },
+    
     customerId: { type: Schema.Types.ObjectId, ref: 'SalesCustomer', required: true, index: true },
     customerName: { type: String, required: true },
     customerEmail: { type: String, lowercase: true, trim: true },
     customerPhone: { type: String, trim: true },
     customerLocation: { type: String, trim: true },
 
-    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     createdByName: { type: String },
 
-    items: { type: [quotationItemSchema], required: true, validate: {
-      validator: function(items: any[]) {
-        return items && items.length > 0;
-      },
-      message: 'At least one item is required'
-    } },
+    items: { type: [invoiceItemSchema], required: true },
 
     subtotal: { type: Number, required: true, min: 0 },
     totalCost: { type: Number, default: 0, min: 0 },
@@ -125,41 +145,46 @@ const quotationSchema = new Schema<IQuotation>(
     taxPerItem: { type: Boolean, default: false },
     discount: { type: Number, required: true, min: 0 },
     discountType: { type: String, enum: ['percentage', 'fixed'], required: true },
-    discountReason: { type: String },
     transportInfo: { type: transportInfoSchema },
-    transportCost: { type: Number, default: 0, min: 0 },
-    transportDescription: { type: String, trim: true },
-    estimatedDelivery: { type: String, trim: true },
+    transportCost: { type: Number, default: 0 },
+    transportDescription: { type: String },
     total: { type: Number, required: true, min: 0 },
 
-    quoteNumber: { type: String, required: true, unique: true, index: true },
-
+    invoiceNumber: { type: String, required: true, unique: true, index: true },
+    
     status: {
       type: String,
-      enum: ['draft', 'sent', 'accepted', 'rejected', 'expired'],
+      enum: ['draft', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled'],
       default: 'draft',
       index: true
     },
-
-    validUntil: { type: Date, required: true, index: true },
-
+    
+    paymentStatus: {
+      type: String,
+      enum: ['unpaid', 'partially_paid', 'paid', 'overpaid'],
+      default: 'unpaid'
+    },
+    
+    amountPaid: { type: Number, default: 0, min: 0 },
+    balanceDue: { type: Number, default: 0, min: 0 },
+    
+    issueDate: { type: Date, required: true, default: Date.now },
+    dueDate: { type: Date, required: true },
+    
     notes: { type: String, trim: true },
     terms: { type: String, trim: true },
-
-    acceptedAt: { type: Date },
-    sentAt: { type: Date },
-    rejectedAt: { type: Date },
-    rejectedReason: { type: String }
+    
+    payments: [paymentSchema],
+    
+    sentAt: { type: Date }
   },
   { timestamps: true }
 );
 
 // Pre-save middleware to calculate totals including profit
-quotationSchema.pre('save', function(next) {
-  if (this.isModified('items') || this.isModified('discount') || this.isModified('discountType') || 
-      this.isModified('transportInfo') || this.isModified('taxPerItem')) {
-    
-    // Calculate subtotal, totalCost, totalProfit
+invoiceSchema.pre('save', function(next) {
+  // Calculate profit metrics for items
+  if (this.isModified('items')) {
     this.subtotal = 0;
     this.totalCost = 0;
     this.totalProfit = 0;
@@ -177,45 +202,43 @@ quotationSchema.pre('save', function(next) {
       this.totalCost += itemCost;
       this.totalProfit += itemProfit;
     }
+  }
+  
+  // Calculate balance due
+  if (this.isModified('amountPaid') || this.isModified('total')) {
+    this.balanceDue = Math.max(0, this.total - this.amountPaid);
     
-    // Calculate discount
-    let discountAmount = this.discount;
-    if (this.discountType === 'percentage') {
-      discountAmount = this.subtotal * (this.discount / 100);
-    }
-    
-    // Calculate tax
-    let tax = 0;
-    if (this.taxPerItem) {
-      tax = this.items.reduce((sum, item) => sum + (item.tax || 0), 0);
+    if (this.amountPaid === 0) {
+      this.paymentStatus = 'unpaid';
+    } else if (this.amountPaid < this.total) {
+      this.paymentStatus = 'partially_paid';
+    } else if (this.amountPaid === this.total) {
+      this.paymentStatus = 'paid';
+      if (this.status === 'draft' || this.status === 'sent') {
+        this.status = 'paid';
+      }
     } else {
-      const taxableAmount = Math.max(0, this.subtotal - discountAmount);
-      tax = taxableAmount * this.taxRate;
+      this.paymentStatus = 'overpaid';
     }
-    this.tax = tax;
-    
-    // Calculate final total
-    const transportCost = this.transportInfo?.cost || this.transportCost || 0;
-    this.total = this.subtotal - discountAmount + this.tax + transportCost;
   }
   next();
 });
 
-// Generate quote number in format: 0001-MM-PSMA/Q
-export async function generateQuoteNumber(date: Date = new Date()): Promise<string> {
+// Generate invoice number
+export async function generateInvoiceNumber(date: Date = new Date()): Promise<string> {
   const year = date.getFullYear();
   const monthNumber = date.getMonth() + 1;
   const month = String(monthNumber).padStart(2, '0');
 
   const counter = await QuoteNumberCounterModel.findOneAndUpdate(
-    { year, month: monthNumber, type: 'quotation' },
+    { year, month: monthNumber, type: 'invoice' },
     { $inc: { sequence: 1 } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
   const sequence = String(counter!.sequence).padStart(4, '0');
-  return `${sequence}-${month}-PSMA/Q`;
+  return `${sequence}-${month}-PSMA/I`;
 }
 
-const QuotationModel = mongoose.model<IQuotation>('Quotation', quotationSchema);
-export default QuotationModel;
+const InvoiceModel = mongoose.model<IInvoice>('Invoice', invoiceSchema);
+export default InvoiceModel;

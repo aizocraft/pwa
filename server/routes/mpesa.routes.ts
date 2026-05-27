@@ -240,7 +240,7 @@ router.post('/callback', async (req: Request, res: Response) => {
           items: order.items.map(item => ({
             name: item.name,
             quantity: item.qty,
-            price: item.price
+            price: item.sellingPrice
           }))
         }).catch(err => console.error('Failed to send payment confirmation:', err));
       }

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, Loader2, Smartphone, CreditCard, DollarSign, Banknote, Receipt } from 'lucide-react';
+import { useState } from 'react';
+import { X, Loader2, Smartphone, DollarSign, Banknote, Receipt, CreditCard, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '@/lib/api';
 
@@ -9,75 +9,35 @@ interface RecordPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  orderId: string;
-  orderNumber: string;
+  invoiceId: string;
+  invoiceNumber: string;
   totalAmount: number;
   amountPaid: number;
   balanceDue: number;
-  isQuotation?: boolean; // Flag to indicate if this is a quotation (needs to find associated order)
 }
 
 export function RecordPaymentModal({
   isOpen,
   onClose,
   onSuccess,
-  orderId,
-  orderNumber,
+  invoiceId,
+  invoiceNumber,
   totalAmount,
   amountPaid,
   balanceDue,
-  isQuotation = false,
 }: RecordPaymentModalProps) {
   const [loading, setLoading] = useState(false);
-  const [actualOrderId, setActualOrderId] = useState<string | null>(null);
-  const [resolvingOrder, setResolvingOrder] = useState(false);
   const [formData, setFormData] = useState({
     amount: balanceDue,
-    paymentMethod: 'mpesa' as 'mpesa' | 'cash' | 'bank_transfer' | 'cheque',
+    paymentMethod: 'mpesa',
     reference: '',
     notes: '',
   });
-
-  // Resolve the actual order ID if this is a quotation
-  useEffect(() => {
-    if (isOpen && isQuotation && orderId) {
-      resolveOrderFromQuotation();
-    } else if (isOpen && !isQuotation) {
-      setActualOrderId(orderId);
-    }
-  }, [isOpen, orderId, isQuotation]);
-
-  const resolveOrderFromQuotation = async () => {
-    setResolvingOrder(true);
-    try {
-      // First try to get the quotation details
-      const quotationRes = await api.get(`/sales/quotations/${orderId}`);
-      const quotation = quotationRes.data.quotation;
-      
-      if (quotation.convertedOrderId) {
-        setActualOrderId(quotation.convertedOrderId);
-      } else {
-        toast.error('This quotation has not been converted to an order yet');
-        onClose();
-      }
-    } catch (error) {
-      console.error('Failed to resolve order from quotation:', error);
-      toast.error('Could not find associated order for this quotation');
-      onClose();
-    } finally {
-      setResolvingOrder(false);
-    }
-  };
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!actualOrderId) {
-      toast.error('No valid order ID found');
-      return;
-    }
     
     if (formData.amount <= 0) {
       toast.error('Please enter a valid amount');
@@ -91,10 +51,9 @@ export function RecordPaymentModal({
 
     setLoading(true);
     try {
-      await api.post('/payments/record', {
-        orderId: actualOrderId,
+      await api.post(`/sales/invoices/${invoiceId}/payments`, {
         amount: formData.amount,
-        paymentMethod: formData.paymentMethod,
+        method: formData.paymentMethod,
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
       });
@@ -103,129 +62,133 @@ export function RecordPaymentModal({
       onSuccess();
       onClose();
     } catch (error: any) {
+      console.error('Payment error:', error);
       toast.error(error.response?.data?.error || 'Failed to record payment');
     } finally {
       setLoading(false);
     }
   };
 
-  const getPaymentIcon = (method: string) => {
-    switch (method) {
-      case 'mpesa': return <Smartphone className="w-4 h-4" />;
-      case 'cash': return <DollarSign className="w-4 h-4" />;
-      case 'bank_transfer': return <Banknote className="w-4 h-4" />;
-      case 'cheque': return <Receipt className="w-4 h-4" />;
-      default: return <CreditCard className="w-4 h-4" />;
-    }
-  };
+  const paymentMethods = [
+    { value: 'mpesa', label: 'M-PESA', icon: Smartphone, color: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800' },
+    { value: 'cash', label: 'Cash', icon: DollarSign, color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800' },
+    { value: 'bank_transfer', label: 'Bank Transfer', icon: Banknote, color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800' },
+    { value: 'card', label: 'Card', icon: CreditCard, color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800' },
+    { value: 'cheque', label: 'Cheque', icon: Receipt, color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800' },
+  ];
 
-  if (resolvingOrder) {
-    return (
-      <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-gray-900 rounded-xl max-w-md w-full p-8 text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-cyan-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading order details...</p>
-        </div>
-      </div>
-    );
-  }
+  const selectedMethod = paymentMethods.find(m => m.value === formData.paymentMethod);
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl max-w-md w-full shadow-2xl">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Record Payment</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {isQuotation ? 'Invoice' : 'Order'}: {orderNumber}
-            </p>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Record Payment</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                Invoice #{invoiceNumber}
+              </p>
+            </div>
+            <button 
+              onClick={onClose} 
+              className="p-2 hover:bg-white/50 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
+            >
+              <X className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+            </button>
           </div>
-          <button 
-            onClick={onClose} 
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-          </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Amount Summary */}
-          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Total Amount:</span>
-              <span className="font-semibold text-gray-900 dark:text-white">KES {totalAmount.toLocaleString()}</span>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Amount Summary Cards */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">KES {totalAmount.toLocaleString()}</p>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Already Paid:</span>
-              <span className="font-semibold text-green-600 dark:text-green-400">KES {amountPaid.toLocaleString()}</span>
+            <div className="bg-green-50 dark:bg-green-950/20 rounded-xl p-3 text-center">
+              <p className="text-xs text-green-600 dark:text-green-400 mb-1">Paid</p>
+              <p className="text-lg font-bold text-green-600 dark:text-green-400">KES {amountPaid.toLocaleString()}</p>
             </div>
-            <div className="flex justify-between text-sm pt-2 border-t border-gray-200 dark:border-gray-700">
-              <span className="text-gray-900 dark:text-white font-medium">Balance Due:</span>
-              <span className="font-bold text-amber-600 dark:text-amber-400">KES {balanceDue.toLocaleString()}</span>
+            <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-3 text-center">
+              <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">Balance</p>
+              <p className="text-lg font-bold text-amber-600 dark:text-amber-400">KES {balanceDue.toLocaleString()}</p>
             </div>
           </div>
 
           {/* Amount Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Payment Amount <span className="text-red-500">*</span>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Payment Amount
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">KES</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">KES</span>
               <input
                 type="number"
-                step="0.01"
+                step="100"
                 min="1"
                 max={balanceDue}
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                className="w-full pl-12 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+                className="w-full pl-16 pr-4 py-3 text-lg font-semibold border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
                 required
               />
             </div>
+            <p className="text-xs text-gray-400 mt-1.5">Max: KES {balanceDue.toLocaleString()}</p>
           </div>
 
-          {/* Payment Method */}
+          {/* Payment Method Dropdown - Sleek Design */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Payment Method <span className="text-red-500">*</span>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Payment Method
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['mpesa', 'cash', 'bank_transfer', 'cheque'] as const).map((method) => (
-                <button
-                  key={method}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, paymentMethod: method })}
-                  className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${
-                    formData.paymentMethod === method
-                      ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/30 text-cyan-700 dark:text-cyan-400'
-                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  {getPaymentIcon(method)}
-                  <span className="capitalize">{method.replace('_', ' ')}</span>
-                </button>
-              ))}
+            <div className="relative">
+              <select
+                value={formData.paymentMethod}
+                onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white appearance-none cursor-pointer focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+              >
+                {paymentMethods.map((method) => (
+                  <option key={method.value} value={method.value}>
+                    {method.label}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                {selectedMethod && <selectedMethod.icon className="w-5 h-5 text-gray-400" />}
+              </div>
+            </div>
+            
+            {/* Selected method hint */}
+            <div className={`mt-2 px-3 py-2 rounded-lg text-xs flex items-center gap-2 ${selectedMethod?.color} border`}>
+              {selectedMethod && <selectedMethod.icon className="w-3.5 h-3.5" />}
+              <span>Payment will be recorded as {selectedMethod?.label}</span>
             </div>
           </div>
 
-          {/* Reference (optional) */}
+          {/* Reference Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Reference (Optional)
             </label>
             <input
               type="text"
-              placeholder="e.g., M-Pesa transaction ID, Cheque number, etc."
+              placeholder={
+                formData.paymentMethod === 'mpesa' ? 'M-PESA Transaction ID' :
+                formData.paymentMethod === 'cheque' ? 'Cheque Number' :
+                formData.paymentMethod === 'bank_transfer' ? 'Transfer Reference' :
+                'Reference Number'
+              }
               value={formData.reference}
               onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+              className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
             />
           </div>
 
-          {/* Notes (optional) */}
+          {/* Notes Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Notes (Optional)
             </label>
             <textarea
@@ -233,24 +196,28 @@ export function RecordPaymentModal({
               placeholder="Additional notes about this payment..."
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+              className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all resize-none"
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25"
             >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {loading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <CheckCircle className="w-5 h-5" />
+              )}
               Record Payment
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
+              className="flex-1 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200 text-gray-700 dark:text-gray-300 font-medium"
             >
               Cancel
             </button>

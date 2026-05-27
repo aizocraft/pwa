@@ -24,7 +24,9 @@ import {
   Sparkles,
   ChevronDown,
   Link as LinkIcon,
-  Save
+  Save,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { getProduct, updateProduct, uploadProductImages, deleteProductImage, getImageUrl } from '@/lib/api';
@@ -34,10 +36,12 @@ import { cn } from '@/lib/utils';
 interface EditProductFormData {
   name: string;
   slug: string;
+  sku: string;
   category: string;
   brand: string;
   type: string;
   price: number;
+  buyingPrice: number;
   compareAtPrice?: number;
   description: string;
   specs: Record<string, string>;
@@ -46,6 +50,8 @@ interface EditProductFormData {
   images: ProductImage[];
   featured: boolean;
   rating: number;
+  supplier?: string;
+  supplierName?: string;
 }
 
 export default function EditProductPage() {
@@ -58,10 +64,12 @@ export default function EditProductPage() {
   const [formData, setFormData] = useState<EditProductFormData>({
     name: '',
     slug: '',
+    sku: '',
     category: '',
     brand: '',
     type: '',
     price: 0,
+    buyingPrice: 0,
     compareAtPrice: undefined,
     description: '',
     specs: {},
@@ -84,6 +92,11 @@ export default function EditProductPage() {
   const [specKey, setSpecKey] = useState('');
   const [specValue, setSpecValue] = useState('');
 
+  // Calculate profit
+  const profitAmount = formData.price - formData.buyingPrice;
+  const profitMargin = formData.price > 0 ? (profitAmount / formData.price) * 100 : 0;
+  const markup = formData.buyingPrice > 0 ? (profitAmount / formData.buyingPrice) * 100 : 0;
+
   // Fetch product
   const { data: product, isLoading } = useQuery({
     queryKey: ['product', productSlug],
@@ -97,10 +110,12 @@ export default function EditProductPage() {
       setFormData({
         name: product.name || '',
         slug: product.slug || '',
+        sku: product.sku || '',
         category: product.category || '',
         brand: product.brand || '',
         type: product.type || '',
         price: product.price || 0,
+        buyingPrice: product.buyingPrice || 0,
         compareAtPrice: product.compareAtPrice,
         description: product.description || '',
         specs: product.specs || {},
@@ -236,10 +251,12 @@ export default function EditProductPage() {
       const productData = {
         name: formData.name,
         slug: formData.slug,
+        sku: formData.sku || undefined,
         category: formData.category,
         brand: formData.brand,
         type: formData.type,
         price: Number(formData.price),
+        buyingPrice: Number(formData.buyingPrice),
         compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
         description: formData.description,
         specs: formData.specs,
@@ -252,6 +269,7 @@ export default function EditProductPage() {
 
       await updateProduct(productSlug, productData);
       
+      toast.success('Product updated successfully!');
       router.push('/dashboard/products');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update product');
@@ -372,7 +390,7 @@ export default function EditProductPage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Slug
+                    Slug (SEO)
                   </label>
                   <input
                     type="text"
@@ -382,29 +400,42 @@ export default function EditProductPage() {
                   />
                 </div>
 
-<div>
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-    Category <span className="text-red-500">*</span>
-  </label>
-  <div className="relative">
-    <select
-      value={formData.category}
-      onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 appearance-none"
-      required
-    >
-      <option value="">Select a category</option>
-      <option value="Solar Panels">Solar Panels</option>
-      <option value="Inverters">Inverters</option>
-      <option value="Batteries">Batteries</option>
-      <option value="Water Pumps">Water Pumps</option>
-      <option value="Cables & Connectors">Cables & Connectors</option>
-      <option value="Solar Lights">Solar Lights</option>
-      <option value="Accessories">Accessories</option>
-    </select>
-    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-  </div>
-</div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    SKU
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.sku}
+                    onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 font-mono text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Category <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 appearance-none"
+                      required
+                    >
+                      <option value="">Select a category</option>
+                      <option value="Solar Panels">Solar Panels</option>
+                      <option value="Inverters">Inverters</option>
+                      <option value="Batteries">Batteries</option>
+                      <option value="Water Pumps">Water Pumps</option>
+                      <option value="Cables & Connectors">Cables & Connectors</option>
+                      <option value="Solar Lights">Solar Lights</option>
+                      <option value="Generators">Generators</option>
+                      <option value="Accessories">Accessories</option>
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -440,7 +471,7 @@ export default function EditProductPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Price (KES) <span className="text-red-500">*</span>
+                    Selling Price (KES) <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -458,6 +489,61 @@ export default function EditProductPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Buying Price (KES)
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.buyingPrice}
+                      onChange={(e) => setFormData(prev => ({ ...prev, buyingPrice: Number(e.target.value) }))}
+                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Profit Display */}
+              {(formData.price > 0 || formData.buyingPrice > 0) && (
+                <div className={`mt-4 p-4 rounded-xl ${profitAmount >= 0 ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800'}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      {profitAmount >= 0 ? (
+                        <TrendingUp className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <TrendingDown className="w-5 h-5 text-red-600" />
+                      )}
+                      <span className="font-semibold">Profit Analysis</span>
+                    </div>
+                    <div className="flex flex-wrap gap-4">
+                      <div>
+                        <span className="text-sm text-gray-500">Profit Amount:</span>
+                        <span className={`ml-2 font-semibold ${profitAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {profitAmount >= 0 ? '+' : ''}KES {profitAmount.toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-500">Profit Margin:</span>
+                        <span className={`ml-2 font-semibold ${profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {profitMargin.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-500">Markup:</span>
+                        <span className={`ml-2 font-semibold ${markup >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {markup.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Compare at Price (Optional)
                   </label>
                   <div className="relative">
@@ -469,6 +555,7 @@ export default function EditProductPage() {
                       value={formData.compareAtPrice ?? ''}
                       onChange={(e) => setFormData(prev => ({ ...prev, compareAtPrice: e.target.value ? Number(e.target.value) : undefined }))}
                       className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                      placeholder="Original price before discount"
                     />
                   </div>
                 </div>

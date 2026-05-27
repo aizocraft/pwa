@@ -1,5 +1,4 @@
 // src/routes/orderRoutes.ts
-
 import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import OrderModel from '../models/Order';
@@ -96,16 +95,10 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
       };
     }
 
-    // Debug logging
-    console.log('=== ORDER CREATION ===');
-    console.log('ShippingAreaId:', shippingAreaId);
-    console.log('PromoCode:', promoCode);
-    console.log('User authenticated:', !!req.user);
-    console.log('User ID:', req.user?.userId);
-    console.log('Payment method:', paymentMethod);
-
-    // Process items and verify stock
+    // Process items and verify stock with profit tracking
     let calculatedSubtotal = 0;
+    let totalCost = 0;
+    let totalProfit = 0;
     const orderItems = [];
 
     for (const item of items) {
@@ -121,16 +114,27 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
         });
       }
       
-      const price = parseFloat(product.price.toString());
-      calculatedSubtotal += price * item.qty;
+      const sellingPrice = parseFloat(product.price.toString());
+      const buyingPrice = parseFloat(product.buyingPrice?.toString() || '0');
+      const profitPerItem = sellingPrice - buyingPrice;
+      const itemTotal = sellingPrice * item.qty;
+      const itemCost = buyingPrice * item.qty;
+      const itemProfit = profitPerItem * item.qty;
+      
+      calculatedSubtotal += itemTotal;
+      totalCost += itemCost;
+      totalProfit += itemProfit;
       
       orderItems.push({
         productId: item.productId,
         name: product.name,
         slug: product.slug,
         image: getImageUrl(product.images?.[0]),
-        price: price,
-        qty: item.qty
+        sellingPrice: sellingPrice,
+        buyingPrice: buyingPrice,
+        profit: profitPerItem,
+        qty: item.qty,
+        description: product.description || ''
       });
       
       // Update stock
@@ -139,9 +143,10 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
     }
 
     console.log('Subtotal:', calculatedSubtotal);
+    console.log('Total Cost:', totalCost);
+    console.log('Total Profit:', totalProfit);
 
-    // Use client-provided values or calculate fallbacks
-    // Server-side calculation for shipping and promo
+    // Calculate shipping, tax, discount
     const shippingArea = await ShippingAreaModel.findOne({ _id: shippingAreaId, isActive: true });
     if (!shippingArea) {
       return res.status(400).json({ error: 'Invalid shipping area' });
@@ -158,7 +163,6 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
           : Math.min(promo.value, calculatedSubtotal);
         appliedPromo = promo._id;
         promoCodeStr = promo.code;
-        // Increment used count
         promo.usedCount += 1;
         await promo.save();
       } else {
@@ -173,12 +177,12 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
     const tax = calculatedSubtotal * taxRate;
     const finalTotal = calculatedSubtotal + shippingCost - discount + tax;
 
-    console.log('Server calc - Subtotal:', calculatedSubtotal, 'Shipping:', shippingCost, 'Discount:', discount, 'Tax:', tax, 'Total:', finalTotal);
-
     // Create order
     const orderData: any = {
       items: orderItems,
       subtotal: calculatedSubtotal,
+      totalCost: totalCost,
+      totalProfit: totalProfit,
       shippingCost,
       tax,
       discount,
@@ -204,23 +208,6 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
     const order = new OrderModel(orderData);
     await order.save();
 
-    // Initialize payment tracking (REPLACE existing code)
-const paymentInit = await PaymentService.initializeOrderPayment(
-  order._id.toString(),
-  paymentMethod
-);
-
-// Add to response
-res.status(201).json({
-  success: true,
-  message: 'Order created successfully',
-  _id: order._id,
-  orderNumber: order.orderNumber,
-  total: Number(order.total),
-  // ... existing fields ...
-  paymentStatus: paymentInit.status  // Add this
-});
-
     // Get customer information for emails
     let customerName = shippingAddress.fullName;
     let customerEmail = shippingAddress.email || '';
@@ -245,100 +232,90 @@ res.status(201).json({
     const emailItems = orderItems.map(item => ({
       name: item.name,
       quantity: item.qty,
-      price: item.price
+      price: item.sellingPrice
     }));
 
-// Send order confirmation to customer (don't await - let it run in background)
-sendOrderConfirmation({
-  orderId: order._id.toString(),
-  customerName: customerName,
-  customerEmail: customerEmail,
-  subtotal: calculatedSubtotal,
-  shippingCost: shippingCost,
-  discount: discount,
-  tax: tax,
-  total: finalTotal,
-  promoCode: promoCodeStr,
-  status: order.status,
-  items: emailItems
-}).catch(err => console.error('Failed to send customer confirmation:', err));
+    // Send order confirmation to customer
+    sendOrderConfirmation({
+      orderId: order._id.toString(),
+      customerName: customerName,
+      customerEmail: customerEmail,
+      subtotal: calculatedSubtotal,
+      shippingCost: shippingCost,
+      discount: discount,
+      tax: tax,
+      total: finalTotal,
+      promoCode: promoCodeStr,
+      status: order.status,
+      items: emailItems
+    }).catch(err => console.error('Failed to send customer confirmation:', err));
 
-// Send admin notification (don't await - let it run in background)
-if (process.env.ADMIN_EMAIL) {
-  sendAdminOrderNotification({
-    orderId: order._id.toString(),
-    customerName: customerName,
-    customerEmail: customerEmail,
-    customerPhone: customerPhone,
-    shippingAddress: formattedAddress,
-    subtotal: calculatedSubtotal,
-    shippingCost: shippingCost,
-    discount: discount,
-    tax: tax,
-    total: finalTotal,
-    promoCode: promoCodeStr,
-    paymentMethod: paymentMethod,
-    status: order.status,
-    items: emailItems,
-    orderDate: order.createdAt || new Date()
-  }).catch(err => console.error('Failed to send admin notification:', err));
-}
-
-// 🔔 CREATE NEW ORDER NOTIFICATION for admin users
-try {
-  const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
-  if (adminUsers.length > 0) {
-    // Create notifications for ALL admin users, not just first one
-    const notificationPromises = adminUsers.map(admin => 
-      createNotification({
-        userId: admin._id.toString(), // Convert ObjectId to string
-        type: 'order',
-        title: `🛍️ New Order #${order.orderNumber}`,
-        message: `Order placed by ${customerName} (Total: KES ${finalTotal.toFixed(2)})`,
-        actionUrl: `/dashboard/orders/${order._id}`,
-        metadata: {
-          orderId: order._id.toString(),
-          orderNumber: order.orderNumber,
-          customerName: customerName,
-          customerEmail: customerEmail,
-          paymentMethod: paymentMethod,
-          total: finalTotal
-        }
-      })
-    );
-    
-    await Promise.all(notificationPromises);
-    console.log(`✅ Created ${adminUsers.length} admin notifications for order ${order.orderNumber}`);
-  }
-  
-  // Also notify the customer if they are an authenticated user
-  if (userId) {
-    await createNotification({
-      userId: userId.toString(), // Convert ObjectId to string if needed
-      type: 'order',
-      title: `✅ Order Confirmed #${order.orderNumber}`,
-      message: `Your order has been confirmed. Total: KES ${finalTotal.toFixed(2)}`,
-      actionUrl: `/orders/${order._id}`,
-      metadata: {
+    // Send admin notification
+    if (process.env.ADMIN_EMAIL) {
+      sendAdminOrderNotification({
         orderId: order._id.toString(),
-        orderNumber: order.orderNumber,
+        customerName: customerName,
+        customerEmail: customerEmail,
+        customerPhone: customerPhone,
+        shippingAddress: formattedAddress,
+        subtotal: calculatedSubtotal,
+        shippingCost: shippingCost,
+        discount: discount,
+        tax: tax,
         total: finalTotal,
-        status: order.status
+        promoCode: promoCodeStr,
+        paymentMethod: paymentMethod,
+        status: order.status,
+        items: emailItems,
+        orderDate: order.createdAt || new Date()
+      }).catch(err => console.error('Failed to send admin notification:', err));
+    }
+
+    // Create order notifications
+    try {
+      const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+      if (adminUsers.length > 0) {
+        const notificationPromises = adminUsers.map(admin => 
+          createNotification({
+            userId: admin._id.toString(),
+            type: 'order',
+            title: `🛍️ New Order #${order.orderNumber}`,
+            message: `Order placed by ${customerName} (Total: KES ${finalTotal.toFixed(2)}, Profit: KES ${totalProfit.toFixed(2)})`,
+            actionUrl: `/dashboard/orders/${order._id}`,
+            metadata: {
+              orderId: order._id.toString(),
+              orderNumber: order.orderNumber,
+              customerName: customerName,
+              customerEmail: customerEmail,
+              paymentMethod: paymentMethod,
+              total: finalTotal,
+              profit: totalProfit
+            }
+          })
+        );
+        await Promise.all(notificationPromises);
       }
-    });
-    console.log(`✅ Created customer notification for order ${order.orderNumber}`);
-  }
-  
-} catch (notificationErr) {
-  console.error('Failed to create order notifications:', notificationErr);
-}
+      
+      if (userId) {
+        await createNotification({
+          userId: userId.toString(),
+          type: 'order',
+          title: `✅ Order Confirmed #${order.orderNumber}`,
+          message: `Your order has been confirmed. Total: KES ${finalTotal.toFixed(2)}`,
+          actionUrl: `/orders/${order._id}`,
+          metadata: {
+            orderId: order._id.toString(),
+            orderNumber: order.orderNumber,
+            total: finalTotal,
+            status: order.status
+          }
+        });
+      }
+    } catch (notificationErr) {
+      console.error('Failed to create order notifications:', notificationErr);
+    }
 
-    // Populate product details for response
-    const populatedOrder = await OrderModel.findById(order._id)
-      .populate('items.productId', 'name images slug')
-      .populate('selectedShippingArea', 'name baseCost freeThreshold')
-      .populate('appliedPromoCode', 'code type value');
-
+    // Return response
     res.status(201).json({
       success: true,
       message: 'Order created successfully',
@@ -348,6 +325,8 @@ try {
       subtotal: Number(order.subtotal),
       shippingCost: Number(order.shippingCost),
       tax: Number(order.tax),
+      discount: Number(order.discount),
+      totalProfit: Number(order.totalProfit),
       status: order.status,
       paymentMethod: order.paymentMethod,
       paymentStatus: order.paymentStatus,
@@ -357,7 +336,9 @@ try {
         productId: item.productId,
         name: item.name,
         image: item.image,
-        price: Number(item.price),
+        sellingPrice: Number(item.sellingPrice),
+        buyingPrice: Number(item.buyingPrice),
+        profit: Number(item.profit),
         qty: item.qty
       })),
       shippingAddress: order.shippingAddress
@@ -371,13 +352,74 @@ try {
   }
 });
 
+// GET /api/orders/profit/analytics - Profit analytics endpoint
+router.get('/profit/analytics', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    const { startDate, endDate } = req.query;
+    
+    const matchStage: any = {
+      status: { $in: ['paid', 'delivered', 'processing'] }
+    };
+    
+    if (startDate || endDate) {
+      matchStage.createdAt = {};
+      if (startDate) matchStage.createdAt.$gte = new Date(startDate as string);
+      if (endDate) matchStage.createdAt.$lte = new Date(endDate as string);
+    }
+    
+    const pipeline: any[] = [
+      { $match: matchStage },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$total' },
+          totalCost: { $sum: '$totalCost' },
+          totalProfit: { $sum: '$totalProfit' },
+          totalOrders: { $sum: 1 },
+          totalUnitsSold: { $sum: { $sum: '$items.qty' } }
+        }
+      },
+      {
+        $addFields: {
+          averageOrderValue: { $cond: [{ $gt: ['$totalOrders', 0] }, { $divide: ['$totalRevenue', '$totalOrders'] }, 0] },
+          profitMargin: { $cond: [{ $gt: ['$totalRevenue', 0] }, { $multiply: [{ $divide: ['$totalProfit', '$totalRevenue'] }, 100] }, 0] },
+          averageProfitPerOrder: { $cond: [{ $gt: ['$totalOrders', 0] }, { $divide: ['$totalProfit', '$totalOrders'] }, 0] }
+        }
+      }
+    ];
+    
+    const results = await OrderModel.aggregate(pipeline);
+    const analytics = results[0] || {
+      totalRevenue: 0,
+      totalCost: 0,
+      totalProfit: 0,
+      totalOrders: 0,
+      totalUnitsSold: 0,
+      averageOrderValue: 0,
+      profitMargin: 0,
+      averageProfitPerOrder: 0
+    };
+    
+    res.json({
+      success: true,
+      analytics
+    });
+  } catch (error: any) {
+    console.error('Profit analytics error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/orders/track/:orderNumber - Track order by order number (public)
 router.get('/track/:orderNumber', async (req: Request, res: Response) => {
   try {
     const { orderNumber } = req.params;
     const orderId = 'ORD-' + orderNumber;
     
-    // Find by ID or order number pattern
     const order = await OrderModel.findOne({
       $or: [
         { _id: orderNumber },
@@ -389,7 +431,6 @@ router.get('/track/:orderNumber', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    //  sensitive info
     const safeOrder = {
       orderNumber: order.orderNumber,
       status: order.status,
@@ -449,9 +490,12 @@ router.get('/', authMiddleware, async (req: Request & { user?: any }, res: Respo
       orderNumber: order.orderNumber,
       total: Number(order.total),
       subtotal: Number(order.subtotal),
+      totalProfit: Number(order.totalProfit),
       items: order.items.map((item: any) => ({
         ...item.toObject(),
-        price: Number(item.price)
+        sellingPrice: Number(item.sellingPrice),
+        buyingPrice: Number(item.buyingPrice),
+        profit: Number(item.profit)
       }))
     }));
     
@@ -462,13 +506,12 @@ router.get('/', authMiddleware, async (req: Request & { user?: any }, res: Respo
   }
 });
 
-// GET /api/orders/:id - Get single order (supports both auth and guest)
+// GET /api/orders/:id - Get single order
 router.get('/:id', optionalAuthMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
     const orderId = req.params.id;
     let order = null;
 
-    // Try to find by ID
     if (mongoose.Types.ObjectId.isValid(orderId)) {
       const validOrderId = new mongoose.Types.ObjectId(orderId);
       order = await OrderModel.findById(validOrderId)
@@ -479,15 +522,11 @@ router.get('/:id', optionalAuthMiddleware, async (req: Request & { user?: any },
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Check permissions
     let hasAccess = false;
     
     if (req.user && req.user.userId) {
-      // Authenticated user - check if order belongs to them or they're admin
       hasAccess = order.userId?.toString() === req.user.userId || req.user.role === 'admin';
     } else {
-      // Guest - would need to verify via email/phone, but for single order view
-      // we'll just allow if they have the ID (basic security)
       hasAccess = true;
     }
 
@@ -500,9 +539,12 @@ router.get('/:id', optionalAuthMiddleware, async (req: Request & { user?: any },
       orderNumber: order.orderNumber,
       total: Number(order.total),
       subtotal: Number(order.subtotal),
+      totalProfit: Number(order.totalProfit),
       items: order.items.map((item: any) => ({
         ...item.toObject(),
-        price: Number(item.price)
+        sellingPrice: Number(item.sellingPrice),
+        buyingPrice: Number(item.buyingPrice),
+        profit: Number(item.profit)
       }))
     };
     
@@ -558,9 +600,13 @@ router.get('/admin/orders', authMiddleware, async (req: Request & { user?: any }
       orderNumber: order.orderNumber,
       total: Number(order.total),
       subtotal: Number(order.subtotal),
+      totalProfit: Number(order.totalProfit),
+      totalCost: Number(order.totalCost),
       items: order.items.map((item: any) => ({
         ...item.toObject(),
-        price: Number(item.price)
+        sellingPrice: Number(item.sellingPrice),
+        buyingPrice: Number(item.buyingPrice),
+        profit: Number(item.profit)
       }))
     }));
 
@@ -579,11 +625,11 @@ router.get('/admin/orders', authMiddleware, async (req: Request & { user?: any }
   }
 });
 
-// PUT /api/orders/:id/cancel - Cancel order (user or guest)
+// PUT /api/orders/:id/cancel - Cancel order
 router.put('/:id/cancel', optionalAuthMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
     const orderId = req.params.id;
-    const { email, phone } = req.body; // For guest verification
+    const { email, phone } = req.body;
     
     const order = await OrderModel.findById(orderId);
     
@@ -591,13 +637,11 @@ router.put('/:id/cancel', optionalAuthMiddleware, async (req: Request & { user?:
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Verify permissions
     let hasPermission = false;
     
     if (req.user && req.user.userId) {
       hasPermission = order.userId?.toString() === req.user.userId;
     } else {
-      // Guest verification
       hasPermission = order.guestInfo?.email === email || order.guestInfo?.phone === phone;
     }
 
@@ -605,7 +649,6 @@ router.put('/:id/cancel', optionalAuthMiddleware, async (req: Request & { user?:
       return res.status(403).json({ error: 'Permission denied' });
     }
 
-    // Check if order can be cancelled
     if (!order.canCancel || (typeof order.canCancel === 'function' && !order.canCancel())) {
       return res.status(400).json({ 
         error: `Cannot cancel order with status: ${order.status}` 
@@ -633,7 +676,9 @@ router.put('/:id/cancel', optionalAuthMiddleware, async (req: Request & { user?:
       total: Number(order.total),
       items: order.items.map((item: any) => ({
         ...item.toObject(),
-        price: Number(item.price)
+        sellingPrice: Number(item.sellingPrice),
+        buyingPrice: Number(item.buyingPrice),
+        profit: Number(item.profit)
       }))
     };
 
@@ -673,7 +718,6 @@ router.patch('/admin/orders/:id/status', authMiddleware, async (req: Request & {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Handle stock restoration for cancellation
     if (status === 'cancelled' && order.status !== 'cancelled') {
       for (const item of order.items) {
         await ProductModel.findByIdAndUpdate(item.productId, {
@@ -682,19 +726,17 @@ router.patch('/admin/orders/:id/status', authMiddleware, async (req: Request & {
       }
     }
 
-    // Update order fields
     order.status = status as any;
     if (trackingNumber) order.trackingNumber = trackingNumber;
     if (estimatedDelivery) order.estimatedDelivery = new Date(estimatedDelivery);
     
     if (status === 'paid') {
-      // When order is marked as paid, ensure payment status reflects that
       if (order.amountPaid >= order.total) {
         order.paymentStatus = 'paid';
       } else if (order.amountPaid > 0) {
         order.paymentStatus = 'partially_paid';
       } else {
-        order.paymentStatus = 'paid'; // Admin override
+        order.paymentStatus = 'paid';
       }
     } else if (status === 'cancelled' || status === 'refunded') {
       order.paymentStatus = 'refunded';
@@ -702,7 +744,6 @@ router.patch('/admin/orders/:id/status', authMiddleware, async (req: Request & {
     
     await order.save();
 
-    // Create notification
     try {
       const adminUsers = await UserModel.find({ role: 'admin', isActive: true }).limit(1);
       if (adminUsers.length > 0 && status !== 'pending') {
@@ -732,9 +773,12 @@ router.patch('/admin/orders/:id/status', authMiddleware, async (req: Request & {
       ...populated!.toObject(),
       orderNumber: populated!.orderNumber,
       total: Number(populated!.total),
+      totalProfit: Number(populated!.totalProfit),
       items: populated!.items.map((item: any) => ({
         ...item.toObject(),
-        price: Number(item.price)
+        sellingPrice: Number(item.sellingPrice),
+        buyingPrice: Number(item.buyingPrice),
+        profit: Number(item.profit)
       }))
     };
 
@@ -765,13 +809,10 @@ router.post('/:id/retry-payment', optionalAuthMiddleware, async (req: Request & 
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // FIXED: Check payment status correctly
-    // 'refunded' is the only status that cannot be retried
     if (order.paymentStatus === 'refunded') {
       return res.status(400).json({ error: 'Cannot retry payment for refunded order' });
     }
     
-    // Check if there's a failed transaction
     const failedTransaction = await TransactionModel.findOne({
       orderId: order._id,
       status: 'failed'
@@ -781,7 +822,6 @@ router.post('/:id/retry-payment', optionalAuthMiddleware, async (req: Request & 
       return res.status(400).json({ error: 'No failed payment found to retry' });
     }
 
-    // Reset payment status to unpaid for retry
     order.paymentStatus = 'unpaid';
     await order.save();
 
@@ -810,6 +850,7 @@ router.get('/admin/stats/summary', authMiddleware, async (req: Request & { user?
           _id: null,
           totalOrders: { $sum: 1 },
           totalRevenue: { $sum: '$total' },
+          totalProfit: { $sum: '$totalProfit' },
           averageOrderValue: { $avg: '$total' },
           codOrders: { $sum: { $cond: [{ $eq: ['$paymentMethod', 'cod'] }, 1, 0] } },
           mpesaOrders: { $sum: { $cond: [{ $eq: ['$paymentMethod', 'mpesa'] }, 1, 0] } },
@@ -823,7 +864,8 @@ router.get('/admin/stats/summary', authMiddleware, async (req: Request & { user?
         $group: {
           _id: '$status',
           count: { $sum: 1 },
-          revenue: { $sum: '$total' }
+          revenue: { $sum: '$total' },
+          profit: { $sum: '$totalProfit' }
         }
       }
     ]);
@@ -832,6 +874,7 @@ router.get('/admin/stats/summary', authMiddleware, async (req: Request & { user?
       summary: stats[0] || {
         totalOrders: 0,
         totalRevenue: 0,
+        totalProfit: 0,
         averageOrderValue: 0,
         codOrders: 0,
         mpesaOrders: 0,

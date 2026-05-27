@@ -31,6 +31,9 @@ import notificationRoutes from './routes/notification.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import salesRoutes from './routes/sales.routes';
 import paymentRoutes from './routes/payment.routes';
+import inventoryRoutes from './routes/inventory.routes';
+import supplierRoutes from './routes/supplier.routes';
+import profitRoutes from './routes/profit.routes';
 
 
 dotenv.config();
@@ -104,6 +107,9 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/profit', profitRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/', healthzRoutes);
 

@@ -1,12 +1,11 @@
-// app/sales/quotations/components/QuotationPDF.tsx
+// app/sales/invoices/components/InvoicePDF.tsx
 'use client';
 
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export async function generateQuotationPDF(
-  quote: any,
-  customer: any,
+export async function generateInvoicePDF(
+  invoice: any,
   settings: any,
   logoUrl: string | null
 ): Promise<Blob> {
@@ -18,21 +17,19 @@ export async function generateQuotationPDF(
   
   const companyName = settings?.companyName || 'PLASMA WATER AFRICA';
   const companySlogan = settings?.slogan || 'Quality Water Solutions';
-  const taxRate = quote.taxRate || 0.16;
+  const taxRate = invoice.taxRate || 0.16;
 
   // Get transport info
-  const transportCost = quote.transportCost || quote.transportInfo?.cost || 0;
-  const transportDescription = quote.transportDescription || quote.transportInfo?.description || '';
-  const estimatedDelivery = quote.estimatedDelivery || quote.shippingInfo?.estimatedDelivery || '';
+  const transportCost = invoice.transportCost || invoice.transportInfo?.cost || 0;
+  const transportDescription = invoice.transportDescription || invoice.transportInfo?.description || '';
   
   // Tax calculation mode
-  const taxPerItem = quote.taxPerItem || false;
-  const displayTaxableBadges = !!taxPerItem;
+  const taxPerItem = invoice.taxPerItem || false;
 
   let calculatedSubtotal = 0;
   let calculatedTax = 0;
 
-  const itemsWithCalculations = quote.items.map((item: any) => {
+  const itemsWithCalculations = invoice.items.map((item: any) => {
     const qty = Number(item.qty || 0);
     const unitPrice = Number(item.price || 0);
 
@@ -54,9 +51,9 @@ export async function generateQuotationPDF(
     };
   });
 
-  const discountAmount = quote.discountType === 'percentage'
-    ? calculatedSubtotal * ((quote.discount || 0) / 100)
-    : (quote.discount || 0);
+  const discountAmount = invoice.discountType === 'percentage'
+    ? calculatedSubtotal * ((invoice.discount || 0) / 100)
+    : (invoice.discount || 0);
 
   if (!taxPerItem) {
     const taxableAmount = Math.max(0, calculatedSubtotal - discountAmount);
@@ -64,6 +61,17 @@ export async function generateQuotationPDF(
   }
 
   const calculatedTotal = calculatedSubtotal - discountAmount + calculatedTax + transportCost;
+
+  // Payment status badge
+  const getPaymentStatusBadge = () => {
+    if (invoice.paymentStatus === 'paid') {
+      return '<span class="payment-status-badge badge-paid">✓ PAID</span>';
+    } else if (invoice.paymentStatus === 'partially_paid') {
+      return `<span class="payment-status-badge badge-partial">⚠ PARTIALLY PAID (Balance: KES ${invoice.balanceDue?.toLocaleString()})</span>`;
+    } else {
+      return '<span class="payment-status-badge badge-unpaid">⚠ UNPAID</span>';
+    }
+  };
 
   function escapeHtml(str: string): string {
     if (!str) return '';
@@ -88,7 +96,6 @@ export async function generateQuotationPDF(
     tax: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>`,
   };
 
-  // ALWAYS SHOW QUOTATION (never invoice)
   const getHeaderHTML = () => `
     <div class="header">
       <div class="company-info">
@@ -103,25 +110,19 @@ export async function generateQuotationPDF(
       </div>
     </div>
 
-    <div class="doc-title-section doc-title-quotation">
+    <div class="doc-title-section doc-title-invoice">
       <div class="doc-title-container">
-        <div class="doc-title-text text-quotation">QUOTATION</div>
+        <div class="doc-title-text text-invoice">TAX INVOICE</div>
       </div>
     </div>
   `;
 
-  // Updated Routing Logic: 3 items or less = single page, otherwise 2 pages
   const shouldUseTwoPages = itemsWithCalculations.length > 3;
-  
-  // Items distribution
   const page1Items = shouldUseTwoPages ? itemsWithCalculations.slice(0, 9) : itemsWithCalculations;
   const page2Items = shouldUseTwoPages ? itemsWithCalculations.slice(9) : [];
-
-  // Determine where totals panel goes
   const showTotalsOnPage1 = !shouldUseTwoPages || (shouldUseTwoPages && page2Items.length === 0);
   const showTotalsOnPage2 = shouldUseTwoPages && page2Items.length > 0;
 
-  // Items Table Markup Engine
   const getItemsTableHTML = (itemsList: any[]) => `
     <table class="items-table">
       <thead>
@@ -141,25 +142,19 @@ export async function generateQuotationPDF(
               ${item.description ? `<div class="item-description">${escapeHtml(item.description.substring(0, 120))}</div>` : ''}
             </td>
             <td class="text-center font-mono">${item.qty}</td>
-            <td class="text-right font-mono">
-              ${item.unitPrice.toLocaleString()}
-              ${displayTaxableBadges ? `
-                <div class="item-description" style="margin-top:6px;">Tax: ${item.isTaxable ? ('+' + (item.unitPrice * taxRate).toLocaleString()) : '0'}</div>
-              ` : ''}
-            </td>
+            <td class="text-right font-mono">${item.unitPrice.toLocaleString()}</td>
             ${taxPerItem ? `
               <td class="text-center font-mono" style="${item.isTaxable ? 'color: #2c6e3c; font-weight: 600;' : 'color: #b46f0b;'}">
                 ${item.isTaxable ? `KES ${item.itemTax.toLocaleString()}` : 'Exempt'}
               </td>
-            ` : `<td class="text-center"></td>`}
-            <td class="text-right font-mono" style="font-weight: 600;">${(item.itemTotal + (displayTaxableBadges ? item.itemTax : 0)).toLocaleString()}</td>
-          </tr>
+            ` : ``}
+            <td class="text-right font-mono" style="font-weight: 600;">${item.itemTotal.toLocaleString()}</td>
+          </td>
         `).join('')}
       </tbody>
     </table>
   `;
 
-  // Extracted Totals Box Component
   const totalsBoxHTML = `
     <div class="totals-wrapper">
       <div class="totals-box">
@@ -167,9 +162,9 @@ export async function generateQuotationPDF(
           <span>Subtotal</span>
           <span class="font-mono">KES ${calculatedSubtotal.toLocaleString()}</span>
         </div>
-        ${quote.discount > 0 ? `
+        ${invoice.discount > 0 ? `
           <div class="total-row discount">
-            <span>Discount (${quote.discountType === 'percentage' ? `${quote.discount}%` : `KES ${quote.discount.toLocaleString()}`})</span>
+            <span>Discount (${invoice.discountType === 'percentage' ? `${invoice.discount}%` : `KES ${invoice.discount.toLocaleString()}`})</span>
             <span class="font-mono">-KES ${discountAmount.toLocaleString()}</span>
           </div>
         ` : ''}
@@ -191,9 +186,8 @@ export async function generateQuotationPDF(
     </div>
   `;
 
-  // Payment Information + Notes + Terms
   const getPaymentAndNotesHTML = () => `
-    <div class="payment-section" style="margin-top: ${shouldUseTwoPages ? '20px' : '30px'};">
+    <div class="payment-section">
       <div class="payment-header">
         <h4>Payment Information</h4>
       </div>
@@ -210,6 +204,7 @@ export async function generateQuotationPDF(
             <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
             <div class="payment-detail"><span class="payment-detail-key">Account Number</span><span class="payment-detail-value">1312281278</span></div>
             <div class="payment-detail"><span class="payment-detail-key">Branch</span><span class="payment-detail-value">Moi Avenue, Nairobi</span></div>
+            <div class="payment-detail"><span class="payment-detail-key">Reference</span><span class="payment-detail-value">${invoice.invoiceNumber}</span></div>
           </div>
         </div>
         <div class="payment-method">
@@ -221,34 +216,32 @@ export async function generateQuotationPDF(
             </div>
           </div>
           <div class="payment-details">
-            <div class="payment-detail"><span class="payment-detail-key">Lipa na M-PESA  - </span><span class="payment-detail-value">Buy Goods & Services </span></div>
-            <div class="payment-detail"><span class="payment-detail-key">Till No.</span><span class="payment-detail-value">9114123</span></div>
+            <div class="payment-detail"><span class="payment-detail-key">Till Number</span><span class="payment-detail-value">9114123</span></div>
             <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
+            <div class="payment-detail"><span class="payment-detail-key">Reference</span><span class="payment-detail-value">${invoice.invoiceNumber}</span></div>
           </div>
         </div>
       </div>
     </div>
     
-    ${quote.notes || quote.terms ? `
+    ${invoice.notes || invoice.terms ? `
       <div class="notes-terms-grid">
-        ${quote.notes ? `
+        ${invoice.notes ? `
           <div class="notes-box">
             <div class="notes-title">Notes</div>
-            <div class="notes-text">${escapeHtml(quote.notes)}</div>
+            <div class="notes-text">${escapeHtml(invoice.notes)}</div>
           </div>
         ` : '<div class="empty-placeholder"></div>'}
-        
-        ${quote.terms ? `
+        ${invoice.terms ? `
           <div class="terms-box">
             <div class="terms-title">Terms & Conditions</div>
-            <div class="terms-text">${escapeHtml(quote.terms)}</div>
+            <div class="terms-text">${escapeHtml(invoice.terms)}</div>
           </div>
         ` : '<div class="empty-placeholder"></div>'}
       </div>
     ` : ''}
   `;
 
-  // Footer HTML
   const getFooterHTML = () => `
     <div class="footer">
       <div class="footer-main">
@@ -271,7 +264,6 @@ export async function generateQuotationPDF(
     </div>
   `;
 
-  // Page 1 HTML
   const page1HTML = `
     <!DOCTYPE html>
     <html>
@@ -291,50 +283,44 @@ export async function generateQuotationPDF(
               <h3>Bill To</h3>
             </div>
             <div class="info-content">
-              <div class="customer-name">${escapeHtml(customer.name)}</div>
-              <div class="detail-row">    
-                ${customer.email ? `
-                  <div class="contact-item">
-                    <span class="detail-label">Email</span>
-                    <span class="detail-value">${escapeHtml(customer.email)}</span>
-                  </div>
-                ` : ''}
-              </div>
-              <div class="detail-row">
-                ${customer.phone ? `
-                  <div class="contact-item">
-                    <span class="detail-label">Phone</span>
-                    <span class="detail-value">${escapeHtml(customer.phone)}</span>
-                  </div>
-                ` : ''}
-              </div>
-              ${customer.location ? `<div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${escapeHtml(customer.location)}</span></div>` : ''}
+              <div class="customer-name">${escapeHtml(invoice.customerName)}</div>
+              ${invoice.customerEmail ? `<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${escapeHtml(invoice.customerEmail)}</span></div>` : ''}
+              ${invoice.customerPhone ? `<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escapeHtml(invoice.customerPhone)}</span></div>` : ''}
+              ${invoice.customerLocation ? `<div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${escapeHtml(invoice.customerLocation)}</span></div>` : ''}
             </div>
           </div>
 
           <div class="info-card">
             <div class="info-card-header">
               ${icons.package}
-              <h3>QUOTATION DETAILS</h3>
+              <h3>INVOICE DETAILS</h3>
             </div>
             <div class="info-content">
               <div class="detail-row">
-                <span class="detail-label">Quote Number</span>
-                <span class="detail-value">${quote.quoteNumber}</span>
+                <span class="detail-label">Invoice Number</span>
+                <span class="detail-value">${invoice.invoiceNumber}</span>
               </div>
               <div class="detail-row">
-                <span class="detail-label">Date Issued</span>
-                <span class="detail-value">${new Date(quote.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                <span class="detail-label">Quotation Ref</span>
+                <span class="detail-value">${invoice.quotationNumber}</span>
               </div>
               <div class="detail-row">
-                <span class="detail-label">Valid Until</span>
-                <span class="detail-value">${new Date(quote.validUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                <span class="detail-label">Issue Date</span>
+                <span class="detail-value">${new Date(invoice.issueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Due Date</span>
+                <span class="detail-value">${new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Payment Status</span>
+                <span class="detail-value">${getPaymentStatusBadge()}</span>
               </div>
             </div>
           </div>
         </div>
         
-        ${(transportCost > 0 || transportDescription || estimatedDelivery) ? `
+        ${(transportCost > 0 || transportDescription) ? `
           <div class="transport-info">
             ${transportDescription ? `
               <div class="transport-item">
@@ -350,14 +336,6 @@ export async function generateQuotationPDF(
                 <div>
                   <div class="transport-label">Delivery Cost</div>
                   <div class="transport-value">KES ${transportCost.toLocaleString()}</div>
-                </div>
-              </div>
-            ` : ''}
-            ${estimatedDelivery ? `
-              <div class="transport-item">
-                <div>
-                  <div class="transport-label">Est. Delivery</div>
-                  <div class="transport-value">${escapeHtml(estimatedDelivery)}</div>
                 </div>
               </div>
             ` : ''}
@@ -376,7 +354,6 @@ export async function generateQuotationPDF(
     </html>
   `;
 
-  // Page 2 HTML
   const page2HTML = `
     <!DOCTYPE html>
     <html>
@@ -389,7 +366,7 @@ export async function generateQuotationPDF(
       <div class="pdf-container">
         ${getHeaderHTML()}
         
-        ${(transportCost > 0 || transportDescription || estimatedDelivery) ? `
+        ${(transportCost > 0 || transportDescription) ? `
           <div class="transport-info">
             ${transportDescription ? `
               <div class="transport-item">
@@ -405,14 +382,6 @@ export async function generateQuotationPDF(
                 <div>
                   <div class="transport-label">Delivery Cost</div>
                   <div class="transport-value">KES ${transportCost.toLocaleString()}</div>
-                </div>
-              </div>
-            ` : ''}
-            ${estimatedDelivery ? `
-              <div class="transport-item">
-                <div>
-                  <div class="transport-label">Est. Delivery</div>
-                  <div class="transport-value">${escapeHtml(estimatedDelivery)}</div>
                 </div>
               </div>
             ` : ''}
@@ -507,12 +476,11 @@ export async function generateQuotationPDF(
         box-sizing: border-box;
       }
 
-      .doc-title-section.doc-title-quotation {
-        height: 4px !important; 
-        background: #0b355e !important;
-        border-top: 1px solid #ffffff !important;
-        border-bottom: 1px solid #ffffff !important;
-        box-shadow: 0 0 0 1px #0b355e !important;
+      .doc-title-section.doc-title-invoice {
+        height: 4px !important;
+        background: #374151 !important;
+        border: none !important;
+        box-shadow: none !important;
       }
 
       .doc-title-container {
@@ -537,9 +505,9 @@ export async function generateQuotationPDF(
         line-height: 1.2 !important;
       }
 
-      .doc-title-text.text-quotation {
-        color: #0b355e !important;
-        border: 1.5px solid #0b355e !important;
+      .doc-title-text.text-invoice {
+        color: #374151 !important;
+        border: 1.5px solid #374151 !important;
       }
       
       .info-section {
@@ -588,6 +556,7 @@ export async function generateQuotationPDF(
         align-items: baseline;
         gap: 12px;
         margin-bottom: 10px;
+        flex-wrap: wrap;
       }
 
       .detail-label {
@@ -635,6 +604,35 @@ export async function generateQuotationPDF(
         font-size: 16px;
         font-weight: 500;
         color: #2c5e3c;
+      }
+
+      .payment-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+
+      .badge-paid {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        color: white;
+        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+      }
+
+      .badge-unpaid {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+      }
+
+      .badge-partial {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
       }
 
       .items-table {
