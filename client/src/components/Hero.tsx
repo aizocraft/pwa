@@ -86,7 +86,7 @@ export default function Hero() {
 
 <section 
   ref={heroRef} 
-  className="relative min-h-[95vh] md:min-h-[95vh] lg:min-h-[90vh] flex items-center justify-center overflow-hidden"
+  className="relative min-h-[95vh] md:min-h-[95vh] lg:min-h-[90vh] lg:mt-7 flex items-center justify-center overflow-hidden"
 >
         
         {/* Background Images Carousel - No overlay */}

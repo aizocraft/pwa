@@ -52,7 +52,8 @@ export default function Home() {
       <Services />
 
       {/* Featured Products Section */}
-      <section className="py-20 lg:py-28 bg-white dark:bg-gray-950">
+      <section className="py-12 lg:py-16 bg-white dark:bg-gray-950">
+        
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div 
             initial={{ opacity: 0, y: 30 }}
@@ -112,68 +113,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Service Categories Grid */}
-      <section className="py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 text-gray-900 dark:text-white">
-              Our Service Categories
-            </h2>
-            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-              Comprehensive solutions tailored to your specific needs
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
-            {serviceCategories.map((category, index) => {
-              const Icon = category.icon;
-              return (
-                <motion.div
-                  key={category.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ y: -5 }}
-                >
-                  <Link href={category.href}>
-                    <div className="group relative bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-800 h-full cursor-pointer">
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-600/0 to-blue-600/0 group-hover:from-blue-600/5 group-hover:to-blue-600/0 rounded-2xl transition-all duration-500" />
-                      
-                      <div className="relative z-10">
-                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-4 shadow-md group-hover:scale-110 transition-transform duration-300">
-                          <Icon className="w-7 h-7 text-white" />
-                        </div>
-                        
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                          {category.name}
-                        </h3>
-                        
-                        <p className="text-gray-600 dark:text-gray-400 mb-3 text-sm">
-                          {category.description}
-                        </p>
-                        
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                            {category.stats}
-                          </span>
-                          <ArrowRight className="w-4 h-4 text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform duration-300" />
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+   
      
       {/* Features Component */}
       <Features />

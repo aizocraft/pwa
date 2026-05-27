@@ -10,7 +10,7 @@ import {
 } from "lucide-react"
 import Image from 'next/image'
 import Link from 'next/link'
-import { LogoLoop } from './LogoLoop'
+import { motion } from 'framer-motion'
 
 // Partner logos configuration
 const partnerLogos = [
@@ -26,7 +26,7 @@ const partnerLogos = [
     alt: "Grundfos", 
     href: "https://www.grundfos.com",
     width: 160,
-    height: 80
+    height: 100
   },
   { 
     src: "/logos/taflo.png", 
@@ -41,14 +41,7 @@ const partnerLogos = [
     href: "https://pedrollo.com",
     width: 160,
     height: 80
-  },
-  { 
-    src: "/logo.png", 
-    alt: "Plasma Water Africa", 
-    href: "/",
-    width: 160,
-    height: 80
-  },
+  }
 ]
 
 const features = [
@@ -197,6 +190,83 @@ const FeatureCard = memo(({
 
 FeatureCard.displayName = 'FeatureCard'
 
+// Infinite Scrolling Logos Component
+const InfiniteScrollingLogos = ({ 
+  logos, 
+  speed = 80,
+  direction = 'left',
+  pauseOnHover = true,
+  fadeOut = true,
+  fadeOutColor = 'white'
+}: { 
+  logos: typeof partnerLogos;
+  speed?: number;
+  direction?: 'left' | 'right';
+  pauseOnHover?: boolean;
+  fadeOut?: boolean;
+  fadeOutColor?: 'white' | 'gray-950' | string;
+}) => {
+  const [isPaused, setIsPaused] = useState(false)
+  
+  // Get the fade color based on background
+  const getFadeColor = () => {
+    if (fadeOutColor === 'white') return 'from-white dark:from-gray-950'
+    if (fadeOutColor === 'gray-950') return 'from-gray-950'
+    return `from-${fadeOutColor}`
+  }
+
+  return (
+    <div 
+      className={`relative overflow-hidden ${fadeOut ? `before:absolute before:left-0 before:top-0 before:z-10 before:h-full before:w-20 before:bg-gradient-to-r before:${getFadeColor()} before:to-transparent before:content-[''] after:absolute after:right-0 after:top-0 after:h-full after:w-20 after:bg-gradient-to-l after:${getFadeColor()} after:to-transparent after:content-['']` : ''}`}
+      onMouseEnter={() => pauseOnHover && setIsPaused(true)}
+      onMouseLeave={() => pauseOnHover && setIsPaused(false)}
+    >
+      <motion.div
+        transition={{
+          duration: speed,
+          ease: 'linear',
+          repeat: Infinity,
+          repeatType: 'loop',
+        }}
+        initial={{ translateX: direction === 'left' ? 0 : '-50%' }}
+        animate={{ 
+          translateX: direction === 'left' ? '-50%' : 0,
+        }}
+        style={{
+          animationPlayState: isPaused ? 'paused' : 'running',
+        }}
+        className="flex flex-none gap-12 pr-12"
+      >
+        {/* Double the logos for seamless loop */}
+        {[...new Array(2)].fill(0).map((_, index) => (
+          <div key={index} className="flex gap-12">
+            {logos.map((logo) => (
+              <Link
+                key={`${logo.alt}-${index}`}
+                href={logo.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 transition-all duration-300 hover:scale-110 hover:opacity-100"
+              >
+               <div className="relative h-20 w-40 sm:h-24 sm:w-48 lg:h-28 lg:w-56">
+
+
+                  <Image
+                    src={logo.src}
+                    alt={logo.alt}
+                    fill
+                    className="object-contain filter grayscale-[50%] hover:grayscale-0 transition-all duration-300"
+                  />
+                </div>
+              </Link>
+            ))}
+          </div>
+        ))}
+      </motion.div>
+    </div>
+  )
+}
+
 // Main Features Component
 const Features = () => {
   const sectionRef = useRef<HTMLElement>(null)
@@ -220,17 +290,9 @@ const Features = () => {
     return () => observer.disconnect()
   }, [])
 
-  // Prepare logos for LogoLoop component
-  const logosForLoop = partnerLogos.map(logo => ({
-    src: logo.src,
-    alt: logo.alt,
-    href: logo.href,
-    width: logo.width,
-    height: logo.height
-  }))
-
   return (
-    <section ref={sectionRef} className="py-20 sm:py-24 lg:py-28 bg-white dark:bg-gray-950">
+     <section ref={sectionRef} className="pt-0 pb-4 sm:pb-6 lg:pb-8 bg-white dark:bg-gray-950">
+
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         
         {/* Header Section - Minimalistic */}
@@ -270,7 +332,7 @@ const Features = () => {
           ))}
         </div>
 
-        {/* Partner Logos Section - Premium */}
+        {/* Partner Logos Section with Infinite Scrolling */}
         <div className="pt-12 border-t border-gray-100 dark:border-gray-800">
           <div className="text-center mb-12">
             <h3 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -282,25 +344,14 @@ const Features = () => {
           </div>
           
           <div className="relative py-8">
-<LogoLoop
-  logos={partnerLogos.map(logo => ({
-    src: logo.src,
-    alt: logo.alt,
-    href: logo.href,
-    width: logo.width,
-    height: logo.height
-  }))}
-  speed={80}
-  direction="left"
-  width="100%"
-  logoHeight={64}
-  gap={48}
-  pauseOnHover={true}
-  fadeOut={true}
-  fadeOutColor="white"
-  scaleOnHover={true}
-  className="py-4"
-/>
+            <InfiniteScrollingLogos 
+              logos={partnerLogos}
+              speed={60}
+              direction="left"
+              pauseOnHover={true}
+              fadeOut={true}
+              fadeOutColor="white"
+            />
           </div>
         </div>
       </div>

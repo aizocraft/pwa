@@ -200,48 +200,49 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
               'flex gap-2 pt-4',
               isList ? 'flex-row' : 'flex-row'
             )}>
-              {/* View Details Button */}
-              <button
-                onClick={handleViewDetails}
-                className={cn(
-                  'flex items-center justify-center gap-2 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium transition-all duration-300 border border-gray-200 dark:border-gray-700',
-                  isList
-                    ? 'flex-1 px-5 py-3 text-sm rounded-xl'
-                    : 'flex-1 px-4 py-2.5 text-xs rounded-lg',
-                  'hover:border-gray-300 dark:hover:border-gray-600'
-                )}
-              >
-                <Eye className={cn('transition-all', isList ? 'w-4 h-4' : 'w-3.5 h-3.5')} />
-                <span className={isList ? 'text-sm' : 'text-xs'}>View Details</span>
-              </button>
+            
+            <button
+              onClick={handleViewDetails}
+              className={cn(
+                'flex items-center justify-center gap-2 bg-transparent hover:bg-blue-50 dark:hover:bg-blue-950/30 text-[#0043b3] dark:text-[#009dff] hover:text-[#000063] dark:hover:text-[#009dff] font-medium transition-all duration-300 border border-blue-200 dark:border-blue-800/50',
+                isList
+                  ? 'flex-1 px-5 py-3 text-sm rounded-xl'
+                  : 'flex-1 px-4 py-2.5 text-xs rounded-lg',
+                'hover:border-[#009dff] dark:hover:border-[#009dff]'
+              )}
+            >
+              <Eye className={cn('transition-all', isList ? 'w-4 h-4' : 'w-3.5 h-3.5')} />
+              <span className={isList ? 'text-sm' : 'text-xs'}>View</span>
+            </button>
 
-              {/* Add to Cart Button */}
-              <button
-                onClick={handleAddToCart}
-                disabled={product.stock === 0}
-                className={cn(
-                  'flex items-center justify-center gap-2 transition-all duration-300 font-medium',
-                  isList
-                    ? 'flex-1 px-5 py-3 text-sm rounded-xl'
-                    : 'flex-1 px-4 py-2.5 text-xs rounded-lg',
-                  product.stock > 0
-                    ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                )}
-              >
-                {showAddedFeedback ? (
-                  <>
-                    <span>Added!</span>
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className={cn('transition-all', isList ? 'w-4 h-4' : 'w-3.5 h-3.5')} />
-                    <span className={isList ? 'text-sm' : 'text-xs'}>
-                      {itemQty > 0 ? `Add More (${itemQty})` : 'Add to Cart'}
-                    </span>
-                  </>
-                )}
-              </button>
+               {/* Add to Cart Button */}
+<button
+  onClick={handleAddToCart}
+  disabled={product.stock === 0}
+  className={cn(
+    'flex items-center justify-center gap-2 transition-all duration-300 font-medium',
+    isList
+      ? 'flex-1 px-5 py-3 text-sm rounded-xl'
+      : 'flex-1 px-4 py-2.5 text-xs rounded-lg',
+    product.stock > 0
+      ? 'bg-[#000063] hover:bg-[#0043b3] text-white shadow-md hover:shadow-lg active:scale-[0.98]'
+      : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+  )}
+>
+  {showAddedFeedback ? (
+    <span className="flex items-center gap-2">
+      <span>Added!</span>
+    </span>
+  ) : (
+    <>
+      <ShoppingCart className={cn('transition-all', isList ? 'w-4 h-4' : 'w-3.5 h-3.5')} />
+      <span className={isList ? 'text-sm' : 'text-xs'}>
+        {itemQty > 0 ? `Add More (${itemQty})` : 'Add to Cart'}
+      </span>
+    </>
+  )}
+</button>
+                
             </div>
           </div>
         </div>

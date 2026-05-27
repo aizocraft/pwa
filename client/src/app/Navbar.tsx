@@ -36,8 +36,9 @@ import {
   Award,
   Shield,
   ArrowRight,
-  Briefcase,
+  Briefcase, LogIn
 } from 'lucide-react'
+import { BoreholeIcon } from '@/components/icons/BoreholeIcon'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/context/ThemeContext'
 import Avatar from '@/components/Avatar'
@@ -68,7 +69,7 @@ export default function Navbar() {
   const navLinks = [
     { href: '/', label: 'Home', icon: Home },
     { href: '/about', label: 'About', icon: Briefcase },
-    { href: '/products', label: 'Products', icon: Package },
+   
   ]
 
   // Main hub pages for dropdowns
@@ -76,17 +77,7 @@ export default function Navbar() {
   const solarHub = '/solar-solutions'
   const waterTowerHub = '/water-towers'
 
-  // Borehole Services Dropdown
-  const boreholeServices = [
-    { href: '/hydro-geological-survey', label: 'Hydro-Geological Survey', icon: Map, description: 'Site assessment & analysis' },
-    { href: '/environmental-impact-assessment', label: 'Environmental Impact Assessment', icon: FileText, description: 'Environmental compliance' },
-    { href: '/borehole-drilling', label: 'Borehole Drilling', icon: Drill, description: 'Professional drilling services' },
-    { href: '/submersible-pumps', label: 'Submersible & Booster Pumps', icon: GitBranch, description: 'Pump installation & maintenance' },
-    { href: '/borehole-rehabilitation', label: 'Borehole Rehabilitation', icon: Wrench, description: 'Restore & optimize boreholes' },
-    { href: '/geo-membrane-ponds', label: 'Geo-Membrane Ponds', icon: Waves, description: 'Water storage solutions' },
-  ]
-
-  // Solar Solutions Dropdown
+    // Solar Solutions Dropdown
   const solarSolutions = [
     { href: '/solar-home-systems', label: 'Residential Solar', icon: Home, description: 'Home energy solutions' },
     { href: '/solar-commercial-systems', label: 'Commercial Solar', icon: Building2, description: 'Business solar systems' },
@@ -94,6 +85,16 @@ export default function Navbar() {
     { href: '/solar-water-pumps', label: 'Solar Water Pumps', icon: Droplets, description: 'Solar-powered pumping' },
     { href: '/solar-backup-systems', label: 'Solar Backup Systems', icon: Battery, description: 'Reliable power backup' },
     { href: '/solar-hybrid-systems', label: 'Hybrid Solar Systems', icon: SunIcon, description: 'Integrated power solutions' },
+  ]
+
+  // Borehole Services Dropdown
+  const boreholeServices = [
+    { href: '/hydro-geological-survey', label: 'Hydro-Geological Survey', icon: Map, description: 'Site assessment & analysis' },
+    { href: '/environmental-impact-assessment', label: 'Environmental Impact Assessment', icon: FileText, description: 'Environmental compliance' },
+    { href: '/borehole-drilling', label: 'Borehole Drilling', icon: BoreholeIcon, description: 'Professional drilling services' },
+    { href: '/submersible-pumps', label: 'Submersible & Booster Pumps', icon: GitBranch, description: 'Pump installation & maintenance' },
+    { href: '/borehole-rehabilitation', label: 'Borehole Rehabilitation', icon: Wrench, description: 'Restore & optimize boreholes' },
+    { href: '/geo-membrane-ponds', label: 'Geo-Membrane Ponds', icon: Waves, description: 'Water storage solutions' },
   ]
 
   // Water Tower Solutions Dropdown
@@ -104,6 +105,7 @@ export default function Navbar() {
 
   // Additional nav items after dropdowns
   const rightNavLinks = [
+    { href: '/products', label: 'Products', icon: Package },
     { href: '/projects', label: 'Projects', icon: Briefcase },
     { href: '/contact', label: 'Contact', icon: Phone },
   ]
@@ -187,40 +189,38 @@ export default function Navbar() {
     )
   }
 
-  const logoUrl = '/logo1.png'
+  const logoUrl = '/logo3.png'
   const companyName = 'Plasma Water Africa'
 
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/98 dark:bg-gray-900/98 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-<div className="flex items-center justify-between h-20 sm:h-20">
-            
-            {/* Logo Section - Moved to right with margin left auto */}
-            {/* ml-auto pushes logo to the right side */}
-            <div className="flex-shrink-0 -ml-2 sm:-ml-3 md:-ml-60">
-              <Link
-                href="/"
-                className="flex items-center transition-opacity duration-300 hover:opacity-90 active:scale-[0.98] group"
-                aria-label="Home"
-              >
-                {/* Keep logo vertically centered within nav height */}
-                <div className="relative h-20 w-80 sm:h-20 sm:w-80 md:h-20 md:w-80 lg:h-20 lg:w-80">
-                  <Image
-                    src={logoUrl}
-                    alt={companyName}
-                    fill
-                    className="object-contain drop-shadow-sm"
-                    priority
-                    sizes="(max-width: 640px) 160px, (max-width: 768px) 176px, (max-width: 1024px) 192px, 224px"
-                  />
-                </div>
-              </Link>
-            </div>
+
+ <div className="flex items-center justify-between h-20 sm:h-20 lg:h-28">       			
+ 
+ <div className="flex-shrink-0 w-36 sm:w-48 md:w-56 lg:w-72 lg:-ml-40">
+  <Link
+    href="/"
+    className="flex items-center transition-opacity duration-300 hover:opacity-90 active:scale-[0.98] group"
+    aria-label="Home"
+  >
+    <div className="relative h-20 w-80 sm:h-20 sm:w-80 md:h-20 md:w-80 lg:h-28 lg:w-96">
+      <Image
+        src={logoUrl}
+        alt={companyName}
+        fill
+        className="object-contain drop-shadow-sm"
+        priority
+        sizes="(max-width: 640px) 160px, (max-width: 768px) 176px, (max-width: 1024px) 192px, 280px"
+      />
+    </div>
+  </Link>
+</div>
 
 
             {/* Desktop Navigation */}
-            <div className="hidden lg:flex flex-1 items-center justify-center gap-1 xl:gap-2">
+            <div className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-1 xl:gap-2">
               {navLinks.map(({ href, label }) => (
                 <Link
                   key={href}
@@ -242,155 +242,130 @@ export default function Navbar() {
               ))}
 
 
-              {/* Borehole Services Dropdown - Desktop */}
-                <div className="relative group/dropdown">
-                <button
-                  className={`flex items-center gap-1.5 px-3 xl:px-4 h-10 rounded-xl text-sm xl:text-base font-medium transition-colors duration-200 group whitespace-nowrap ${
-                    boreholeServices.some(s => pathname === s.href) || pathname === boreholeHub
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
-                  }`}
-                >
-                  <span className="leading-none whitespace-nowrap">Borehole Services</span>
-                  <ChevronDown className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" />
-                </button>
+               {/* Solar Solutions Dropdown - Desktop */}
+<div className="relative group/dropdown">
+  <button
+    className={`flex items-center gap-1.5 px-3 xl:px-4 h-10 rounded-xl text-sm xl:text-base font-medium transition-all duration-200 group whitespace-nowrap ${
+      solarSolutions.some(s => pathname === s.href) || pathname === solarHub
+        ? 'text-[#0043b3] dark:text-[#009dff]'
+        : 'text-gray-700 dark:text-gray-300 hover:text-[#0043b3] dark:hover:text-[#009dff]'
+    }`}
+  >
+    <span className="leading-none whitespace-nowrap">Solar Solutions</span>
+    <ChevronDown className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" />
+  </button>
 
-                
-                <div className="absolute top-full left-0 mt-2 w-80 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 transform -translate-y-2 group-hover/dropdown:translate-y-0 z-50">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <div className="py-2">
-                      {boreholeServices.map((service) => (
-                        <Link
-                          key={service.href}
-                          href={service.href}
-                          className="flex items-start gap-3 px-4 py-3 transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-700 group/item"
-                        >
-                          <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 group-hover/item:bg-blue-100 dark:group-hover/item:bg-blue-800/50 transition-colors">
-                            <service.icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                              {service.label}
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                              {service.description}
-                            </div>
-                          </div>
-                          <ArrowRight className="w-3 h-3 text-gray-400 opacity-0 group-hover/item:opacity-100 transition-all duration-200" />
-                        </Link>
-                      ))}
-                      <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-                      <Link
-                        href={boreholeHub}
-                        className="flex items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all duration-200 group/link"
-                      >
-                        <span>View All Borehole Services</span>
-                        <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover/link:translate-x-1" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </div>
+  <div className="absolute top-full left-0 mt-2 w-72 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 transform -translate-y-2 group-hover/dropdown:translate-y-0 z-50">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="py-2">
+        {solarSolutions.map((solution) => (
+          <Link
+            key={solution.href}
+            href={solution.href}
+            className="flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-blue-50 dark:hover:bg-blue-950/30 group/item"
+          >
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover/item:text-[#0043b3] dark:group-hover/item:text-[#009dff] transition-colors">
+              {solution.label}
+            </span>
+            <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover/item:opacity-100 group-hover/item:translate-x-1 transition-all duration-200" />
+          </Link>
+        ))}
+        <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+        <Link
+          href={solarHub}
+          className="flex items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-[#0043b3] dark:text-[#009dff] hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all duration-200 group/link"
+        >
+          <span>View All Solutions</span>
+          <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover/link:translate-x-1" />
+        </Link>
+      </div>
+    </div>
+  </div>
+</div>
 
-              {/* Solar Solutions Dropdown - Desktop */}
-              <div className="relative group/dropdown">
-                <button
-                  className={`flex items-center gap-1.5 px-3 xl:px-4 h-10 rounded-xl text-sm xl:text-base font-medium transition-colors duration-200 group whitespace-nowrap ${
-                    solarSolutions.some(s => pathname === s.href) || pathname === solarHub
-                      ? 'text-yellow-600 dark:text-yellow-400'
-                      : 'text-gray-700 dark:text-gray-300 hover:text-yellow-600 dark:hover:text-yellow-400'
-                  }`}
-                >
-                  <span className="leading-none whitespace-nowrap">Solar Solutions</span>
-                  <ChevronDown className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" />
-                </button>
+{/* Borehole Services Dropdown - Desktop */}
+<div className="relative group/dropdown">
+  <button
+    className={`flex items-center gap-1.5 px-3 xl:px-4 h-10 rounded-xl text-sm xl:text-base font-medium transition-all duration-200 group whitespace-nowrap ${
+      boreholeServices.some(s => pathname === s.href) || pathname === boreholeHub
+        ? 'text-[#0043b3] dark:text-[#009dff]'
+        : 'text-gray-700 dark:text-gray-300 hover:text-[#0043b3] dark:hover:text-[#009dff]'
+    }`}
+  >
+    <span className="leading-none whitespace-nowrap">Borehole Services</span>
+    <ChevronDown className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" />
+  </button>
 
-                
-                <div className="absolute top-full left-0 mt-2 w-80 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 transform -translate-y-2 group-hover/dropdown:translate-y-0 z-50">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <div className="py-2">
-                      {solarSolutions.map((solution) => (
-                        <Link
-                          key={solution.href}
-                          href={solution.href}
-                          className="flex items-start gap-3 px-4 py-3 transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-700 group/item"
-                        >
-                          <div className="p-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 group-hover/item:bg-yellow-100 dark:group-hover/item:bg-yellow-800/50 transition-colors">
-                            <solution.icon className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                              {solution.label}
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                              {solution.description}
-                            </div>
-                          </div>
-                          <ArrowRight className="w-3 h-3 text-gray-400 opacity-0 group-hover/item:opacity-100 transition-all duration-200" />
-                        </Link>
-                      ))}
-                      <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-                      <Link
-                        href={solarHub}
-                        className="flex items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-950/30 transition-all duration-200 group/link"
-                      >
-                        <span>View All Solar Solutions</span>
-                        <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover/link:translate-x-1" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </div>
+  <div className="absolute top-full left-0 mt-2 w-72 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 transform -translate-y-2 group-hover/dropdown:translate-y-0 z-50">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="py-2">
+        {boreholeServices.map((service) => (
+          <Link
+            key={service.href}
+            href={service.href}
+            className="flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-blue-50 dark:hover:bg-blue-950/30 group/item"
+          >
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover/item:text-[#0043b3] dark:group-hover/item:text-[#009dff] transition-colors">
+              {service.label}
+            </span>
+            <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover/item:opacity-100 group-hover/item:translate-x-1 transition-all duration-200" />
+          </Link>
+        ))}
+        <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+        <Link
+          href={boreholeHub}
+          className="flex items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-[#0043b3] dark:text-[#009dff] hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all duration-200 group/link"
+        >
+          <span>View All Services</span>
+          <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover/link:translate-x-1" />
+        </Link>
+      </div>
+    </div>
+  </div>
+</div>
 
-              {/* Water Tower Solutions Dropdown - Desktop */}
-              <div className="relative group/dropdown">
-                <button
-                  className={`flex items-center gap-1.5 px-3 xl:px-4 h-10 rounded-xl text-sm xl:text-base font-medium transition-colors duration-200 group whitespace-nowrap ${
-                    waterTowerSolutions.some(s => pathname === s.href) || pathname === waterTowerHub
-                      ? 'text-cyan-600 dark:text-cyan-400'
-                      : 'text-gray-700 dark:text-gray-300 hover:text-cyan-600 dark:hover:text-cyan-400'
-                  }`}
-                >
-                  <span className="leading-none whitespace-nowrap">Water Towers</span>
-                  <ChevronDown className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" />
-                </button>
 
-                
-                <div className="absolute top-full left-0 mt-2 w-80 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 transform -translate-y-2 group-hover/dropdown:translate-y-0 z-50">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <div className="py-2">
-                      {waterTowerSolutions.map((tower) => (
-                        <Link
-                          key={tower.href}
-                          href={tower.href}
-                          className="flex items-start gap-3 px-4 py-3 transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-700 group/item"
-                        >
-                          <div className="p-2 rounded-lg bg-cyan-50 dark:bg-cyan-900/30 group-hover/item:bg-cyan-100 dark:group-hover/item:bg-cyan-800/50 transition-colors">
-                            <tower.icon className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                              {tower.label}
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                              {tower.description}
-                            </div>
-                          </div>
-                          <ArrowRight className="w-3 h-3 text-gray-400 opacity-0 group-hover/item:opacity-100 transition-all duration-200" />
-                        </Link>
-                      ))}
-                      <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-                      <Link
-                        href={waterTowerHub}
-                        className="flex items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 transition-all duration-200 group/link"
-                      >
-                        <span>View All Water Towers</span>
-                        <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover/link:translate-x-1" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </div>
+{/* Water Tower Solutions Dropdown - Desktop */}
+<div className="relative group/dropdown">
+  <button
+    className={`flex items-center gap-1.5 px-3 xl:px-4 h-10 rounded-xl text-sm xl:text-base font-medium transition-all duration-200 group whitespace-nowrap ${
+      waterTowerSolutions.some(s => pathname === s.href) || pathname === waterTowerHub
+        ? 'text-[#0043b3] dark:text-[#009dff]'
+        : 'text-gray-700 dark:text-gray-300 hover:text-[#0043b3] dark:hover:text-[#009dff]'
+    }`}
+  >
+    <span className="leading-none whitespace-nowrap">Water Towers</span>
+    <ChevronDown className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" />
+  </button>
+
+  <div className="absolute top-full left-0 mt-2 w-64 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 transform -translate-y-2 group-hover/dropdown:translate-y-0 z-50">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="py-2">
+        {waterTowerSolutions.map((tower) => (
+          <Link
+            key={tower.href}
+            href={tower.href}
+            className="flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-blue-50 dark:hover:bg-blue-950/30 group/item"
+          >
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover/item:text-[#0043b3] dark:group-hover/item:text-[#009dff] transition-colors">
+              {tower.label}
+            </span>
+            <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover/item:opacity-100 group-hover/item:translate-x-1 transition-all duration-200" />
+          </Link>
+        ))}
+        <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+        <Link
+          href={waterTowerHub}
+          className="flex items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-[#0043b3] dark:text-[#009dff] hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all duration-200 group/link"
+        >
+          <span>View All Towers</span>
+          <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover/link:translate-x-1" />
+        </Link>
+      </div>
+    </div>
+  </div>
+</div>
+
 
               {rightNavLinks.map(({ href, label }) => (
                 <Link
@@ -414,7 +389,8 @@ export default function Navbar() {
             </div>
 
             {/* Right Section - Icons and User Menu */}
-            <div className="flex items-center gap-1 sm:gap-2">
+           <div className="flex items-center gap-1 sm:gap-2 lg:ml-auto lg:-mr-24">
+            
               {/* Cart Button */}
               <Link
                 href="/cart"
@@ -445,6 +421,18 @@ export default function Navbar() {
                   <Moon className="w-5 h-5" />
                 )}
               </button>
+                             {/* Mobile Login Icon - Only shows on mobile when NOT logged in */}
+              {!authLoading && !isLoggedIn && (
+                <Link
+                  href="/auth/login"
+                  className="lg:hidden relative p-2.5 rounded-xl text-gray-700 dark:text-gray-300 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 group"
+                  aria-label="Sign In"
+                >
+                  <LogIn className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
+                  <span className="absolute inset-0 rounded-xl bg-[#0043b3]/0 group-hover:bg-[#0043b3]/10 dark:group-hover:bg-[#009dff]/10 transition-all duration-300" />
+                </Link>
+              )}
+
 
               {/* Auth Section */}
               {!authLoading && (
@@ -537,13 +525,27 @@ export default function Navbar() {
                         </div>
                       )}
                     </div>
+
+
                   ) : (
-                    <Link
-                      href="/auth/login"
-                      className="hidden lg:flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95"
-                    >
-                      Sign In
-                    </Link>
+                  
+<Link
+  href="/auth/login"
+  className="hidden lg:flex relative items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-[#000063] rounded-xl transition-all duration-300 hover:bg-[#0043b3] hover:shadow-lg hover:shadow-[#0043b3]/25 hover:scale-105 active:scale-95 group overflow-hidden"
+>
+  <span className="relative z-10">Sign In</span>
+  <LogIn className="relative z-10 w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+  
+  {/* Shimmer effect */}
+  <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+  
+  {/* Subtle border glow on hover */}
+  <span className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-[0_0_12px_#009dff]" />
+</Link>
+
+
+
+
                   )}
                 </>
               )}
@@ -565,260 +567,156 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Mobile Menu - Improved with smooth animations and better dropdown logic */}
-        <div
-          className={`lg:hidden overflow-hidden transition-all duration-300 ease-in-out ${
-            isMenuOpen ? 'max-h-[calc(100vh-80px)] opacity-100' : 'max-h-0 opacity-0'
-          }`}
+     {/* Mobile Menu - Improved with smooth animations and better dropdown logic */}
+<div
+  className={`lg:hidden overflow-hidden transition-all duration-300 ease-in-out ${
+    isMenuOpen ? 'max-h-[calc(100vh-80px)] opacity-100' : 'max-h-0 opacity-0'
+  }`}
+>
+  <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-xl max-h-[calc(100vh-80px)] overflow-y-auto">
+    <div className="px-4 py-3 space-y-1">
+      {/* Main Navigation Links */}
+      {navLinks.map(({ href, label, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+          onClick={() => setIsMenuOpen(false)}
         >
-          <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-xl max-h-[calc(100vh-80px)] overflow-y-auto">
-            <div className="px-4 py-3 space-y-1">
-              {/* Main Navigation Links */}
-              {navLinks.map(({ href, label, icon: Icon }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <Icon className="w-5 h-5" />
-                  {label}
-                </Link>
-              ))}
+          <Icon className="w-5 h-5" />
+          {label}
+        </Link>
+      ))}
 
-              {/* Borehole Services Mobile Section */}
-              <div className="mt-1">
-                <button
-                  onClick={() => toggleMobileDropdown('borehole')}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <Drill className="w-5 h-5" />
-                    <span>Borehole Services</span>
-                  </div>
-                  <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${activeMobileDropdown === 'borehole' ? 'rotate-180' : ''}`} />
-                </button>
-                
-                <div className={`overflow-hidden transition-all duration-300 ${
-                  activeMobileDropdown === 'borehole' ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
-                }`}>
-                  <div className="ml-6 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-1 mt-1">
-                    {boreholeServices.map((service) => (
-                      <Link
-                        key={service.href}
-                        href={service.href}
-                        className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <service.icon className="w-4 h-4" />
-                        <div className="flex-1">
-                          <div>{service.label}</div>
-                          <div className="text-xs text-gray-400">{service.description}</div>
-                        </div>
-                      </Link>
-                    ))}
-                    <Link
-                      href={boreholeHub}
-                      className="flex items-center justify-center gap-2 mt-3 mx-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-sm font-semibold transition-all duration-200 hover:shadow-lg"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      View All Services
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-
-              {/* Solar Solutions Mobile Section */}
-              <div>
-                <button
-                  onClick={() => toggleMobileDropdown('solar')}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <SunIcon className="w-5 h-5" />
-                    <span>Solar Solutions</span>
-                  </div>
-                  <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${activeMobileDropdown === 'solar' ? 'rotate-180' : ''}`} />
-                </button>
-                
-                <div className={`overflow-hidden transition-all duration-300 ${
-                  activeMobileDropdown === 'solar' ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
-                }`}>
-                  <div className="ml-6 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-1 mt-1">
-                    {solarSolutions.map((solution) => (
-                      <Link
-                        key={solution.href}
-                        href={solution.href}
-                        className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <solution.icon className="w-4 h-4" />
-                        <div className="flex-1">
-                          <div>{solution.label}</div>
-                          <div className="text-xs text-gray-400">{solution.description}</div>
-                        </div>
-                      </Link>
-                    ))}
-                    <Link
-                      href={solarHub}
-                      className="flex items-center justify-center gap-2 mt-3 mx-2 px-4 py-3 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm font-semibold transition-all duration-200 hover:shadow-lg"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      View All Solutions
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-
-              {/* Water Towers Mobile Section */}
-              <div>
-                <button
-                  onClick={() => toggleMobileDropdown('watertower')}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <Building2 className="w-5 h-5" />
-                    <span>Water Towers</span>
-                  </div>
-                  <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${activeMobileDropdown === 'watertower' ? 'rotate-180' : ''}`} />
-                </button>
-                
-                <div className={`overflow-hidden transition-all duration-300 ${
-                  activeMobileDropdown === 'watertower' ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'
-                }`}>
-                  <div className="ml-6 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-1 mt-1">
-                    {waterTowerSolutions.map((tower) => (
-                      <Link
-                        key={tower.href}
-                        href={tower.href}
-                        className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <tower.icon className="w-4 h-4" />
-                        <div className="flex-1">
-                          <div>{tower.label}</div>
-                          <div className="text-xs text-gray-400">{tower.description}</div>
-                        </div>
-                      </Link>
-                    ))}
-                    <Link
-                      href={waterTowerHub}
-                      className="flex items-center justify-center gap-2 mt-3 mx-2 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-sm font-semibold transition-all duration-200 hover:shadow-lg"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      View All Towers
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-
-              {/* Projects and Contact for Mobile */}
-              {rightNavLinks.map(({ href, label, icon: Icon }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <Icon className="w-5 h-5" />
-                  {label}
-                </Link>
-              ))}
-
-              {/* Mobile Auth Section */}
-              {!authLoading && (
-                <>
-                  {isLoggedIn && user ? (
-                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-3 px-4 py-3 mb-2">
-                        <Avatar 
-                          size="md"
-                          userId={user?.id || user?._id}
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white">{user.name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {isAdmin && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/50 rounded text-[10px] font-medium text-blue-700 dark:text-blue-300">
-                                Admin
-                              </span>
-                            )}
-                            {isSales && !isAdmin && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 dark:bg-green-900/50 rounded text-[10px] font-medium text-green-700 dark:text-green-300">
-                                Sales
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <Link
-                        href="/profile"
-                        className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <User className="w-4 h-4" />
-                        Profile
-                      </Link>
-                      
-                      {isAdmin && (
-                        <Link
-                          href="/dashboard"
-                          className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
-                          onClick={() => setIsMenuOpen(false)}
-                        >
-                          <LayoutDashboard className="w-4 h-4" />
-                          Admin Dashboard
-                        </Link>
-                      )}
-                      
-                      {hasSalesAccess && (
-                        <Link
-                          href="/sales"
-                          className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
-                          onClick={() => setIsMenuOpen(false)}
-                        >
-                          <Award className="w-4 h-4" />
-                          Sales Dashboard
-                        </Link>
-                      )}
-                      
-                      <Link
-                        href="/orders"
-                        className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <Package className="w-4 h-4" />
-                        My Orders
-                      </Link>
-                      
-                      <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all duration-200 mt-2"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Sign Out
-                      </button>
-                    </div>
-                  ) : (
-                    <Link
-                      href="/auth/login"
-                      className="flex items-center justify-center gap-2 mt-3 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl transition-all duration-200 hover:shadow-lg"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <User className="w-4 h-4" />
-                      Sign In
-                    </Link>
-                  )}
-                </>
-              )}
-            </div>
+        {/* Solar Solutions Mobile Section - Clean Design */}
+      <div>
+        <button
+          onClick={() => toggleMobileDropdown('solar')}
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+        >
+          <span>Solar Solutions</span>
+          <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${activeMobileDropdown === 'solar' ? 'rotate-180' : ''}`} />
+        </button>
+        
+        <div className={`overflow-hidden transition-all duration-300 ${
+          activeMobileDropdown === 'solar' ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
+        }`}>
+          <div className="ml-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-1 mt-1">
+            {solarSolutions.map((solution) => (
+              <Link
+                key={solution.href}
+                href={solution.href}
+                className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <span className="font-medium">{solution.label}</span>
+                <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+              </Link>
+            ))}
+            <Link
+              href={solarHub}
+              className="flex items-center justify-between gap-2 mt-3 mx-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#000063] to-[#0043b3] text-white text-sm font-semibold transition-all duration-200 hover:shadow-lg group"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <span>View All Solutions</span>
+              <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+            </Link>
           </div>
         </div>
+      </div>
+      
+      {/* Borehole Services Mobile Section - Clean Design */}
+      <div className="mt-1">
+        <button
+          onClick={() => toggleMobileDropdown('borehole')}
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+        >
+          <span>Borehole Services</span>
+          <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${activeMobileDropdown === 'borehole' ? 'rotate-180' : ''}`} />
+        </button>
+        
+        <div className={`overflow-hidden transition-all duration-300 ${
+          activeMobileDropdown === 'borehole' ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
+        }`}>
+          <div className="ml-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-1 mt-1">
+            {boreholeServices.map((service) => (
+              <Link
+                key={service.href}
+                href={service.href}
+                className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <span className="font-medium">{service.label}</span>
+                <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+              </Link>
+            ))}
+            <Link
+              href={boreholeHub}
+              className="flex items-center justify-between gap-2 mt-3 mx-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#000063] to-[#0043b3] text-white text-sm font-semibold transition-all duration-200 hover:shadow-lg group"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <span>View All Services</span>
+              <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+    
+
+      {/* Water Towers Mobile Section - Clean Design */}
+      <div>
+        <button
+          onClick={() => toggleMobileDropdown('watertower')}
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+        >
+          <span>Water Towers</span>
+          <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${activeMobileDropdown === 'watertower' ? 'rotate-180' : ''}`} />
+        </button>
+        
+        <div className={`overflow-hidden transition-all duration-300 ${
+          activeMobileDropdown === 'watertower' ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'
+        }`}>
+          <div className="ml-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-1 mt-1">
+            {waterTowerSolutions.map((tower) => (
+              <Link
+                key={tower.href}
+                href={tower.href}
+                className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <span className="font-medium">{tower.label}</span>
+                <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+              </Link>
+            ))}
+            <Link
+              href={waterTowerHub}
+              className="flex items-center justify-between gap-2 mt-3 mx-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#000063] to-[#0043b3] text-white text-sm font-semibold transition-all duration-200 hover:shadow-lg group"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <span>View All Towers</span>
+              <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Projects and Contact for Mobile */}
+      {rightNavLinks.map(({ href, label, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+          onClick={() => setIsMenuOpen(false)}
+        >
+          <Icon className="w-5 h-5" />
+          {label}
+        </Link>
+      ))}
+    </div>
+  </div>
+</div>
+
       </nav>
 
       {/* Spacer */}

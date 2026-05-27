@@ -32,8 +32,8 @@ import FAQ from './FAQ';
 const profilePdf = {
   url: "/profile.pdf",
   name: "Plasma_Water_Africa_Profile.pdf",
-  size: "8 MB",
-  lastUpdated: "December 2025",
+  size: "1 MB",
+  lastUpdated: "January 2026",
 };
 
 // Data

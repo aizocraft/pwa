@@ -24,6 +24,8 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, Variants } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { BoreholeIcon } from "@/components/icons/BoreholeIcon";
+import { WaterTowerIcon } from "@/components/icons/WaterTowerIcon";
 
 interface Service {
   id: number;
@@ -33,16 +35,15 @@ interface Service {
   features: string[];
   longDescription: string;
   image: string;
-  stats: { value: string; label: string; icon: React.ComponentType<{ className?: string }> }[];
   benefits: string[];
 }
 
 const services: Service[] = [
   {
     id: 1,
-    Icon: Droplets,
+    Icon: BoreholeIcon,
     title: "Borehole Drilling",
-    description: "Precision drilling solutions delivering sustainable groundwater access with advanced hydrogeological surveying and state-of-the-art equipment.",
+    description: "Precision drilling solutions delivering sustainable groundwater access with hydrogeological surveying and state-of-the-art equipment.",
     longDescription: "Our comprehensive borehole drilling service combines cutting-edge technology with decades of geological expertise. We conduct detailed hydrogeological surveys, utilize advanced rotary drilling rigs, and implement strict quality control measures to ensure optimal water yield, purity, and long-term sustainability for communities and industries across Africa.",
     features: [
       "Advanced Rotary Drilling Technology",
@@ -59,11 +60,6 @@ const services: Service[] = [
       "Emergency response team"
     ],
     image: "/images/borehole-drilling5.jpg",
-    stats: [
-      { value: "500+", label: "Projects Completed", icon: Activity },
-      { value: "98%", label: "Success Rate", icon: BarChart3 },
-      { value: "24/7", label: "Support Available", icon: Clock }
-    ]
   },
   {
     id: 2,
@@ -86,15 +82,10 @@ const services: Service[] = [
       "Government incentive eligible"
     ],
     image: "/images/solar.jpg",
-    stats: [
-      { value: "1.2MW+", label: "Capacity Installed", icon: Activity },
-      { value: "45%", label: "Average Savings", icon: TrendingUp },
-      { value: "500+", label: "Happy Clients", icon: Users }
-    ]
   },
   {
     id: 3,
-    Icon: Building2,
+    Icon: WaterTowerIcon,
     title: "Water Towers",
     description: "Engineered water storage solutions with robust construction, seismic resilience, and advanced corrosion protection systems.",
     longDescription: "Our elevated water tower construction service delivers robust, long-lasting structures engineered to withstand extreme environmental conditions. We specialize in custom-designed storage solutions that ensure consistent water pressure, reliable supply, and structural integrity for communities, industries, and municipalities across Africa.",
@@ -113,11 +104,6 @@ const services: Service[] = [
       "Free structural inspection"
     ],
     image: "/images/watertower.jpg",
-    stats: [
-      { value: "50+", label: "Towers Built", icon: Building2 },
-      { value: "100K+", label: "People Served", icon: Users },
-      { value: "30+", label: "Years Experience", icon: Calendar }
-    ]
   },
 ];
 
@@ -211,7 +197,6 @@ const backdropVariants: Variants = {
 const Services = () => {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -252,8 +237,6 @@ const Services = () => {
           transition={{ duration: 0.7, ease: "easeOut" }}
           className="text-center mb-12 sm:mb-16 lg:mb-20"
         >
-
-          
           <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-5">
             Our{" "}
             <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 bg-clip-text text-transparent">
@@ -261,11 +244,11 @@ const Services = () => {
             </span>
           </h2>
           <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed px-4">
-           Water and energy solutions engineered for a sustainable future
+            Water and energy solutions engineered for a sustainable future
           </p>
         </motion.div>
 
-        {/* Desktop: 3D Tilt Cards */}
+        {/* Desktop: 3D Tilt Cards - Description always visible */}
         <div className="hidden lg:grid lg:grid-cols-3 gap-6 xl:gap-8">
           {services.map((service, index) => {
             const Icon = service.Icon;
@@ -276,8 +259,6 @@ const Services = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: index * 0.15, ease: "easeOut" }}
-                onHoverStart={() => setHoveredIndex(index)}
-                onHoverEnd={() => setHoveredIndex(null)}
               >
                 <TiltCard3D>
                   <div 
@@ -308,40 +289,17 @@ const Services = () => {
                         </div>
                       </div>
                       
-                      <AnimatePresence>
-                        {hoveredIndex === index && (
-                          <motion.p 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10 }}
-                            transition={{ duration: 0.2 }}
-                            className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-4"
-                          >
-                            {service.description}
-                          </motion.p>
-                        )}
-                      </AnimatePresence>
-
-                      {/* Stats */}
-                      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-                        {service.stats.map((stat, i) => {
-                          const StatIcon = stat.icon;
-                          return (
-                            <div key={i} className="text-center group/stat">
-                              <StatIcon className="w-4 h-4 text-blue-500 mx-auto mb-1 opacity-60 group-hover/stat:opacity-100 transition-opacity" />
-                              <div className="text-sm font-bold text-gray-900 dark:text-white">{stat.value}</div>
-                              <div className="text-[10px] text-gray-500 dark:text-gray-500">{stat.label}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {/* Description always visible on desktop */}
+                      <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-4">
+                        {service.description}
+                      </p>
 
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();
                           openModal(service);
                         }}
-                        className="w-full h-11 mt-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold text-sm rounded-xl transition-all duration-300 flex items-center justify-center gap-2 group/btn shadow-md hover:shadow-lg"
+                        className="w-full h-11 mt-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold text-sm rounded-xl transition-all duration-300 flex items-center justify-center gap-2 group/btn shadow-md hover:shadow-lg"
                       >
                         <span>Explore Service</span>
                         <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
@@ -389,19 +347,6 @@ const Services = () => {
                     <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed line-clamp-2">
                       {service.description}
                     </p>
-
-                    <div className="grid grid-cols-3 gap-2 pt-2">
-                      {service.stats.map((stat, i) => {
-                        const StatIcon = stat.icon;
-                        return (
-                          <div key={i} className="text-center">
-                            <StatIcon className="w-3 h-3 text-blue-500 mx-auto mb-1" />
-                            <div className="text-xs font-bold text-gray-900 dark:text-white">{stat.value}</div>
-                            <div className="text-[9px] text-gray-500 dark:text-gray-500">{stat.label}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
 
                     <ul className="space-y-1.5">
                       {service.features.slice(0, 3).map((feature, i) => (
@@ -465,29 +410,16 @@ const Services = () => {
                       {service.description}
                     </p>
 
-                    <div className="flex items-center justify-between pt-2">
-                      <div className="flex gap-3">
-                        {service.stats.slice(0, 2).map((stat, i) => {
-                          const StatIcon = stat.icon;
-                          return (
-                            <div key={i} className="text-center">
-                              <StatIcon className="w-2.5 h-2.5 text-blue-500 mx-auto mb-0.5" />
-                              <div className="text-[10px] font-bold text-gray-900 dark:text-white">{stat.value}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openModal(service);
-                        }}
-                        className="h-8 px-3 text-xs font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg flex items-center gap-1"
-                      >
-                        Details
-                        <ArrowRight className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openModal(service);
+                      }}
+                      className="w-full h-8 px-3 text-xs font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg flex items-center justify-center gap-1"
+                    >
+                      Details
+                      <ArrowRight className="h-3 w-3" />
+                    </Button>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -495,7 +427,7 @@ const Services = () => {
           })}
         </div>
 
-        {/* Modal */}
+        {/* Modal with increased top margin */}
         <AnimatePresence mode="wait">
           {isModalOpen && selectedService && (
             <motion.div
@@ -513,7 +445,7 @@ const Services = () => {
                 initial="hidden"
                 animate="visible"
                 exit="exit"
-                className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-[95%] sm:max-w-[90%] md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800"
+                className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-[95%] sm:max-w-[90%] md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800 mt-8 sm:mt-12 md:mt-16"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header */}
@@ -543,7 +475,7 @@ const Services = () => {
                   </div>
                 </div>
 
-                {/* Scrollable Body */}
+                {/* Scrollable Body - No stats section */}
                 <div className="overflow-y-auto max-h-[calc(90vh-80px)] sm:max-h-[calc(90vh-100px)]">
                   <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                     {/* Image */}
@@ -559,20 +491,6 @@ const Services = () => {
                     <p className="text-gray-700 dark:text-gray-300 text-sm sm:text-base leading-relaxed">
                       {selectedService.longDescription}
                     </p>
-
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-3 gap-3 sm:gap-4 py-3 sm:py-4 px-3 sm:px-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 rounded-xl sm:rounded-2xl">
-                      {selectedService.stats.map((stat, i) => {
-                        const StatIcon = stat.icon;
-                        return (
-                          <div key={i} className="text-center">
-                            <StatIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
-                            <div className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</div>
-                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{stat.label}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
 
                     {/* Features */}
                     <div>
@@ -592,27 +510,6 @@ const Services = () => {
                             <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 mr-2 sm:mr-3 mt-0.5 flex-shrink-0 transition-transform group-hover/feature:scale-110" />
                             <span className="text-gray-700 dark:text-gray-300 text-xs sm:text-sm">{feature}</span>
                           </motion.div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Benefits */}
-                    <div className="pt-2">
-                      <h4 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
-                        <Award className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                        What You Get
-                      </h4>
-                      <div className="flex flex-wrap gap-2 sm:gap-3">
-                        {selectedService.benefits.map((benefit, i) => (
-                          <motion.span
-                            key={i}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: i * 0.05 }}
-                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 text-blue-700 dark:text-blue-400 text-xs sm:text-sm font-medium rounded-full border border-blue-200 dark:border-blue-800"
-                          >
-                            {benefit}
-                          </motion.span>
                         ))}
                       </div>
                     </div>

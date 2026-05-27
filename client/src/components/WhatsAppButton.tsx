@@ -10,13 +10,13 @@ interface WhatsAppButtonProps {
   welcomeMessage?: string;
   avatar?: string;
 }
-
+ const whatsappAvatar = "/whatsapp-logo.png"; 
 const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
   phoneNumber = "254728749722",
   accountName = "Plasma Water Africa",
   welcomeMessage = "Hi there! 👋 Welcome to Plasma Water Africa. How can we assist you today?",
   avatar = "/logo.png",
-}) => {
+ }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [isMinimized, setIsMinimized] = useState(false);
@@ -102,7 +102,7 @@ className="group relative bg-transparent text-white rounded-full p-3 shadow-2xl 
           
           {/* Real WhatsApp Icon from local file */}
           <img 
-            src="/whatsapp-logo.png" 
+            src={whatsappAvatar} 
             alt="WhatsApp"
             className="w-8 h-8 relative z-10 object-contain"
           />
@@ -121,12 +121,12 @@ className="group relative bg-transparent text-white rounded-full p-3 shadow-2xl 
           } ${isVisible ? 'translate-y-0' : 'translate-y-24'} animate-slideUp`}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-t-2xl p-4 text-white">
-            <div className="flex items-center justify-between">
+<div className="bg-gradient-to-r from-[#000063] to-[#0043b3] rounded-t-2xl p-4 text-white">
+              <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <img 
-                    src={avatar} 
+                    src={whatsappAvatar} 
                     alt={accountName}
                     className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-lg"
                     onError={(e) => {
@@ -268,9 +268,7 @@ className="group relative bg-transparent text-white rounded-full p-3 shadow-2xl 
                     <Send className="w-5 h-5" />
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
-                  We'll respond within 30 minutes ⚡
-                </p>
+
               </div>
             </>
           )}
