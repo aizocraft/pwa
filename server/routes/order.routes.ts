@@ -57,7 +57,7 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
       return res.status(400).json({ error: 'Complete shipping address is required' });
     }
 
-    if (!paymentMethod || !['cod', 'mpesa', 'card'].includes(paymentMethod)) {
+    if (!paymentMethod || !['cod', 'mpesa', 'card', 'cash', 'bank_transfer', 'cheque'].includes(paymentMethod)) {
       return res.status(400).json({ error: 'Valid payment method is required' });
     }
 
@@ -190,7 +190,7 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
         email: shippingAddress.email || guestInfoData?.email
       },
       paymentMethod,
-      paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending',
+      paymentStatus: 'unpaid',
       status: paymentMethod === 'cod' ? 'pending' : 'processing',
       notes: notes || null
     };

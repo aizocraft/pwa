@@ -20,7 +20,7 @@ export interface IOrder extends Document {
   discount: number;
   total: number;
   status: 'pending' | 'processing' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
-  paymentMethod: 'cod' | 'mpesa' | 'card';
+  paymentMethod: 'cod' | 'mpesa' | 'card' | 'cash' | 'bank_transfer' | 'cheque';
   
   // Payment summary (denormalized from Transaction model)
   paymentStatus: 'unpaid' | 'partially_paid' | 'paid' | 'overpaid' | 'refunded';
@@ -104,7 +104,7 @@ const orderSchema = new Schema<IOrder, IOrderModel>({
     enum: ['pending', 'processing', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'], 
     default: 'pending' 
   },
-  paymentMethod: { type: String, enum: ['cod', 'mpesa', 'card'], required: true },
+  paymentMethod: { type: String, enum: ['cod', 'mpesa', 'card', 'cash', 'bank_transfer', 'cheque'], required: true },
   
   // Payment summary (denormalized)
   paymentStatus: {

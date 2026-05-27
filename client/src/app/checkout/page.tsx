@@ -18,13 +18,13 @@ import PaymentMethods from "./components/PaymentMethods"
 import MpesaPayment from "./components/MpesaPayment"
 import CardPayment from "./components/CardPayment"
 
-type PaymentMethod = "cod" | "mpesa" | "card"
+type PaymentMethod = "cash" | "mpesa" | "bank_transfer" | "card"
 
 export default function CheckoutPage() {
   const cart = useCartStore()
   const { items, subtotal, shippingCost, discount, totals, clearCart } = cart
   const [loading, setLoading] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod")
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash")
   const [step, setStep] = useState<"shipping" | "payment">("shipping")
   const cartStore = useCartStore()
   const [orderSuccess, setOrderSuccess] = useState(false)
@@ -45,7 +45,8 @@ export default function CheckoutPage() {
     }
     
     ensureCartReady().catch(console.error)
-  }, [])
+  }, [cartStore])
+  
   const [orderId, setOrderId] = useState("")
   const [isGuest, setIsGuest] = useState(false)
   
@@ -60,14 +61,13 @@ export default function CheckoutPage() {
   const [mpesaError, setMpesaError] = useState("")
   const [countdown, setCountdown] = useState(60)
   
-// Card payment state
+  // Card payment state
   const [cardNumber, setCardNumber] = useState("")
   const [cardExpiry, setCardExpiry] = useState("")
   const [cardCvc, setCardCvc] = useState("")
   const [cardName, setCardName] = useState("")
   const [cardError, setCardError] = useState("")
 
-  // Add this state at the top with other state declarations
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitTimeout, setSubmitTimeout] = useState<NodeJS.Timeout | null>(null)
   
@@ -89,10 +89,10 @@ export default function CheckoutPage() {
     setIsGuest(!token)
   }, [])
 
-const tax = cart.totals.tax || (subtotal * cart.taxRate)
-const total = cart.totals.total || totals.total
-const shipping = cart.totals.shippingCost || shippingCost
-const finalDiscount = cart.totals.discount || discount
+  const tax = cart.totals.tax || (subtotal * cart.taxRate)
+  const total = cart.totals.total || totals.total
+  const shipping = cart.totals.shippingCost || shippingCost
+  const finalDiscount = cart.totals.discount || discount
 
   const isShippingValid = (): boolean => {
     return !!(
@@ -110,14 +110,13 @@ const finalDiscount = cart.totals.discount || discount
     return !!(guestEmail && guestPhone && guestEmail.includes("@"))
   }
 
-  // Update the M-PESA request function
+  // Handle M-PESA request
   const handleMpesaRequest = () => {
     if (!mpesaPhone || mpesaPhone.length < 10) {
       setMpesaError("Please enter a valid phone number (e.g., 254700000000)")
       return
     }
     
-    // Prevent double request
     if (isSubmitting) return
     
     setMpesaError("")
@@ -139,7 +138,7 @@ const finalDiscount = cart.totals.discount || discount
     }, 1500)
   }
 
-  // Update the M-PESA verify function
+  // Handle M-PESA verify
   const handleMpesaVerify = async () => {
     if (!mpesaCode || mpesaCode.length < 4) {
       setMpesaError("Please enter the 4-digit verification code")
@@ -147,7 +146,6 @@ const finalDiscount = cart.totals.discount || discount
     }
     setMpesaError("")
     
-    // Prevent double submission
     if (isSubmitting || loading) return
     
     setIsSubmitting(true)
@@ -164,41 +162,14 @@ const finalDiscount = cart.totals.discount || discount
     }, 1500)
   }
 
-  // Update the card payment function
+  // Handle card payment (coming soon)
   const handleCardPayment = async () => {
-    const cleanCardNumber = cardNumber.replace(/\s/g, "")
-    if (!cleanCardNumber || cleanCardNumber.length < 15) {
-      setCardError("Please enter a valid card number")
-      return
-    }
-    if (!cardExpiry || !cardExpiry.match(/^(0[1-9]|1[0-2])\/([0-9]{2})$/)) {
-      setCardError("Please enter a valid expiry date (MM/YY)")
-      return
-    }
-    if (!cardCvc || cardCvc.length < 3) {
-      setCardError("Please enter a valid CVC")
-      return
-    }
-    if (!cardName) {
-      setCardError("Please enter the cardholder name")
-      return
-    }
-    setCardError("")
-    
-    // Prevent double submission
-    if (isSubmitting || loading) return
-    
-    setIsSubmitting(true)
-    setLoading(true)
-    
-    setTimeout(async () => {
-      await handlePlaceOrder()
-    }, 2000)
+    setCardError("Card payments are coming soon. Please use Cash, M-PESA, or Bank Transfer.")
+    return
   }
 
-  // Replace the handlePlaceOrder function with this optimized version
+  // Handle place order for all payment methods
   const handlePlaceOrder = async () => {
-    // Prevent multiple submissions
     if (isSubmitting || loading) {
       toast.error('Please wait, order is already being processed...')
       return
@@ -210,11 +181,9 @@ const finalDiscount = cart.totals.discount || discount
       
       const token = getToken()
       const isGuestUser = !token
-      const apiPaymentMethod = paymentMethod === "cod" ? "cod" : paymentMethod
       
       const calculatedTax = subtotal * cart.taxRate
       
-      // Validate required fields
       if (!cart.selectedShippingAreaId) {
         toast.error('Please select a shipping area')
         setIsSubmitting(false)
@@ -248,7 +217,7 @@ const finalDiscount = cart.totals.discount || discount
           phone: shippingAddress.phone.trim(),
           email: isGuestUser ? guestEmail.trim() : undefined
         },
-        paymentMethod: apiPaymentMethod,
+        paymentMethod: paymentMethod,
         notes: ""
       }
 
@@ -326,7 +295,7 @@ const finalDiscount = cart.totals.discount || discount
     setGuestPhone("")
   }
 
-  // Add cleanup effect to prevent memory leaks
+  // Cleanup effect
   useEffect(() => {
     return () => {
       if (submitTimeout) {
@@ -355,7 +324,7 @@ const finalDiscount = cart.totals.discount || discount
               >
                 Clear Data
               </button>
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-blue-700 flex items-center justify-center shadow-lg ring-1 ring-blue-500/30">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-blue-700 flex items-center justify-center shadow-lg ring-1 ring-blue-500/30">
                 <span className="text-white text-xs font-bold">{items.length}</span>
               </div>
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Items</span>
@@ -445,9 +414,9 @@ const finalDiscount = cart.totals.discount || discount
                   <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-lg overflow-hidden">
                     <div className="p-6 lg:p-8">
                       <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/50 flex items-center justify-center">
-                          <CreditCard className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                        </div>
+                       <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center">
+                        <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
                         Payment Method
                       </h2>
 
@@ -471,6 +440,44 @@ const finalDiscount = cart.totals.discount || discount
                           onRequest={handleMpesaRequest}
                           onVerify={handleMpesaVerify}
                           onReset={resetMpesa}
+                          paymentMethod={paymentMethod}
+                          total={total}
+                        />
+                      )}
+
+                      {paymentMethod === "cash" && (
+                        <MpesaPayment
+                          mpesaPhone={mpesaPhone}
+                          setMpesaPhone={setMpesaPhone}
+                          mpesaCode={mpesaCode}
+                          setMpesaCode={setMpesaCode}
+                          mpesaStep={mpesaStep}
+                          mpesaError={mpesaError}
+                          countdown={countdown}
+                          loading={loading}
+                          onRequest={handlePlaceOrder}
+                          onVerify={handleMpesaVerify}
+                          onReset={resetMpesa}
+                          paymentMethod={paymentMethod}
+                          total={total}
+                        />
+                      )}
+
+                      {paymentMethod === "bank_transfer" && (
+                        <MpesaPayment
+                          mpesaPhone={mpesaPhone}
+                          setMpesaPhone={setMpesaPhone}
+                          mpesaCode={mpesaCode}
+                          setMpesaCode={setMpesaCode}
+                          mpesaStep={mpesaStep}
+                          mpesaError={mpesaError}
+                          countdown={countdown}
+                          loading={loading}
+                          onRequest={handlePlaceOrder}
+                          onVerify={handleMpesaVerify}
+                          onReset={resetMpesa}
+                          paymentMethod={paymentMethod}
+                          total={total}
                         />
                       )}
 
@@ -491,35 +498,13 @@ const finalDiscount = cart.totals.discount || discount
                         />
                       )}
 
-{paymentMethod === "cod" && (
-  <motion.button
-    onClick={handlePlaceOrder}
-    disabled={isSubmitting || loading}
-    className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 p-1 shadow-xl ring-1 ring-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/30 hover:ring-blue-400/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-clip-padding shadow-lg"
-    whileHover={{ scale: 1.02, boxShadow: '0 20px 40px -10px rgba(59,130,246,0.4)' }}
-    whileTap={{ scale: 0.98 }}
-    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-  >
-    {(isSubmitting || loading) ? (
-      <>
-        <Loader2 className="w-5 h-5 animate-spin" />
-        Processing Order...
-      </>
-    ) : (
-      <>
-        <span>Place Order - {formatCurrency(total)}</span>
-      </>
-    )}
-  </motion.button>
-)}
-
                       <button
                         onClick={() => setStep("shipping")}
                         className="w-full mt-4 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-sm font-medium flex items-center justify-center gap-1 group"
-                        >
-                          <ArrowRight className="w-4 h-4 rotate-180 group-hover:-translate-x-0.5 transition-transform" />
-                          Back to Shipping
-                        </button>
+                      >
+                        <ArrowRight className="w-4 h-4 rotate-180 group-hover:-translate-x-0.5 transition-transform" />
+                        Back to Shipping
+                      </button>
                     </div>
                   </div>
                 </motion.div>
@@ -528,7 +513,7 @@ const finalDiscount = cart.totals.discount || discount
           </div>
 
           <div className="lg:col-span-1">
-           <OrderSummary 
+            <OrderSummary 
               items={items} 
               subtotal={cart.totals.subtotal || subtotal} 
               tax={cart.totals.tax || tax} 
@@ -540,7 +525,6 @@ const finalDiscount = cart.totals.discount || discount
               guestEmail={guestEmail}
               guestPhone={guestPhone} 
             />
-
           </div>
         </div>
       </div>

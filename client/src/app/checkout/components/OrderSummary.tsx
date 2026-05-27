@@ -1,6 +1,6 @@
 'use client'
 
-import { Package, Truck, CreditCard, Smartphone, Gift, MapPin, User } from 'lucide-react'
+import { Package, Truck, CreditCard, Smartphone, Gift, MapPin, User, Landmark, Banknote } from 'lucide-react'
 import { useCartStore } from '../../../store/cart'
 import { formatCurrency } from '../../../lib/utils'
 
@@ -14,6 +14,7 @@ interface ShippingAddress {
   zip: string;
   country: string;
   phone: string;
+  email?: string;
 }
 
 interface OrderSummaryProps {
@@ -27,6 +28,22 @@ interface OrderSummaryProps {
   isGuest: boolean
   guestEmail?: string
   guestPhone?: string
+}
+
+// Helper to get payment method icon and label
+const getPaymentMethodInfo = (method: string) => {
+  switch (method) {
+    case 'cash':
+      return { icon: Banknote, label: 'Cash', color: 'blue' }
+    case 'mpesa':
+      return { icon: Smartphone, label: 'M-PESA', color: 'blue' }
+    case 'bank_transfer':
+      return { icon: Landmark, label: 'Bank Transfer', color: 'blue' }
+    case 'card':
+      return { icon: CreditCard, label: 'Credit/Debit Card', color: 'gray' }
+    default:
+      return { icon: Truck, label: 'Cash on Delivery', color: 'blue' }
+  }
 }
 
 export default function OrderSummary({ 
@@ -43,10 +60,10 @@ export default function OrderSummary({
 }: OrderSummaryProps) {
   const cart = useCartStore()
   
-const shippingCost = cart.totals.shippingCost || cart.shippingCost
-const discount = cart.totals.discount || cart.discount
-const promoCode = cart.promoCode
-const promoValid = cart.promoValid
+  const shippingCost = cart.totals.shippingCost || cart.shippingCost
+  const discount = cart.totals.discount || cart.discount
+  const promoCode = cart.promoCode
+  const promoValid = cart.promoValid
 
   const getDisplayEmail = () => {
     if (!isGuest) return 'Your account email';
@@ -68,6 +85,9 @@ const promoValid = cart.promoValid
     ].filter(Boolean).join(', ');
     return parts || 'Address not complete';
   };
+
+  const paymentInfo = paymentMethod ? getPaymentMethodInfo(paymentMethod) : null;
+  const PaymentIcon = paymentInfo?.icon || Truck;
 
   return (
     <div className="sticky top-24 bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-lg overflow-hidden">
@@ -140,22 +160,22 @@ const promoValid = cart.promoValid
             </span>
           </div>
 
-        {/*  promo code display section */}
-            {promoValid && discount > 0 && (
-              <div className="flex justify-between items-center text-sm p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-xl border border-green-200 dark:border-green-800">
-                <div className="flex items-center gap-2">
-                  <Gift className="w-4 h-4 text-green-600" />
-                  <span className="font-medium text-green-700 dark:text-green-400">
-                    Promo: {promoCode}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="font-bold text-green-600 dark:text-green-400">
-                    -{formatCurrency(discount)}
-                  </span>
-                </div>
+          {/* Promo code display section */}
+          {promoValid && discount > 0 && (
+            <div className="flex justify-between items-center text-sm p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-xl border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2">
+                <Gift className="w-4 h-4 text-green-600" />
+                <span className="font-medium text-green-700 dark:text-green-400">
+                  Promo: {promoCode}
+                </span>
               </div>
-            )}
+              <div className="text-right">
+                <span className="font-bold text-green-600 dark:text-green-400">
+                  -{formatCurrency(discount)}
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-between text-sm">
             <span className="text-gray-600 dark:text-gray-400">Tax (VAT)</span>
@@ -166,7 +186,7 @@ const promoValid = cart.promoValid
             <div className="flex justify-between items-end">
               <span className="text-xl font-bold text-gray-900 dark:text-white">Total</span>
               <div className="text-right">
-  <span className="text-3xl font-black bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 bg-clip-text text-transparent tracking-tight">
+                <span className="text-3xl font-black bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 bg-clip-text text-transparent tracking-tight">
                   {formatCurrency(total)}
                 </span>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">incl. VAT</p>
@@ -174,16 +194,15 @@ const promoValid = cart.promoValid
             </div>
           </div>
 
+          {/* Payment Method Display */}
           {step === "payment" && paymentMethod && (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl">
-                <span className="text-sm font-medium text-blue-800 dark:text-blue-300 flex items-center gap-2">
-                  {paymentMethod === "cod" && <Truck className="w-4 h-4" />}
-                  {paymentMethod === "mpesa" && <Smartphone className="w-4 h-4" />}
-                  {paymentMethod === "card" && <CreditCard className="w-4 h-4" />}
-                  {paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod === "mpesa" ? "M-PESA" : "Card"}
+              <div className={`flex items-center justify-between p-3 bg-gradient-to-r from-${paymentInfo?.color}-50 to-${paymentInfo?.color}-100 dark:from-${paymentInfo?.color}-950/30 dark:to-${paymentInfo?.color}-900/20 rounded-xl`}>
+                <span className={`text-sm font-medium text-${paymentInfo?.color}-800 dark:text-${paymentInfo?.color}-300 flex items-center gap-2`}>
+                  <PaymentIcon className="w-4 h-4" />
+                  {paymentInfo?.label}
                 </span>
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-ping" />
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               </div>
             </div>
           )}
@@ -221,4 +240,3 @@ const promoValid = cart.promoValid
     </div>
   )
 }
-

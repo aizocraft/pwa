@@ -61,7 +61,7 @@ export interface PaymentDetails {
 }
 
 export type OrderStatus = 'pending' | 'processing' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
-export type PaymentMethod = 'cod' | 'mpesa' | 'card';
+export type PaymentMethod = 'cod' | 'mpesa' | 'card' | 'cash' | 'bank_transfer' | 'cheque';
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
 
 export interface Order {

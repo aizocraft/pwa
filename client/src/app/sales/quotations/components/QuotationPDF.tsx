@@ -183,7 +183,7 @@ export async function generateQuotationPDF(
           </div>
         ` : ''}
         <div class="total-row">
-          <span>Tax (${(taxRate * 100).toFixed(0)}% VAT${taxPerItem ? ' - Per Item' : ' - On Total'})</span>
+          <span>Tax (${(taxRate * 100).toFixed(0)}% VAT)</span>
           <span class="font-mono">KES ${calculatedTax.toLocaleString()}</span>
         </div>
         <div class="total-row grand-total">
