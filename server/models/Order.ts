@@ -83,7 +83,7 @@ const orderItemSchema = new Schema({
   productId: { type: SchemaTypes.ObjectId, ref: 'Product', required: true },
   name: { type: String, required: true },
   slug: { type: String, required: true },
-  image: { type: String, required: true },
+  image: { type: String},
   sellingPrice: { type: Number, required: true },
   buyingPrice: { type: Number, default: 0 },
   profit: { type: Number, default: 0 },

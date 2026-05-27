@@ -109,7 +109,7 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/suppliers', supplierRoutes);
-app.use('/api/profit', profitRoutes);
+app.use('/api/profits', profitRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/', healthzRoutes);
 
