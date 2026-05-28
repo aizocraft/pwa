@@ -51,6 +51,8 @@ import {
   Settings,
   ToggleLeft,
   ToggleRight,
+  FileSpreadsheet,
+  RotateCcw,
 } from 'lucide-react';
 import {
   listSalesQuotations,
@@ -359,10 +361,14 @@ export default function QuotationsPage() {
   const [reportStartDate, setReportStartDate] = useState('');
   const [reportEndDate, setReportEndDate] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+  const [creatingNewInvoiceId, setCreatingNewInvoiceId] = useState<string | null>(null);
   
   const itemsPerPage = 10;
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
-  const productSearchTimeoutRef = useRef<NodeJS.Timeout>();
+  
+  // Improved debounce for search - prevents excessive API calls
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const productSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSearchingRef = useRef(false);
 
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -394,13 +400,21 @@ export default function QuotationsPage() {
     taxable: true,
   });
 
-  // Debounced search handlers
+  // Improved debounced search handler - prevents refresh on each keystroke
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    setCurrentPage(1);
+    
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Set new timeout for debounced search (500ms delay)
     searchTimeoutRef.current = setTimeout(() => {
-      setCurrentPage(1);
-      fetchData();
+      if (!isSearchingRef.current) {
+        fetchData();
+      }
     }, 500);
   };
 
@@ -413,10 +427,46 @@ export default function QuotationsPage() {
     }, 300);
   };
 
+  // Clean up timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      if (productSearchTimeoutRef.current) clearTimeout(productSearchTimeoutRef.current);
+    };
+  }, []);
+
+  // Fetch data with proper loading state - only when searchTerm or filters change after debounce
+  const fetchData = useCallback(async () => {
+    if (isSearchingRef.current) return;
+    
+    isSearchingRef.current = true;
+    try {
+      setLoading(true);
+      const [quotesRes, customersRes] = await Promise.all([
+        listSalesQuotations({ 
+          search: searchTerm || undefined, 
+          status: statusFilter || undefined, 
+          page: currentPage, 
+          limit: itemsPerPage 
+        }),
+        listSalesCustomers({ limit: 100 }),
+      ]);
+      setQuotations(quotesRes.quotations);
+      setTotalPages(quotesRes.pagination?.pages || 1);
+      setCustomers(customersRes.customers);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+      isSearchingRef.current = false;
+    }
+  }, [searchTerm, statusFilter, currentPage]);
+
   useEffect(() => {
     fetchData();
     fetchCategories();
-  }, [searchTerm, statusFilter, currentPage]);
+  }, [fetchData]);
 
   useEffect(() => {
     if (showModal) fetchProducts();
@@ -466,24 +516,6 @@ export default function QuotationsPage() {
       setProducts(enhancedProducts);
     } catch (error) {
       console.error('Failed to fetch products:', error);
-    }
-  };
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [quotesRes, customersRes] = await Promise.all([
-        listSalesQuotations({ search: searchTerm || undefined, status: statusFilter || undefined, page: currentPage, limit: itemsPerPage }),
-        listSalesCustomers({ limit: 100 }),
-      ]);
-      setQuotations(quotesRes.quotations);
-      setTotalPages(quotesRes.pagination?.pages || 1);
-      setCustomers(customersRes.customers);
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
-      toast.error('Failed to load data');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -561,6 +593,20 @@ export default function QuotationsPage() {
     setTempItem({ ...tempItem, productId: newProduct._id });
     setProductSearchTerm(newProduct.name);
     setShowProductDropdown(false);
+  };
+
+  // Handle creating a new invoice from an accepted quotation after editing
+  const handleCreateNewInvoiceFromQuote = async (quoteId: string) => {
+    setCreatingNewInvoiceId(quoteId);
+    try {
+      const response = await api.post(`/sales/quotations/${quoteId}/create-invoice`);
+      toast.success(`New invoice created: ${response.data.invoice.invoiceNumber}`);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to create new invoice');
+    } finally {
+      setCreatingNewInvoiceId(null);
+    }
   };
 
   const calculateTotals = useCallback(() => {
@@ -782,11 +828,25 @@ export default function QuotationsPage() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filters - Improved debounced search */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Search by quote # or customer..." value={searchTerm} onChange={(e) => handleSearchChange(e.target.value)} className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg bg-white dark:bg-gray-900" />
+            <input 
+              type="text" 
+              placeholder="Search by quote # or customer..." 
+              value={searchTerm} 
+              onChange={(e) => handleSearchChange(e.target.value)} 
+              className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg bg-white dark:bg-gray-900"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => handleSearchChange('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-900">
             <option value="">All Status</option>
@@ -815,46 +875,99 @@ export default function QuotationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                {quotations.map((quote) => (
-                  <tr key={quote._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium">{quote.quoteNumber}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium">{quote.customerName}</p>
-                      <p className="text-xs text-gray-500">{quote.customerEmail}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm">{quote.items.length} items</td>
-                    <td className="px-6 py-4 text-sm font-semibold">KES {quote.total?.toLocaleString() || 0}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(quote.status)}`}>
-                        {getStatusIcon(quote.status)} {quote.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">{new Date(quote.createdAt).toLocaleDateString()}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <button onClick={() => handleView(quote)} className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="View"><Eye className="w-4 h-4 text-blue-500" /></button>
-                        <button onClick={() => handleSendEmail(quote._id)} disabled={sendingId === quote._id} className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="Send Email">
-                          {sendingId === quote._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 text-green-500" />}
-                        </button>
-                        <button onClick={() => handlePrintPDF(quote)} disabled={isGeneratingPDF} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Download PDF">
-                          <Printer className="w-4 h-4 text-gray-500" />
-                        </button>
-                        <button onClick={() => { setEditingQuote(quote); setFormData({ customerId: quote.customerId, items: quote.items.map((i: any) => ({ productId: i.productId, qty: i.qty, customPrice: i.customPrice ? i.price : undefined, taxable: i.taxable !== false })), discount: quote.discount, discountType: quote.discountType, notes: quote.notes || '', terms: quote.terms || '', validUntil: quote.validUntil?.split('T')[0] || '', transportCost: (quote as any).transportCost || 0, transportDescription: (quote as any).transportDescription || '', estimatedDelivery: (quote as any).estimatedDelivery || '', taxPerItem: (quote as any).taxPerItem || false }); setShowModal(true); }} className="p-1.5 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-lg transition-colors" title="Edit"><Edit className="w-4 h-4 text-yellow-500" /></button>
-                        <button onClick={() => handleDelete(quote._id)} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4 text-red-500" /></button>
-                        {(quote.status === 'sent' || quote.status === 'draft') && (
-                          <button onClick={() => handleAccept(quote._id)} disabled={acceptingId === quote._id} className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="Accept">
-                            {acceptingId === quote._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4 text-green-500" />}
-                          </button>
+                {quotations.map((quote) => {
+                  const hasInvoice = !!(quote as any).invoiceId;
+                  const isAccepted = quote.status === 'accepted';
+                  
+                  return (
+                    <tr key={quote._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm font-medium">{quote.quoteNumber}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium">{quote.customerName}</p>
+                        <p className="text-xs text-gray-500">{quote.customerEmail}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm">{quote.items.length} items</td>
+                      <td className="px-6 py-4 text-sm font-semibold">KES {quote.total?.toLocaleString() || 0}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(quote.status)}`}>
+                          {getStatusIcon(quote.status)} {quote.status}
+                        </span>
+                        {hasInvoice && (
+                          <span className="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700">
+                            <Receipt className="w-3 h-3" /> Invoice Created
+                          </span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 text-sm">{new Date(quote.createdAt).toLocaleDateString()}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <button onClick={() => handleView(quote)} className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="View">
+                            <Eye className="w-4 h-4 text-blue-500" />
+                          </button>
+                          <button onClick={() => handleSendEmail(quote._id)} disabled={sendingId === quote._id} className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="Send Email">
+                            {sendingId === quote._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 text-green-500" />}
+                          </button>
+                          <button onClick={() => handlePrintPDF(quote)} disabled={isGeneratingPDF} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Download PDF">
+                            <Printer className="w-4 h-4 text-gray-500" />
+                          </button>
+                          <button 
+                            onClick={() => { 
+                              setEditingQuote(quote); 
+                              setFormData({ 
+                                customerId: quote.customerId, 
+                                items: quote.items.map((i: any) => ({ productId: i.productId, qty: i.qty, customPrice: i.customPrice ? i.price : undefined, taxable: i.taxable !== false })), 
+                                discount: quote.discount, 
+                                discountType: quote.discountType, 
+                                notes: quote.notes || '', 
+                                terms: quote.terms || '', 
+                                validUntil: quote.validUntil?.split('T')[0] || '', 
+                                transportCost: (quote as any).transportCost || 0, 
+                                transportDescription: (quote as any).transportDescription || '', 
+                                estimatedDelivery: (quote as any).estimatedDelivery || '', 
+                                taxPerItem: (quote as any).taxPerItem || false 
+                              }); 
+                              setShowModal(true); 
+                            }} 
+                            className="p-1.5 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-lg transition-colors" 
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4 text-yellow-500" />
+                          </button>
+                          <button onClick={() => handleDelete(quote._id)} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors" title="Delete">
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
+                          
+                          {/* Accept button - only show if not accepted */}
+                          {(quote.status === 'sent' || quote.status === 'draft') && (
+                            <button onClick={() => handleAccept(quote._id)} disabled={acceptingId === quote._id} className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="Accept">
+                              {acceptingId === quote._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4 text-green-500" />}
+                            </button>
+                          )}
+                          
+                          {/* Create New Invoice button - show for accepted quotations that have an invoice, allowing recreation */}
+                          {isAccepted && hasInvoice && (
+                            <button 
+                              onClick={() => handleCreateNewInvoiceFromQuote(quote._id)} 
+                              disabled={creatingNewInvoiceId === quote._id} 
+                              className="p-1.5 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors" 
+                              title="Create New Invoice (from edited quotation)"
+                            >
+                              {creatingNewInvoiceId === quote._id ? 
+                                <Loader2 className="w-4 h-4 animate-spin text-purple-500" /> : 
+                                <FileSpreadsheet className="w-4 h-4 text-purple-500" />
+                              }
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -874,11 +987,29 @@ export default function QuotationsPage() {
               <div className="p-6 border-b dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10 flex justify-between items-center">
                 <div>
                   <h2 className="text-xl font-bold">{editingQuote ? 'Edit Quotation' : 'Create Quotation'}</h2>
-                  <p className="text-sm text-gray-500 mt-1">Fill in the details below to create a quotation for your customer</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {editingQuote && editingQuote.status === 'accepted' 
+                      ? 'Editing an accepted quotation. After saving, you can create a new invoice.' 
+                      : 'Fill in the details below to create a quotation for your customer'}
+                  </p>
                 </div>
                 <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                {/* Warning for editing accepted quotation */}
+                {editingQuote && editingQuote.status === 'accepted' && (
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border-l-4 border-amber-500 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                      <AlertCircle className="w-5 h-5" />
+                      <span className="font-semibold">Editing Accepted Quotation</span>
+                    </div>
+                    <p className="text-sm text-amber-600 dark:text-amber-300 mt-1">
+                      This quotation has already been accepted and an invoice created. After saving changes, 
+                      use the "Create New Invoice" button to generate a new invoice with the updated details.
+                    </p>
+                  </div>
+                )}
+
                 {/* Customer Selection */}
                 <div className="bg-gradient-to-r from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/20 dark:to-purple-950/20 rounded-xl p-5 border border-indigo-100 dark:border-indigo-900/30">
                   <h3 className="font-semibold flex items-center gap-2 mb-4"><Users className="w-5 h-5 text-indigo-600" /> Customer Information</h3>
@@ -1115,7 +1246,9 @@ export default function QuotationsPage() {
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button type="submit" className="flex-1 py-3 bg-cyan-600 text-white rounded-lg font-medium hover:bg-cyan-700 transition-colors"><Save className="w-4 h-4 inline mr-2" /> {editingQuote ? 'Update Quotation' : 'Create Quotation'}</button>
+                  <button type="submit" className="flex-1 py-3 bg-cyan-600 text-white rounded-lg font-medium hover:bg-cyan-700 transition-colors">
+                    <Save className="w-4 h-4 inline mr-2" /> {editingQuote ? 'Update Quotation' : 'Create Quotation'}
+                  </button>
                   <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
                 </div>
               </form>
@@ -1151,6 +1284,9 @@ export default function QuotationsPage() {
                     <p><strong>Status:</strong> {viewingQuote.status}</p>
                     <p><strong>Created:</strong> {new Date(viewingQuote.createdAt).toLocaleDateString()}</p>
                     <p><strong>Valid Until:</strong> {new Date(viewingQuote.validUntil).toLocaleDateString()}</p>
+                    {(viewingQuote as any).invoiceId && (
+                      <p><strong>Invoice:</strong> {(viewingQuote as any).invoiceNumber || (viewingQuote as any).invoiceId}</p>
+                    )}
                   </div>
                 </div>
                 <div>

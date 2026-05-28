@@ -667,6 +667,35 @@ export async function recordInvoicePayment(
   const res = await api.post(`/sales/invoices/${invoiceId}/payments`, payload);
   return res.data;
 }
+// ==================== INVOICES FROM EDITED QUOTATIONS API ====================
+
+/**
+ * Create a new invoice from an accepted quotation (for edited quotations)
+ * This allows creating multiple invoices from the same accepted quotation after editing
+ */
+export async function createInvoiceFromQuotation(
+  quotationId: string
+): Promise<{
+  success: boolean;
+  message: string;
+  invoice: {
+    _id: string;
+    invoiceNumber: string;
+    total: number;
+    totalProfit: number;
+    balanceDue: number;
+    dueDate: string;
+  };
+  quotation: {
+    _id: string;
+    quoteNumber: string;
+    invoiceId: string;
+    invoiceNumber: string;
+  };
+}> {
+  const res = await api.post(`/sales/quotations/${quotationId}/create-invoice`);
+  return res.data;
+}
 
 export async function createOrderFromInvoice(
   invoiceId: string,

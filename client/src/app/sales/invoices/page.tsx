@@ -1,7 +1,7 @@
 // app/sales/invoices/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Search,
   Eye,
@@ -58,26 +58,12 @@ export default function InvoicesPage() {
     amountPaid: number;
     balanceDue: number;
   } | null>(null);
-  const [showCreateOrderModal, setShowCreateOrderModal] = useState(false);
   const [creatingOrderId, setCreatingOrderId] = useState<string | null>(null);
   
   const itemsPerPage = 10;
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => {
-      setCurrentPage(1);
-      fetchInvoices();
-    }, 500);
-  };
-
-  useEffect(() => {
-    fetchInvoices();
-  }, [searchTerm, statusFilter, paymentStatusFilter, currentPage]);
-
-  const fetchInvoices = async () => {
+  // Fetch invoices - no debounce, instant search
+  const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/sales/invoices', {
@@ -97,6 +83,27 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false);
     }
+  }, [searchTerm, statusFilter, paymentStatusFilter, currentPage]);
+
+  // Trigger fetch when any filter changes (no debounce)
+  useEffect(() => {
+    fetchInvoices();
+  }, [fetchInvoices]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1); // Reset to first page on new search
+    // No debounce - fetch will trigger via useEffect
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handlePaymentStatusFilterChange = (value: string) => {
+    setPaymentStatusFilter(value);
+    setCurrentPage(1);
   };
 
   const handleSendEmail = async (id: string) => {
@@ -135,6 +142,13 @@ export default function InvoicesPage() {
   };
 
   const handleCreateOrder = async (invoiceId: string) => {
+    // Check if order already exists
+    const invoice = invoices.find(i => i._id === invoiceId);
+    if (invoice?.orderId) {
+      toast.error('An order has already been created for this invoice');
+      return;
+    }
+
     if (!confirm('Create an order from this invoice? This will deduct stock and create a fulfillment order.')) {
       return;
     }
@@ -176,7 +190,7 @@ export default function InvoicesPage() {
     return config[status] || config.unpaid;
   };
 
-  if (loading) {
+  if (loading && invoices.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="w-12 h-12 animate-spin text-cyan-600" />
@@ -206,7 +220,7 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filters - Instant search without debounce */}
         <div className="flex flex-wrap gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -220,7 +234,7 @@ export default function InvoicesPage() {
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => handleStatusFilterChange(e.target.value)}
             className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
           >
             <option value="">All Status</option>
@@ -233,7 +247,7 @@ export default function InvoicesPage() {
           </select>
           <select
             value={paymentStatusFilter}
-            onChange={(e) => setPaymentStatusFilter(e.target.value)}
+            onChange={(e) => handlePaymentStatusFilterChange(e.target.value)}
             className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
           >
             <option value="">All Payment Status</option>
@@ -260,7 +274,8 @@ export default function InvoicesPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customer</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Payment Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Balance</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Due Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -269,6 +284,8 @@ export default function InvoicesPage() {
                 {invoices.map((invoice) => {
                   const paymentBadge = getPaymentStatusBadge(invoice.paymentStatus);
                   const isOverdue = new Date(invoice.dueDate) < new Date() && invoice.paymentStatus !== 'paid';
+                  const hasOrder = !!invoice.orderId;
+                  
                   return (
                     <tr key={invoice._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                       <td className="px-6 py-4">
@@ -287,25 +304,27 @@ export default function InvoicesPage() {
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{invoice.items.length} items</td>
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">KES {invoice.total?.toLocaleString() || 0}</td>
                       <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
-                            {invoice.status === 'paid' && <CheckCircle className="w-3 h-3" />}
-                            {invoice.status === 'overdue' && <AlertCircle className="w-3 h-3" />}
-                            {invoice.status}
-                          </span>
-                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${paymentBadge.color}`}>
+                        <div className="flex flex-col gap-1">
+                          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${paymentBadge.color}`}>
                             {paymentBadge.icon}
                             {paymentBadge.text}
                           </div>
-                          {invoice.balanceDue > 0 && invoice.balanceDue < invoice.total && (
-                            <div className="text-xs text-amber-600 dark:text-amber-400">
-                              Balance: KES {invoice.balanceDue.toLocaleString()}
+                          {isOverdue && (
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">
+                              <AlertCircle className="w-3 h-3" />
+                              OVERDUE
                             </div>
                           )}
-                          {isOverdue && (
-                            <div className="text-xs text-red-600 dark:text-red-400">⚠ OVERDUE</div>
-                          )}
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {invoice.balanceDue > 0 ? (
+                          <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                            KES {invoice.balanceDue.toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-green-600 dark:text-green-400">Fully Paid</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {new Date(invoice.dueDate).toLocaleDateString()}
@@ -338,7 +357,8 @@ export default function InvoicesPage() {
                           >
                             <Printer className="w-4 h-4 text-gray-500" />
                           </button>
-                          {invoice.paymentStatus !== 'paid' && (
+                          {/* Record Payment - Always show for unpaid and partially paid */}
+                          {invoice.paymentStatus !== 'paid' && invoice.paymentStatus !== 'overpaid' && (
                             <button
                               onClick={() => {
                                 setSelectedInvoiceForPayment({
@@ -356,7 +376,8 @@ export default function InvoicesPage() {
                               <Wallet className="w-4 h-4 text-amber-500" />
                             </button>
                           )}
-                          {invoice.paymentStatus === 'paid' && !invoice.orderId && (
+                          {/* Create Order - Show for all invoices that don't have an order yet */}
+                          {!hasOrder && (
                             <button
                               onClick={() => handleCreateOrder(invoice._id)}
                               disabled={creatingOrderId === invoice._id}
@@ -369,6 +390,12 @@ export default function InvoicesPage() {
                                 <Package className="w-4 h-4 text-purple-500" />
                               )}
                             </button>
+                          )}
+                          {/* Show order exists indicator */}
+                          {hasOrder && (
+                            <div className="p-1.5" title="Order Already Created">
+                              <CheckCircle className="w-4 h-4 text-green-500" />
+                            </div>
                           )}
                         </div>
                       </td>
@@ -449,28 +476,41 @@ export default function InvoicesPage() {
                     <p><strong>Quotation Ref:</strong> {viewingInvoice.quotationNumber}</p>
                     <p><strong>Issue Date:</strong> {new Date(viewingInvoice.issueDate).toLocaleDateString()}</p>
                     <p><strong>Due Date:</strong> {new Date(viewingInvoice.dueDate).toLocaleDateString()}</p>
-                    <p><strong>Payment Status:</strong> {viewingInvoice.paymentStatus}</p>
+                    <p><strong>Payment Status:</strong> 
+                      <span className={`ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${getPaymentStatusBadge(viewingInvoice.paymentStatus).color}`}>
+                        {getPaymentStatusBadge(viewingInvoice.paymentStatus).icon}
+                        {getPaymentStatusBadge(viewingInvoice.paymentStatus).text}
+                      </span>
+                    </p>
                     <p><strong>Amount Paid:</strong> KES {viewingInvoice.amountPaid?.toLocaleString() || 0}</p>
-                    <p><strong>Balance Due:</strong> KES {viewingInvoice.balanceDue?.toLocaleString() || 0}</p>
+                    <p><strong>Balance Due:</strong> 
+                      <span className={viewingInvoice.balanceDue > 0 ? 'text-amber-600 font-semibold' : 'text-green-600'}>
+                        KES {viewingInvoice.balanceDue?.toLocaleString() || 0}
+                      </span>
+                    </p>
+                    {viewingInvoice.orderId && (
+                      <p><strong>Order ID:</strong> {viewingInvoice.orderId}</p>
+                    )}
                   </div>
                 </div>
               </div>
 
-{((viewingInvoice.transportCost ?? 0) > 0 || viewingInvoice.transportDescription) && (
-  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
-    <h3 className="font-semibold flex items-center gap-2 mb-3 text-gray-900 dark:text-white">
-      <Truck className="w-4 h-4 text-amber-600" /> Transport Information
-    </h3>
-    <div className="space-y-1 text-sm">
-      {(viewingInvoice.transportCost ?? 0) > 0 && (
-        <p><strong>Cost:</strong> KES {(viewingInvoice.transportCost ?? 0).toLocaleString()}</p>
-      )}
-      {viewingInvoice.transportDescription && (
-        <p><strong>Description:</strong> {viewingInvoice.transportDescription}</p>
-      )}
-    </div>
-  </div>
-)}
+              {((viewingInvoice.transportCost ?? 0) > 0 || viewingInvoice.transportDescription) && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
+                  <h3 className="font-semibold flex items-center gap-2 mb-3 text-gray-900 dark:text-white">
+                    <Truck className="w-4 h-4 text-amber-600" /> Transport Information
+                  </h3>
+                  <div className="space-y-1 text-sm">
+                    {(viewingInvoice.transportCost ?? 0) > 0 && (
+                      <p><strong>Cost:</strong> KES {(viewingInvoice.transportCost ?? 0).toLocaleString()}</p>
+                    )}
+                    {viewingInvoice.transportDescription && (
+                      <p><strong>Description:</strong> {viewingInvoice.transportDescription}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               <div>
                 <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
                   <Package className="w-4 h-4" /> Items
@@ -511,12 +551,12 @@ export default function InvoicesPage() {
                       <span>-KES {viewingInvoice.discount.toLocaleString()}</span>
                     </div>
                   )}
-{(viewingInvoice.transportCost ?? 0) > 0 && (
-  <div className="flex justify-between py-1">
-    <span>Transport:</span>
-    <span>KES {(viewingInvoice.transportCost ?? 0).toLocaleString()}</span>
-  </div>
-)}
+                  {(viewingInvoice.transportCost ?? 0) > 0 && (
+                    <div className="flex justify-between py-1">
+                      <span>Transport:</span>
+                      <span>KES {(viewingInvoice.transportCost ?? 0).toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between py-1">
                     <span>Tax (16%):</span>
                     <span>KES {viewingInvoice.tax?.toLocaleString() || 0}</span>
@@ -525,6 +565,18 @@ export default function InvoicesPage() {
                     <span className="text-lg font-bold">Total Amount:</span>
                     <span className="text-2xl font-bold text-cyan-600">KES {viewingInvoice.total?.toLocaleString() || 0}</span>
                   </div>
+                  {viewingInvoice.amountPaid > 0 && (
+                    <div className="flex justify-between py-1 text-green-600">
+                      <span>Amount Paid:</span>
+                      <span>-KES {viewingInvoice.amountPaid.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {viewingInvoice.balanceDue > 0 && (
+                    <div className="flex justify-between py-1 text-amber-600 font-semibold">
+                      <span>Balance Due:</span>
+                      <span>KES {viewingInvoice.balanceDue.toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -546,23 +598,23 @@ export default function InvoicesPage() {
       )}
 
       {/* Payment Modal */}
-{showPaymentModal && selectedInvoiceForPayment && (
-  <RecordPaymentModal
-    isOpen={showPaymentModal}
-    onClose={() => {
-      setShowPaymentModal(false);
-      setSelectedInvoiceForPayment(null);
-    }}
-    onSuccess={() => {
-      fetchInvoices();
-    }}
-    invoiceId={selectedInvoiceForPayment.id}
-    invoiceNumber={selectedInvoiceForPayment.number}
-    totalAmount={selectedInvoiceForPayment.total}
-    amountPaid={selectedInvoiceForPayment.amountPaid}
-    balanceDue={selectedInvoiceForPayment.balanceDue}
-  />
-)}
+      {showPaymentModal && selectedInvoiceForPayment && (
+        <RecordPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setSelectedInvoiceForPayment(null);
+          }}
+          onSuccess={() => {
+            fetchInvoices();
+          }}
+          invoiceId={selectedInvoiceForPayment.id}
+          invoiceNumber={selectedInvoiceForPayment.number}
+          totalAmount={selectedInvoiceForPayment.total}
+          amountPaid={selectedInvoiceForPayment.amountPaid}
+          balanceDue={selectedInvoiceForPayment.balanceDue}
+        />
+      )}
     </div>
   );
 }

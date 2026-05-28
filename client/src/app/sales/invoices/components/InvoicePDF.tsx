@@ -18,16 +18,15 @@ export async function generateInvoicePDF(
   const companyName = settings?.companyName || 'PLASMA WATER AFRICA';
   const companySlogan = settings?.slogan || 'Quality Water Solutions';
   const taxRate = invoice.taxRate || 0.16;
-
-  // Get transport info
-  const transportCost = invoice.transportCost || invoice.transportInfo?.cost || 0;
-  const transportDescription = invoice.transportDescription || invoice.transportInfo?.description || '';
   
-  // Tax calculation mode
-  const taxPerItem = invoice.taxPerItem || false;
+  // Get transport info
+  const transportCost = invoice.transportCost || 0;
+  const transportDescription = invoice.transportDescription || '';
+  const estimatedDelivery = invoice.estimatedDelivery || '';
 
   let calculatedSubtotal = 0;
   let calculatedTax = 0;
+  const taxPerItem = invoice.taxPerItem || false;
 
   const itemsWithCalculations = invoice.items.map((item: any) => {
     const qty = Number(item.qty || 0);
@@ -36,7 +35,7 @@ export async function generateInvoicePDF(
     const itemTotal = unitPrice * qty;
     calculatedSubtotal += itemTotal;
 
-    const isTaxable = taxPerItem ? item.taxable !== false : false;
+    const isTaxable = taxPerItem ? item.taxable !== false : true;
     const itemTax = (taxPerItem && isTaxable) ? itemTotal * taxRate : 0;
 
     if (itemTax > 0) calculatedTax += itemTax;
@@ -61,17 +60,8 @@ export async function generateInvoicePDF(
   }
 
   const calculatedTotal = calculatedSubtotal - discountAmount + calculatedTax + transportCost;
-
-  // Payment status badge
-  const getPaymentStatusBadge = () => {
-    if (invoice.paymentStatus === 'paid') {
-      return '<span class="payment-status-badge badge-paid">✓ PAID</span>';
-    } else if (invoice.paymentStatus === 'partially_paid') {
-      return `<span class="payment-status-badge badge-partial">⚠ PARTIALLY PAID (Balance: KES ${invoice.balanceDue?.toLocaleString()})</span>`;
-    } else {
-      return '<span class="payment-status-badge badge-unpaid">⚠ UNPAID</span>';
-    }
-  };
+  const amountPaid = invoice.amountPaid || 0;
+  const balanceDue = calculatedTotal - amountPaid;
 
   function escapeHtml(str: string): string {
     if (!str) return '';
@@ -96,10 +86,21 @@ export async function generateInvoicePDF(
     tax: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>`,
   };
 
+  const getPaymentStatusBadge = () => {
+    const status = invoice.paymentStatus || 'unpaid';
+    if (status === 'paid') {
+      return '<span class="status-badge status-paid">✓ PAID</span>';
+    } else if (status === 'partially_paid') {
+      return '<span class="status-badge status-partial">⟳ PARTIALLY PAID</span>';
+    } else {
+      return '<span class="status-badge status-unpaid">! UNPAID</span>';
+    }
+  };
+
   const getHeaderHTML = () => `
     <div class="header">
       <div class="company-info">
-        <div class="company-name">PLASMA WATER AFRICA</div>
+        <div class="company-name">${escapeHtml(companyName)}</div>
         <div class="company-address">P.O BOX 4996-00200</div>
         <div class="company-location">NAIROBI, KENYA</div>
         <div class="company-tel">TEL: 0710743793</div>
@@ -112,14 +113,17 @@ export async function generateInvoicePDF(
 
     <div class="doc-title-section doc-title-invoice">
       <div class="doc-title-container">
-        <div class="doc-title-text text-invoice">TAX INVOICE</div>
+        <div class="doc-title-text text-invoice">INVOICE</div>
       </div>
     </div>
   `;
 
+  // Routing Logic: 3 items or less = single page, otherwise 2 pages
   const shouldUseTwoPages = itemsWithCalculations.length > 3;
+  
   const page1Items = shouldUseTwoPages ? itemsWithCalculations.slice(0, 9) : itemsWithCalculations;
   const page2Items = shouldUseTwoPages ? itemsWithCalculations.slice(9) : [];
+
   const showTotalsOnPage1 = !shouldUseTwoPages || (shouldUseTwoPages && page2Items.length === 0);
   const showTotalsOnPage2 = shouldUseTwoPages && page2Items.length > 0;
 
@@ -141,15 +145,17 @@ export async function generateInvoicePDF(
               <div class="item-name">${escapeHtml(item.name)}</div>
               ${item.description ? `<div class="item-description">${escapeHtml(item.description.substring(0, 120))}</div>` : ''}
             </td>
-            <td class="text-center font-mono">${item.qty}</td>
-            <td class="text-right font-mono">${item.unitPrice.toLocaleString()}</td>
+            <td class="text-center">${item.qty}</td>
+            <td class="text-right">
+              ${item.unitPrice.toLocaleString()}
+            </td>
             ${taxPerItem ? `
-              <td class="text-center font-mono" style="${item.isTaxable ? 'color: #2c6e3c; font-weight: 600;' : 'color: #b46f0b;'}">
+              <td class="text-center" style="${item.isTaxable ? 'color: #2c6e3c; font-weight: 600;' : 'color: #b46f0b;'}">
                 ${item.isTaxable ? `KES ${item.itemTax.toLocaleString()}` : 'Exempt'}
               </td>
-            ` : ``}
-            <td class="text-right font-mono" style="font-weight: 600;">${item.itemTotal.toLocaleString()}</td>
-          </td>
+            ` : ''}
+            <td class="text-right" style="font-weight: 600;">${(item.itemTotal + (taxPerItem ? item.itemTax : 0)).toLocaleString()}</td>
+          </tr>
         `).join('')}
       </tbody>
     </table>
@@ -160,34 +166,46 @@ export async function generateInvoicePDF(
       <div class="totals-box">
         <div class="total-row">
           <span>Subtotal</span>
-          <span class="font-mono">KES ${calculatedSubtotal.toLocaleString()}</span>
+          <span>KES ${calculatedSubtotal.toLocaleString()}</span>
         </div>
         ${invoice.discount > 0 ? `
           <div class="total-row discount">
             <span>Discount (${invoice.discountType === 'percentage' ? `${invoice.discount}%` : `KES ${invoice.discount.toLocaleString()}`})</span>
-            <span class="font-mono">-KES ${discountAmount.toLocaleString()}</span>
+            <span>-KES ${discountAmount.toLocaleString()}</span>
           </div>
         ` : ''}
         ${transportCost > 0 ? `
           <div class="total-row">
             <span>Transport</span>
-            <span class="font-mono">KES ${transportCost.toLocaleString()}</span>
+            <span>KES ${transportCost.toLocaleString()}</span>
           </div>
         ` : ''}
         <div class="total-row">
           <span>Tax (${(taxRate * 100).toFixed(0)}% VAT)</span>
-          <span class="font-mono">KES ${calculatedTax.toLocaleString()}</span>
+          <span>KES ${calculatedTax.toLocaleString()}</span>
         </div>
         <div class="total-row grand-total">
           <span class="grand-total-label">Total Amount</span>
           <span class="grand-total-amount">KES ${calculatedTotal.toLocaleString()}</span>
         </div>
+        ${amountPaid > 0 ? `
+          <div class="total-row paid-row">
+            <span>Amount Paid</span>
+            <span class="paid-amount">-KES ${amountPaid.toLocaleString()}</span>
+          </div>
+        ` : ''}
+        ${balanceDue > 0 ? `
+          <div class="total-row balance-row">
+            <span class="balance-label">Balance Due</span>
+            <span class="balance-amount">KES ${balanceDue.toLocaleString()}</span>
+          </div>
+        ` : ''}
       </div>
     </div>
   `;
 
   const getPaymentAndNotesHTML = () => `
-    <div class="payment-section">
+    <div class="payment-section" style="margin-top: ${shouldUseTwoPages ? '20px' : '30px'};">
       <div class="payment-header">
         <h4>Payment Information</h4>
       </div>
@@ -204,7 +222,6 @@ export async function generateInvoicePDF(
             <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
             <div class="payment-detail"><span class="payment-detail-key">Account Number</span><span class="payment-detail-value">1312281278</span></div>
             <div class="payment-detail"><span class="payment-detail-key">Branch</span><span class="payment-detail-value">Moi Avenue, Nairobi</span></div>
-            <div class="payment-detail"><span class="payment-detail-key">Reference</span><span class="payment-detail-value">${invoice.invoiceNumber}</span></div>
           </div>
         </div>
         <div class="payment-method">
@@ -216,9 +233,9 @@ export async function generateInvoicePDF(
             </div>
           </div>
           <div class="payment-details">
-            <div class="payment-detail"><span class="payment-detail-key">Till Number</span><span class="payment-detail-value">9114123</span></div>
+            <div class="payment-detail"><span class="payment-detail-key">Lipa na M-PESA</span><span class="payment-detail-value">Buy Goods & Services</span></div>
+            <div class="payment-detail"><span class="payment-detail-key">Till No.</span><span class="payment-detail-value">9114123</span></div>
             <div class="payment-detail"><span class="payment-detail-key">Account Name</span><span class="payment-detail-value">PLASMA WATER AFRICA</span></div>
-            <div class="payment-detail"><span class="payment-detail-key">Reference</span><span class="payment-detail-value">${invoice.invoiceNumber}</span></div>
           </div>
         </div>
       </div>
@@ -232,6 +249,7 @@ export async function generateInvoicePDF(
             <div class="notes-text">${escapeHtml(invoice.notes)}</div>
           </div>
         ` : '<div class="empty-placeholder"></div>'}
+        
         ${invoice.terms ? `
           <div class="terms-box">
             <div class="terms-title">Terms & Conditions</div>
@@ -245,9 +263,6 @@ export async function generateInvoicePDF(
   const getFooterHTML = () => `
     <div class="footer">
       <div class="footer-main">
-        <div class="footer-logo-section">
-          <img src="${footerLogoUrl}" class="footer-logo" alt="Plasma Water Africa" crossorigin="anonymous" onerror="this.style.display='none'" />
-        </div>
         <div class="footer-services">
           <div class="services-list">
             <span class="service-item">Borehole Services</span>
@@ -256,14 +271,17 @@ export async function generateInvoicePDF(
             <span class="service-item">Water Treatment</span>
             <span class="service-item">Generators</span>
             <span class="service-item">Irrigation Systems</span>
-            <span class="service-item">Swimming Pools</span>
           </div>
-          <div class="footer-slogan">${escapeHtml(companySlogan)}  |  © ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.</div>
         </div>
+        <div class="footer-logo-section">
+          <img src="${footerLogoUrl}" class="footer-logo" alt="Plasma Water Africa" crossorigin="anonymous" onerror="this.style.display='none'" />
+        </div>
+        <div class="footer-slogan">${escapeHtml(companySlogan)}  |  © ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.</div>
       </div>
     </div>
   `;
 
+  // Page 1 HTML
   const page1HTML = `
     <!DOCTYPE html>
     <html>
@@ -276,6 +294,10 @@ export async function generateInvoicePDF(
       <div class="pdf-container">
         ${getHeaderHTML()}
         
+        <div class="status-badge-container">
+          ${getPaymentStatusBadge()}
+        </div>
+        
         <div class="info-section">
           <div class="info-card">
             <div class="info-card-header">
@@ -284,8 +306,22 @@ export async function generateInvoicePDF(
             </div>
             <div class="info-content">
               <div class="customer-name">${escapeHtml(invoice.customerName)}</div>
-              ${invoice.customerEmail ? `<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${escapeHtml(invoice.customerEmail)}</span></div>` : ''}
-              ${invoice.customerPhone ? `<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escapeHtml(invoice.customerPhone)}</span></div>` : ''}
+              ${invoice.customerEmail ? `
+                <div class="detail-row">
+                  <div class="contact-item">
+                    <span class="detail-label">Email</span>
+                    <span class="detail-value">${escapeHtml(invoice.customerEmail)}</span>
+                  </div>
+                </div>
+              ` : ''}
+              ${invoice.customerPhone ? `
+                <div class="detail-row">
+                  <div class="contact-item">
+                    <span class="detail-label">Phone</span>
+                    <span class="detail-value">${escapeHtml(invoice.customerPhone)}</span>
+                  </div>
+                </div>
+              ` : ''}
               ${invoice.customerLocation ? `<div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${escapeHtml(invoice.customerLocation)}</span></div>` : ''}
             </div>
           </div>
@@ -301,8 +337,8 @@ export async function generateInvoicePDF(
                 <span class="detail-value">${invoice.invoiceNumber}</span>
               </div>
               <div class="detail-row">
-                <span class="detail-label">Quotation Ref</span>
-                <span class="detail-value">${invoice.quotationNumber}</span>
+                <span class="detail-label">Quote Reference</span>
+                <span class="detail-value">${invoice.quotationNumber || 'N/A'}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Issue Date</span>
@@ -312,15 +348,11 @@ export async function generateInvoicePDF(
                 <span class="detail-label">Due Date</span>
                 <span class="detail-value">${new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               </div>
-              <div class="detail-row">
-                <span class="detail-label">Payment Status</span>
-                <span class="detail-value">${getPaymentStatusBadge()}</span>
-              </div>
             </div>
           </div>
         </div>
         
-        ${(transportCost > 0 || transportDescription) ? `
+        ${(transportCost > 0 || transportDescription || estimatedDelivery) ? `
           <div class="transport-info">
             ${transportDescription ? `
               <div class="transport-item">
@@ -336,6 +368,14 @@ export async function generateInvoicePDF(
                 <div>
                   <div class="transport-label">Delivery Cost</div>
                   <div class="transport-value">KES ${transportCost.toLocaleString()}</div>
+                </div>
+              </div>
+            ` : ''}
+            ${estimatedDelivery ? `
+              <div class="transport-item">
+                <div>
+                  <div class="transport-label">Est. Delivery</div>
+                  <div class="transport-value">${escapeHtml(estimatedDelivery)}</div>
                 </div>
               </div>
             ` : ''}
@@ -354,6 +394,7 @@ export async function generateInvoicePDF(
     </html>
   `;
 
+  // Page 2 HTML
   const page2HTML = `
     <!DOCTYPE html>
     <html>
@@ -366,7 +407,11 @@ export async function generateInvoicePDF(
       <div class="pdf-container">
         ${getHeaderHTML()}
         
-        ${(transportCost > 0 || transportDescription) ? `
+        <div class="status-badge-container">
+          ${getPaymentStatusBadge()}
+        </div>
+        
+        ${(transportCost > 0 || transportDescription || estimatedDelivery) ? `
           <div class="transport-info">
             ${transportDescription ? `
               <div class="transport-item">
@@ -382,6 +427,14 @@ export async function generateInvoicePDF(
                 <div>
                   <div class="transport-label">Delivery Cost</div>
                   <div class="transport-value">KES ${transportCost.toLocaleString()}</div>
+                </div>
+              </div>
+            ` : ''}
+            ${estimatedDelivery ? `
+              <div class="transport-item">
+                <div>
+                  <div class="transport-label">Est. Delivery</div>
+                  <div class="transport-value">${escapeHtml(estimatedDelivery)}</div>
                 </div>
               </div>
             ` : ''}
@@ -477,24 +530,28 @@ export async function generateInvoicePDF(
       }
 
       .doc-title-section.doc-title-invoice {
-        height: 4px !important;
-        background: #374151 !important;
-        border: none !important;
-        box-shadow: none !important;
+        height: 22px !important; 
+        background: #0b355e !important;
+        width: 100% !important;
+        border-top: 1px solid #ffffff !important;
+        border-bottom: 1px solid #ffffff !important;
+        box-shadow: 0 0 0 1px #0b355e !important;
       }
 
       .doc-title-container {
         width: 100% !important;
         display: flex !important;
         justify-content: flex-end !important;
-        padding-right: 60px !important;
+        padding-right: 80px !important;
         position: absolute !important;
         z-index: 10 !important;
       }
 
       .doc-title-text {
-        display: inline-block !important;
-        padding: 8px 32px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0px 32px 20px 32px !important;
         text-align: center !important;
         font-family: 'Inter', sans-serif !important;
         font-size: 22px !important;
@@ -506,8 +563,42 @@ export async function generateInvoicePDF(
       }
 
       .doc-title-text.text-invoice {
-        color: #374151 !important;
-        border: 1.5px solid #374151 !important;
+        color: #0b355e !important;
+        border: 1.5px solid #0b355e !important;
+      }
+      
+      .status-badge-container {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 0px;
+      }
+      
+      .status-badge {
+        display: inline-block;
+        padding: 6px 16px 18px 16px; 
+        border-radius: 30px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      
+      .status-paid {
+        background: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+      }
+      
+      .status-partial {
+        background: #fed7aa;
+        color: #92400e;
+        border: 1px solid #fdba74;
+      }
+      
+      .status-unpaid {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
       }
       
       .info-section {
@@ -556,7 +647,6 @@ export async function generateInvoicePDF(
         align-items: baseline;
         gap: 12px;
         margin-bottom: 10px;
-        flex-wrap: wrap;
       }
 
       .detail-label {
@@ -578,7 +668,7 @@ export async function generateInvoicePDF(
         padding: 18px 28px;
         border-radius: 16px;
         margin-bottom: 25px;
-        display: flex;
+        display: none;
         align-items: center;
         justify-content: space-between;
         flex-wrap: wrap;
@@ -604,35 +694,6 @@ export async function generateInvoicePDF(
         font-size: 16px;
         font-weight: 500;
         color: #2c5e3c;
-      }
-
-      .payment-status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 5px 14px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-      }
-
-      .badge-paid {
-        background: linear-gradient(135deg, #22c55e, #16a34a);
-        color: white;
-        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
-      }
-
-      .badge-unpaid {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-        color: white;
-        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
-      }
-
-      .badge-partial {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        color: white;
-        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
       }
 
       .items-table {
@@ -661,6 +722,16 @@ export async function generateInvoicePDF(
         vertical-align: top;
       }
 
+      .items-table th.text-center,
+      .items-table td.text-center {
+        text-align: center;
+      }
+
+      .items-table th.text-right,
+      .items-table td.text-right {
+        text-align: right;
+      }
+
       .item-name {
         font-weight: 700;
         color: #0f2636;
@@ -673,19 +744,7 @@ export async function generateInvoicePDF(
         color: #8a9aaa;
         line-height: 1.5;
         margin-top: 4px;
-      }
-
-      .text-right {
-        text-align: right;
-      }
-
-      .text-center {
-        text-align: center;
-      }
-
-      .font-mono {
-        font-family: 'Inter', monospace;
-        font-weight: 500;
+        display: none;
       }
 
       .totals-wrapper {
@@ -719,18 +778,46 @@ export async function generateInvoicePDF(
         border-top: 2px solid #0a2540;
         border-bottom: none;
       }
+      
+      .total-row.paid-row {
+        color: #059669;
+      }
+      
+      .total-row.balance-row {
+        padding-top: 12px;
+        margin-top: 4px;
+        border-top: 2px solid #e9eef3;
+        border-bottom: none;
+      }
 
       .grand-total-label {
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 700;
-        color: #0a2540;
+        color: #2d3033;
       }
 
       .grand-total-amount {
-        font-size: 28px;
+        font-size: 20px;
         font-weight: 800;
         color: #0a2540;
         letter-spacing: -0.5px;
+      }
+      
+      .paid-amount {
+        font-weight: 600;
+        color: #059669;
+      }
+      
+      .balance-label {
+        font-size: 17px;
+        font-weight: 700;
+        color: #92400e;
+      }
+      
+      .balance-amount {
+        font-size: 18px;
+        font-weight: 800;
+        color: #b45309;
       }
 
       .payment-section {
@@ -795,30 +882,35 @@ export async function generateInvoicePDF(
       .payment-details {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 14px;
       }
 
       .payment-detail {
         display: flex;
         gap: 16px;
-        font-size: 15px;
+        font-size: 14px;
+        flex-wrap: wrap;
       }
 
       .payment-detail-key {
         color: #8a9aaa;
-        font-weight: 500;
-        min-width: 110px;
+        font-weight: 600;
+        min-width: 130px;
+        font-size: 14px;
+        letter-spacing: 0.3px;
       }
 
       .payment-detail-value {
-        color: #2c3e4e;
-        font-weight: 500;
-        font-family: 'Inter', monospace;
-        font-size: 15px;
+        color: #1a2a3a;
+        font-weight: 800;
+        font-size: 16px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
       }
 
       .notes-terms-grid {
         display: grid;
+        display: none;
         grid-template-columns: 1fr 1fr;
         gap: 24px;
         margin-bottom: 10px;
@@ -882,45 +974,50 @@ export async function generateInvoicePDF(
 
       .footer {
         margin-top: 5px;
-        padding: 25px 0 20px 0;
+        padding: 20px 20px 25px 20px;
         border-top: 2px solid #e9eef3;
         background: white;
       }
 
       .footer-main {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        justify-content: space-between;
-        gap: 30px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-      }
-
-      .footer-logo-section {
-        flex-shrink: 0;
-      }
-
-      .footer-logo {
-        height: 50px;
-        width: auto;
-        object-fit: contain;
+        justify-content: center;
+        gap: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
       }
 
       .footer-services {
-        flex: 1;
+        width: 100%;
         text-align: center;
+        order: 1;
+      }
+
+      .footer-logo-section {
+        text-align: center;
+        order: 2;
+      }
+
+      .footer-logo {
+        height: 55px;
+        width: auto;
+        object-fit: contain;
       }
 
       .services-list {
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 20px;
+        align-items: center;
+        gap: 28px;
+        margin-bottom: 15px;
       }
 
       .service-item {
-        font-size: 11px;
-        font-weight: 500;
+        font-size: 15px;
+        font-weight: 600;
         color: #2c5e3c;
         letter-spacing: 0.5px;
       }
@@ -930,7 +1027,35 @@ export async function generateInvoicePDF(
         font-style: italic;
         font-size: 13px;
         color: #8a9aaa;
-        margin-bottom: 8px;
+        margin-top: 5px;
+        text-align: center;
+        order: 3;
+      }
+
+      @media (max-width: 768px) {
+        .footer {
+          padding: 15px 16px 20px 16px;
+        }
+        
+        .footer-main {
+          gap: 18px;
+        }
+        
+        .services-list {
+          gap: 16px;
+        }
+        
+        .service-item {
+          font-size: 13px;
+        }
+        
+        .footer-logo {
+          height: 42px;
+        }
+        
+        .footer-slogan {
+          font-size: 11px;
+        }
       }
     `;
   }

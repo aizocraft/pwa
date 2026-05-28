@@ -37,6 +37,10 @@ export interface IQuotation extends Document {
   createdBy: mongoose.Types.ObjectId;
   createdByName?: string;
 
+  invoiceId?: mongoose.Types.ObjectId | string;
+  invoiceNumber?: string;
+  lastInvoiceCreatedAt?: Date;
+  
   items: IQuotationItem[];
 
   subtotal: number;
@@ -109,6 +113,20 @@ const quotationSchema = new Schema<IQuotation>(
 
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     createdByName: { type: String },
+
+    invoiceId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Invoice',
+    required: false
+  },
+  invoiceNumber: {
+    type: String,
+    required: false
+  },
+  lastInvoiceCreatedAt: {
+    type: Date,
+    required: false
+  },
 
     items: { type: [quotationItemSchema], required: true, validate: {
       validator: function(items: any[]) {

@@ -859,6 +859,129 @@ router.delete('/quotations/:id', authMiddleware, requireSalesRole, async (req: R
   }
 });
 
+// POST /api/sales/quotations/:id/create-invoice - Create new invoice from edited accepted quotation
+router.post('/quotations/:id/create-invoice', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid quotation ID' });
+    }
+
+    const quotation = await QuotationModel.findById(id);
+    if (!quotation) {
+      return res.status(404).json({ error: 'Quotation not found' });
+    }
+
+    if (req.user!.role === 'sales' && quotation.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    // Only allow creating invoice from accepted quotations that may have been edited
+    if (quotation.status !== 'accepted') {
+      return res.status(400).json({ error: 'Can only create invoice from accepted quotations' });
+    }
+
+    // Check if quotation has items
+    if (!quotation.items || quotation.items.length === 0) {
+      return res.status(400).json({ error: 'Quotation has no items' });
+    }
+
+    // Generate new invoice number
+    const invoiceNumber = await generateInvoiceNumber();
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+
+    // Create new invoice with current quotation data
+    const invoice = await InvoiceModel.create({
+      quotationId: quotation._id,
+      quotationNumber: quotation.quoteNumber,
+      customerId: quotation.customerId,
+      customerName: quotation.customerName,
+      customerEmail: quotation.customerEmail,
+      customerPhone: quotation.customerPhone,
+      customerLocation: quotation.customerLocation,
+      createdBy: req.user!.userId,
+      createdByName: req.user!.name || req.user!.email,
+      items: quotation.items.map((item: any) => ({
+        productId: item.productId,
+        name: item.name,
+        slug: item.slug,
+        qty: item.qty,
+        price: item.price,
+        buyingPrice: item.buyingPrice || 0,
+        profitPerItem: item.profitPerItem || (item.price - (item.buyingPrice || 0)),
+        totalProfit: item.totalProfit || ((item.price - (item.buyingPrice || 0)) * item.qty),
+        total: item.total || (item.price * item.qty),
+        tax: item.tax || 0,
+        taxable: item.taxable !== false,
+        description: item.description || ''
+      })),
+      subtotal: quotation.subtotal,
+      totalCost: quotation.totalCost || 0,
+      totalProfit: quotation.totalProfit || 0,
+      taxRate: quotation.taxRate,
+      tax: quotation.tax,
+      taxPerItem: quotation.taxPerItem || false,
+      discount: quotation.discount,
+      discountType: quotation.discountType || 'fixed',
+      transportInfo: quotation.transportInfo,
+      transportCost: quotation.transportCost || 0,
+      transportDescription: quotation.transportDescription || '',
+      total: quotation.total,
+      invoiceNumber,
+      status: 'sent',
+      paymentStatus: 'unpaid',
+      amountPaid: 0,
+      balanceDue: quotation.total,
+      issueDate: new Date(),
+      dueDate,
+      notes: `Invoice created from edited accepted quotation ${quotation.quoteNumber}\n\nOriginal quotation was accepted on ${quotation.acceptedAt?.toLocaleDateString()}\n\n${quotation.notes || ''}`,
+      terms: quotation.terms,
+      sentAt: new Date()
+    });
+
+    // Update quotation to reference this new invoice
+    quotation.invoiceId = invoice._id;
+    quotation.invoiceNumber = invoice.invoiceNumber;
+    quotation.lastInvoiceCreatedAt = new Date();
+    await quotation.save();
+
+    await createAuditLog(req as any, {
+      action: 'create',
+      resource: 'invoice',
+      resourceId: invoice._id.toString(),
+      details: `New invoice ${invoiceNumber} created from edited accepted quotation ${quotation.quoteNumber}`,
+      skipIfNoUser: false
+    });
+
+    res.json({
+      success: true,
+      message: 'New invoice created successfully from quotation',
+      invoice: {
+        _id: invoice._id,
+        invoiceNumber: invoice.invoiceNumber,
+        total: invoice.total,
+        balanceDue: invoice.balanceDue,
+        dueDate: invoice.dueDate
+      },
+      quotation: {
+        _id: quotation._id,
+        quoteNumber: quotation.quoteNumber,
+        invoiceId: quotation.invoiceId,
+        invoiceNumber: quotation.invoiceNumber
+      }
+    });
+  } catch (error: any) {
+    console.error('Create invoice from quotation error:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to create invoice from quotation',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+
 // =====================
 // Invoices
 // =====================
