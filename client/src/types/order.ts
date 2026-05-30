@@ -30,7 +30,7 @@ export interface OrderItem {
   name: string;
   slug: string;
   image: string;
-  price: number;
+  sellingPrice: number;
   qty: number;
   description?: string;
 }

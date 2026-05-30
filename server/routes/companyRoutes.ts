@@ -561,6 +561,39 @@ router.get('/tax-rate', async (req: Request, res: Response) => {
   }
 });
 
+// In src/routes/companySettings.routes.ts or your admin routes
+
+// PUT /api/admin/settings/tax-exempt-categories
+router.put('/admin/settings/tax-exempt-categories', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { taxExemptCategories } = req.body;
+    
+    if (!Array.isArray(taxExemptCategories)) {
+      return res.status(400).json({ error: 'taxExemptCategories must be an array' });
+    }
+
+    let settings = await CompanySettings.findOne();
+    if (!settings) {
+      settings = new CompanySettings();
+    }
+    
+    settings.taxExemptCategories = taxExemptCategories;
+    await settings.save();
+    
+    res.json({
+      success: true,
+      taxExemptCategories: settings.taxExemptCategories
+    });
+  } catch (error: any) {
+    console.error('Error updating tax-exempt categories:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/company/export
 router.get('/export', authMiddleware, async (req: Request, res: Response) => {
   try {

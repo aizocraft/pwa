@@ -477,7 +477,7 @@ export default function EditProductPage() {
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="number"
-                      step="0.01"
+                      step="10"
                       min="0"
                       value={formData.price}
                       onChange={(e) => setFormData(prev => ({ ...prev, price: Number(e.target.value) }))}
@@ -495,7 +495,7 @@ export default function EditProductPage() {
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="number"
-                      step="0.01"
+                      step="10"
                       min="0"
                       value={formData.buyingPrice}
                       onChange={(e) => setFormData(prev => ({ ...prev, buyingPrice: Number(e.target.value) }))}

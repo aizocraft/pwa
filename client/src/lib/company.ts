@@ -14,6 +14,18 @@ export async function getTaxRate(): Promise<number> {
   return response.data.taxRate;
 }
 
+// Get tax-exempt categories
+export async function getTaxExemptCategories(): Promise<string[]> {
+  const response = await api.get('/company/tax-exempt-categories');
+  return response.data.taxExemptCategories;
+}
+
+// Update tax-exempt categories
+export async function updateTaxExemptCategories(categories: string[]): Promise<CompanySettings> {
+  const response = await api.put('/company/tax-exempt-categories', { taxExemptCategories: categories });
+  return response.data;
+}
+
 // Update company settings (all fields)
 export async function updateCompanySettings(data: UpdateCompanyRequest): Promise<CompanySettings> {
   console.log('Sending update to backend:', JSON.stringify(data, null, 2));

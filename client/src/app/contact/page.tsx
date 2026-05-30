@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send,
   CheckCircle,
-  XCircle,
   AlertCircle,
   Phone,
   Mail,
@@ -15,14 +14,9 @@ import {
   Twitter,
   Linkedin,
   Instagram,
-  MessageCircle,
   User,
   Briefcase,
-  Shield,
-  Droplets,
-  Sun,
-  Zap,
-  Award,
+
   Clock as ClockIcon,
   Calendar,
   ChevronRight,
@@ -222,7 +216,7 @@ export default function ContactPage() {
 
                   {/* Map Link */}
                   <motion.a
-                    href="https://maps.google.com/?q=Hurlingum+Shopping+Square+Nairobi"
+                    href="https://www.google.com/maps/search/Hurlingham%20Square%20Shopping%20Center%20-%20Njiru/@-1.25391636,36.96117471,17z?hl=en"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium mt-2 group/link"
@@ -317,9 +311,7 @@ export default function ContactPage() {
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                     Send us a Message
                   </h2>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">
-                    Fill out the form and we'll respond within 24 hours.
-                  </p>
+
                 </div>
 
                 {status === 'success' ? (

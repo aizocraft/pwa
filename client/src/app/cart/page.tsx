@@ -21,7 +21,8 @@ import {
   Sparkles,
   Package,
   Clock,
-  Lock
+  Lock,
+  Tag
 } from 'lucide-react';
 import { useCartStore } from '../../store/cart';
 import { formatCurrency } from '../../lib/utils';
@@ -42,6 +43,7 @@ export default function CartPage() {
     selectedShippingAreaId,
     loading: cartLoading,
     taxRate,
+    taxExemptCategories,
     removeItem, 
     updateQty, 
     clearCart,
@@ -50,7 +52,9 @@ export default function CartPage() {
     promoValid,
     promoError,
     clearPromoError,
-    recalculateTotals
+    recalculateTotals,
+    taxableSubtotal,
+    taxExemptSubtotal
   } = useCartStore();
 
   
@@ -74,9 +78,8 @@ export default function CartPage() {
     }
   }, [shippingAreas.length, cartLoading]);
 
-
-  const tax = totals.tax || (subtotal * taxRate);
-  const total = totals.total || (subtotal + shippingCost + (subtotal * taxRate) - storeDiscount);
+  const tax = totals.tax || (taxableSubtotal * taxRate);
+  const total = totals.total || (taxableSubtotal + taxExemptSubtotal + shippingCost + tax - storeDiscount);
   const selectedArea = shippingAreas.find(area => area._id === selectedShippingAreaId);
   
   const remainingForFreeShipping = selectedArea && selectedArea.freeThreshold > 0
@@ -94,28 +97,20 @@ export default function CartPage() {
       : 0;
   }, [subtotal, freeShippingThreshold, isFreeShippingEnabled]);
 
-
+  const hasTaxExemptItems = taxExemptSubtotal > 0;
 
   const handleImageError = useCallback((productId: string) => {
     setImageErrors(prev => ({ ...prev, [productId]: true }));
   }, []);
 
-  // Helper function to safely get image URL from cart item (handles both string and object)
   const getCartItemImageUrl = useCallback((item: any): string => {
     if (!item.image) return '';
-    
-    // If it's already a string, return it
     if (typeof item.image === 'string') return item.image;
-    
-    // If it's an object with url property (URL type)
     if (item.image.url) return item.image.url;
-    
-    // If it's a GridFS object with fileId
     if (item.image.fileId) {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
       return `${apiUrl}/products/image/${item.image.fileId}`;
     }
-    
     return '';
   }, []);
 
@@ -295,9 +290,6 @@ export default function CartPage() {
                             </div>
                           </div>
                         )}
-                        {imageErrors[item.id] && (
-                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer group/image" />
-                        )}
                       </div>
                       <div className="absolute -top-3 -right-3 bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-500 dark:to-teal-400 text-white text-xs sm:text-sm font-bold rounded-2xl w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shadow-lg ring-2 ring-white/50 -rotate-6 group-hover:rotate-0 transition-all duration-500 hover:scale-110 hover:shadow-emerald-500/25">
                         {item.qty}
@@ -322,6 +314,14 @@ export default function CartPage() {
                           <Trash2 className="w-4 h-4 hover:scale-110 transition-transform" />
                         </button>
                       </div>
+
+                      {/* Tax Exempt Badge */}
+                      {item.isTaxExempt && (
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full mb-2">
+                          <Tag className="w-3 h-3" />
+                          Tax Exempt
+                        </div>
+                      )}
 
                       {/* Price and Quantity */}
                       <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
@@ -417,7 +417,7 @@ export default function CartPage() {
                     />
                   </div>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                    {progressPercentage >= 100 ? '✨ You qualify for free shipping!' : `${Math.round(progressPercentage)}% to free shipping`}
+                    {progressPercentage >= 100 ? ' You qualify for free shipping!' : `${Math.round(progressPercentage)}% to free shipping`}
                   </p>
                 </div>
               )}
@@ -428,7 +428,7 @@ export default function CartPage() {
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-green-600 dark:text-green-400 animate-pulse" />
                     <span className="text-sm font-semibold text-green-800 dark:text-green-300">
-                      ✨ You qualify for FREE shipping! ✨
+                       You qualify for FREE shipping!
                     </span>
                   </div>
                 </div>
@@ -446,28 +446,42 @@ export default function CartPage() {
                 </div>
               )}
 
-              <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-lg p-5 sm:p-6 lg:p-8 transition-all duration-300 hover:shadow-xl">
-                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+              <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-lg p-5 sm:p-6 transition-all duration-300 hover:shadow-xl">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2">
                   <Package className="w-5 h-5 text-blue-600" />
                   Order Summary
                 </h2>
 
                 {/* Cost Breakdown */}
-                <div className="space-y-4 mb-6">
-                  <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
+                <div className="space-y-3 mb-5">
+                  <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                     <span>Subtotal</span>
                     <span className="font-medium text-gray-900 dark:text-white">
                       {formatCurrency(subtotal)}
                     </span>
                   </div>
+
+                  {/* Tax Breakdown - Show taxable and tax-exempt separately */}
+                  {hasTaxExemptItems && (
+                    <div className="space-y-1 border-t border-gray-100 dark:border-gray-800 pt-2">
+                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 pl-2">
+                        <span>Taxable items</span>
+                        <span>{formatCurrency(taxableSubtotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-green-600 dark:text-green-400 pl-2">
+                        <span>Tax-exempt items</span>
+                        <span>{formatCurrency(taxExemptSubtotal)}</span>
+                      </div>
+                    </div>
+                  )}
                   
-                  <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
+                  <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                     <div className="flex items-center gap-1">
                       <span>Shipping</span>
                       {displayShippingCost === 0 && qualifiesForFreeShipping && <Sparkles className="w-3 h-3 text-green-600" />}
                     </div>
                     {displayShippingCost === 0 ? (
-                      <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
+                      <span className="text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
                         FREE {qualifiesForFreeShipping && <Sparkles className="w-3 h-3" />}
                       </span>
                     ) : (
@@ -477,24 +491,27 @@ export default function CartPage() {
                     )}
                   </div>
                   
-                  <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
-                    <span>Tax (VAT)</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(tax)}
-                    </span>
-                  </div>
+                  {/* Only show tax if there are taxable items */}
+                  {taxableSubtotal > 0 && (
+                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 pb-3">
+                      <span>Tax ({(taxRate * 100).toFixed(0)}% VAT)</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {formatCurrency(tax)}
+                      </span>
+                    </div>
+                  )}
 
                   {promoValid && storeDiscount > 0 && (
-                    <div className="flex justify-between items-center text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 p-3 rounded-xl -mx-1">
-                      <div className="flex items-center gap-2">
-                        <Gift className="w-4 h-4" />
-                        <span className="font-medium">Discount</span>
+                    <div className="flex justify-between items-center text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 p-2 rounded-lg -mx-1">
+                      <div className="flex items-center gap-1 text-sm">
+                        <Gift className="w-3 h-3" />
+                        <span>Discount</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span>-{formatCurrency(storeDiscount)}</span>
+                        <span className="font-semibold">-{formatCurrency(storeDiscount)}</span>
                         <button
                           onClick={handleRemovePromo}
-                          className="p-1 hover:bg-green-100 dark:hover:bg-green-900 rounded transition-colors"
+                          className="p-0.5 hover:bg-green-100 dark:hover:bg-green-900 rounded transition-colors"
                           aria-label="Remove promo"
                         >
                           <X className="w-3 h-3" />
@@ -503,18 +520,19 @@ export default function CartPage() {
                     </div>
                   )}
 
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
-                    <div className="flex justify-between items-center text-lg lg:text-xl font-bold">
+                  <div className="pt-2">
+                    <div className="flex justify-between items-center text-base font-bold">
                       <span className="text-gray-900 dark:text-white">Total</span>
-                      <span className="text-2xl lg:text-3xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
                         {formatCurrency(total)}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Promo Code Input with Error Handling */}
-                <div className="mb-6">
+
+                {/* Promo Code Input */}
+                <div className="mb-5">
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <Gift className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -527,35 +545,33 @@ export default function CartPage() {
                           if (promoError) clearPromoError();
                         }}
                         disabled={promoValid || isApplyingPromo}
-                        className={`w-full pl-10 pr-4 py-3 bg-gray-100 dark:bg-gray-900 border ${
+                        className={`w-full pl-9 pr-3 py-2.5 bg-gray-100 dark:bg-gray-900 border ${
                           promoError ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700'
-                        } rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all`}
+                        } rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all`}
                       />
                     </div>
                     <button
                       onClick={handleApplyPromo}
                       disabled={promoValid || !promoInput.trim() || isApplyingPromo}
-                      className="px-6 py-3 bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-700 dark:to-gray-600 text-white rounded-xl text-sm font-medium hover:from-gray-800 hover:to-gray-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
+                      className="px-4 py-2.5 bg-gray-900 dark:bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isApplyingPromo ? (
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
                         'Apply'
                       )}
                     </button>
                   </div>
                   
-                  {/* Error Message */}
                   {promoError && (
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-2 flex items-center gap-1">
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
                       {promoError}
                     </p>
                   )}
                   
-                  {/* Success Message */}
                   {appliedPromoCode && promoValid && !promoError && (
-                    <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" />
                       Promo code "{appliedPromoCode}" applied!
                     </p>
@@ -563,28 +579,24 @@ export default function CartPage() {
                 </div>
 
                 {/* Checkout Button */}
-<motion.button
+                <button
                   onClick={handleCheckout}
                   disabled={isLoading || !selectedShippingAreaId}
-                  className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 p-1 shadow-xl ring-1 ring-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/30 hover:ring-blue-400/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-clip-padding shadow-lg"
-                  whileHover={{ scale: 1.02, boxShadow: '0 20px 40px -10px rgba(59,130,246,0.4)' }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
                   {isLoading ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       Processing...
                     </>
                   ) : (
                     <>
-                      <CreditCard className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      <CreditCard className="w-4 h-4" />
                       Proceed to Checkout
-                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      <ChevronRight className="w-4 h-4" />
                     </>
                   )}
-                </motion.button>
+                </button>
 
                 {!selectedShippingAreaId && shippingAreas.length > 0 && (
                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
@@ -593,36 +605,36 @@ export default function CartPage() {
                 )}
 
                 <Link href="/products">
-                  <button className="w-full mt-3 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200 hover:scale-[1.02] active:scale-95">
+                  <button className="w-full mt-3 px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200">
                     Continue Shopping
                   </button>
                 </Link>
 
                 {/* Trust Badges */}
-                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 group">
-                      <div className="p-1 bg-green-100 dark:bg-green-950/50 rounded-lg group-hover:scale-110 transition-transform">
+                <div className="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="p-1 bg-green-100 dark:bg-green-950/50 rounded-lg">
                         <Shield className="w-3 h-3 text-green-600 dark:text-green-400" />
                       </div>
                       <span>Secure Checkout</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 group">
-                      <div className="p-1 bg-blue-100 dark:bg-blue-950/50 rounded-lg group-hover:scale-110 transition-transform">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="p-1 bg-blue-100 dark:bg-blue-950/50 rounded-lg">
                         <Truck className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                       </div>
                       <span>Free Shipping Available</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 group">
-                      <div className="p-1 bg-yellow-100 dark:bg-yellow-950/50 rounded-lg group-hover:scale-110 transition-transform">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="p-1 bg-yellow-100 dark:bg-yellow-950/50 rounded-lg">
                         <svg className="w-3 h-3 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                         </svg>
                       </div>
                       <span>30-Day Returns</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 group">
-                      <div className="p-1 bg-purple-100 dark:bg-purple-950/50 rounded-lg group-hover:scale-110 transition-transform">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="p-1 bg-purple-100 dark:bg-purple-950/50 rounded-lg">
                         <Lock className="w-3 h-3 text-purple-600 dark:text-purple-400" />
                       </div>
                       <span>Secure Payment</span>
@@ -631,8 +643,8 @@ export default function CartPage() {
                 </div>
 
                 {/* Delivery Estimate */}
-                <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800/30 rounded-xl">
-                  <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <div className="mt-3 p-2.5 bg-gray-50 dark:bg-gray-800/30 rounded-lg">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
                     <Clock className="w-3 h-3" />
                     <span>Estimated delivery: 3-5 business days</span>
                   </div>
@@ -642,20 +654,6 @@ export default function CartPage() {
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes shimmer {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
-        }
-        .animate-shimmer {
-          animation: shimmer 2s infinite;
-        }
-      `}</style>
     </div>
   );
 }

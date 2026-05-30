@@ -199,22 +199,28 @@ export default function ShippingAreas({ areas, onUpdateAreas }: ShippingAreasPro
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Base Cost (KES) *</label>
-              <input
-                type="number"
-                min="0"
-                step="10"
-                value={editingArea?.baseCost || newArea.baseCost || ''}
-                onChange={(e) => {
-                  const val = Number(e.target.value)
-                  editingArea ? setEditingArea({...editingArea, baseCost: val}) : setNewArea({...newArea, baseCost: val})
-                }}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
-                disabled={loading}
-                placeholder="0"
-              />
-            </div>
+ <div>
+  <label className="block text-sm font-medium mb-2">Base Cost (KES) *</label>
+  <input
+    type="number"
+    min="0"
+    step="10"
+    value={editingArea?.baseCost !== undefined ? editingArea.baseCost : (newArea.baseCost ?? '')}
+    onChange={(e) => {
+      const val = e.target.value === '' ? 0 : Number(e.target.value)
+      if (!isNaN(val) && val >= 0) {
+        if (editingArea) {
+          setEditingArea({...editingArea, baseCost: val})
+        } else {
+          setNewArea({...newArea, baseCost: val})
+        }
+      }
+    }}
+    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
+    disabled={loading}
+    placeholder="0"
+  />
+</div>
 
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-2">Regions (comma separated)</label>

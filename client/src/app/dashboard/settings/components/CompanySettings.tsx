@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Edit3, Save, X, Phone, Mail, MapPin, Link2, Plus, Trash2, Image as ImageIcon, Loader2, FileText } from 'lucide-react'
+import { 
+  Building2, Edit3, Save, X, Phone, Mail, MapPin, Link2, 
+  Plus, Trash2, Image as ImageIcon, Loader2, FileText, 
+  Tag, Percent 
+} from 'lucide-react'
 import { useCompanySettings } from '@/lib/use-company-settings'
 import { getLogoUrl, getFaviconUrl } from '@/lib/company'
 import toast from 'react-hot-toast'
@@ -24,11 +28,12 @@ export default function CompanySettings() {
   const [formData, setFormData] = useState<any>({})
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('basic')
+  const [newCategory, setNewCategory] = useState('')
 
   // Initialize form when company data loads
   useEffect(() => {
     if (company) {
-        setFormData({
+      setFormData({
         companyName: company.companyName || '',
         slogan: company.slogan || '',
         description: company.description || '',
@@ -38,6 +43,7 @@ export default function CompanySettings() {
         website: company.website || '',
         footerText: company.footerText || '',
         taxRate: company.taxRate || 0.16,
+        taxExemptCategories: company.taxExemptCategories || ['Solar Panels', 'Solar Lights', 'Inverters'],
         socialLinks: company.socialLinks || []
       })
     }
@@ -52,6 +58,10 @@ export default function CompanySettings() {
         (link: any) => link.platform?.trim() && link.url?.trim()
       )
       
+      const filteredTaxExemptCategories = (formData.taxExemptCategories || [])
+        .filter((cat: string) => cat.trim())
+        .map((cat: string) => cat.trim());
+      
       const data = {
         companyName: formData.companyName,
         slogan: formData.slogan || undefined,
@@ -62,6 +72,7 @@ export default function CompanySettings() {
         website: formData.website || undefined,
         footerText: formData.footerText || undefined,
         taxRate: formData.taxRate !== undefined ? formData.taxRate : undefined,
+        taxExemptCategories: filteredTaxExemptCategories.length > 0 ? filteredTaxExemptCategories : undefined,
         socialLinks: filteredSocialLinks.length > 0 ? filteredSocialLinks : undefined
       }
       
@@ -95,9 +106,31 @@ export default function CompanySettings() {
     setFormData({ ...formData, socialLinks: newLinks })
   }
 
+  const addTaxExemptCategory = () => {
+    if (newCategory.trim()) {
+      setFormData({
+        ...formData,
+        taxExemptCategories: [...(formData.taxExemptCategories || []), newCategory.trim()]
+      })
+      setNewCategory('')
+    }
+  }
+
+  const removeTaxExemptCategory = (index: number) => {
+    const newCategories = [...(formData.taxExemptCategories || [])]
+    newCategories.splice(index, 1)
+    setFormData({ ...formData, taxExemptCategories: newCategories })
+  }
+
+  const updateTaxExemptCategory = (index: number, value: string) => {
+    const newCategories = [...(formData.taxExemptCategories || [])]
+    newCategories[index] = value
+    setFormData({ ...formData, taxExemptCategories: newCategories })
+  }
+
   const tabs = [
     { id: 'basic', label: 'Basic Info', icon: Building2 },
-    { id: 'tax', label: 'Tax', icon: FileText },
+    { id: 'tax', label: 'Tax', icon: Percent },
     { id: 'contact', label: 'Contact', icon: MapPin },
     { id: 'social', label: 'Social', icon: Link2 },
     { id: 'branding', label: 'Branding', icon: ImageIcon },
@@ -213,10 +246,10 @@ export default function CompanySettings() {
 
           {/* Tax Tab */}
           {activeTab === 'tax' && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
+                  <Percent className="w-4 h-4" />
                   Tax Rate (%)
                 </label>
                 <div className="relative">
@@ -226,16 +259,89 @@ export default function CompanySettings() {
                     max="1"
                     step="0.01"
                     value={formData.taxRate || ''}
-                    onChange={(e) => setFormData({...formData, taxRate: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({...formData, taxRate: parseFloat(e.target.value) || 0})}
                     disabled={!editing}
                     className="w-full pl-10 pr-12 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 disabled:bg-gray-100 dark:disabled:bg-gray-700 focus:ring-2 focus:ring-blue-500"
                     placeholder="0.16"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 dark:text-gray-400">%</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
                 </div>
-                <p className={`mt-1 text-xs ${editing ? 'text-gray-500 dark:text-gray-400' : 'font-medium text-gray-900 dark:text-white'}`}>
-                  Enter as decimal (e.g. 16% = 0.16)
+                <p className="mt-1 text-xs text-gray-500">
+                  Enter as decimal (e.g., 16% = 0.16)
                 </p>
+              </div>
+
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <Tag className="w-4 h-4" />
+                  Tax-Exempt Categories
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  Products in these categories will have 0% tax applied
+                </p>
+
+                <div className="space-y-3">
+                  {(formData.taxExemptCategories || []).map((category: string, index: number) => (
+                    <div key={index} className="flex gap-3 items-center">
+                      <input
+                        type="text"
+                        value={category}
+                        onChange={(e) => updateTaxExemptCategory(index, e.target.value)}
+                        disabled={!editing}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 disabled:bg-gray-100 dark:disabled:bg-gray-700 focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., Solar Panels"
+                      />
+                      {editing && (
+                        <button
+                          type="button"
+                          onClick={() => removeTaxExemptCategory(index)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {editing && (
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        value={newCategory}
+                        onChange={(e) => setNewCategory(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500"
+                        placeholder="New category name"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addTaxExemptCategory();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={addTaxExemptCategory}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add
+                      </button>
+                    </div>
+                  )}
+                  
+                  {(!formData.taxExemptCategories || formData.taxExemptCategories.length === 0) && !editing && (
+                    <p className="text-gray-500 text-sm text-center py-2">
+                      No tax-exempt categories defined.
+                    </p>
+                  )}
+                </div>
+                
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    <strong>Note:</strong> Category matching is case-insensitive. Products with matching categories will have 0% tax.
+                    Example: "Solar Panels", "solar panels", "SOLAR PANELS" all match.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -319,7 +425,7 @@ export default function CompanySettings() {
                   <div key={index} className="flex gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <input
                       type="text"
-                      placeholder="Facebook, Instagram, etc."
+                      placeholder="Platform (e.g., Facebook, Twitter)"
                       value={link.platform}
                       onChange={(e) => updateSocialLink(index, 'platform', e.target.value)}
                       disabled={!editing}
@@ -327,13 +433,13 @@ export default function CompanySettings() {
                     />
                     <input
                       type="url"
-                      placeholder="https://..."
+                      placeholder="URL (https://...)"
                       value={link.url}
                       onChange={(e) => updateSocialLink(index, 'url', e.target.value)}
                       disabled={!editing}
                       className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 disabled:bg-gray-100 dark:disabled:bg-gray-800 focus:ring-2 focus:ring-blue-500"
                     />
-                    {editing && (formData.socialLinks?.length || 0) > 1 && (
+                    {editing && (
                       <button
                         type="button"
                         onClick={() => removeSocialLink(index)}
@@ -398,18 +504,19 @@ export default function CompanySettings() {
               onClick={() => {
                 setEditing(false)
                 if (company) {
-                setFormData({
-                  companyName: company.companyName || '',
-                  slogan: company.slogan || '',
-                  description: company.description || '',
-                  address: company.address || '',
-                  phone: company.phone || '',
-                  email: company.email || '',
-                  website: company.website || '',
-                  footerText: company.footerText || '',
-                  taxRate: company.taxRate || 0.16,
-                  socialLinks: company.socialLinks || []
-                })
+                  setFormData({
+                    companyName: company.companyName || '',
+                    slogan: company.slogan || '',
+                    description: company.description || '',
+                    address: company.address || '',
+                    phone: company.phone || '',
+                    email: company.email || '',
+                    website: company.website || '',
+                    footerText: company.footerText || '',
+                    taxRate: company.taxRate || 0.16,
+                    taxExemptCategories: company.taxExemptCategories || ['Solar Panels', 'Solar Lights', 'Inverters'],
+                    socialLinks: company.socialLinks || []
+                  })
                 }
               }}
               disabled={loading}

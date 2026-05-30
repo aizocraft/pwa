@@ -1,6 +1,5 @@
 'use client'
 
-
 import { MapPin, User, Home, Building2, Phone, ArrowRight, Truck, Gift, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { useCartStore } from '../../../store/cart'
@@ -58,12 +57,9 @@ export default function ShippingForm({
           // Only update if there's actual data
           if (parsedAddress.fullName || parsedAddress.address1) {
             setShippingAddress(parsedAddress);
-
-          } else {
-
           }
         } catch (e) {
-
+          console.error('Error loading saved address:', e);
         }
       }
 
@@ -73,7 +69,6 @@ export default function ShippingForm({
         const savedPhone = localStorage.getItem('saved_guest_phone');
         if (savedEmail) setGuestEmail(savedEmail);
         if (savedPhone) setGuestPhone(savedPhone);
-
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -245,7 +240,7 @@ export default function ShippingForm({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                State/Province *
+                Region *
               </label>
               <input
                 type="text"
@@ -286,21 +281,7 @@ export default function ShippingForm({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Phone Number *
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="tel"
-                value={shippingAddress.phone}
-                onChange={handlePhoneChange}
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-shadow"
-                placeholder="254700000000"
-              />
-            </div>
-          </div>
+          {/* Phone field removed from bottom */}
 
           {/* Read-only: Shipping & Promo from Cart (No Edit) */}
     
@@ -309,9 +290,9 @@ export default function ShippingForm({
             onClick={onContinue}
             disabled={!isShippingValid() || (isGuest && !isGuestInfoValid()) || !cart.selectedShippingAreaId}
             className="group relative w-full mt-6 overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 p-1 shadow-xl ring-1 ring-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/30 hover:ring-blue-400/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-clip-padding shadow-lg"
-  whileHover={{ scale: 1.02, boxShadow: '0 20px 40px -10px rgba(59,130,246,0.4)' }}
-  whileTap={{ scale: 0.98 }}
-  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            whileHover={{ scale: 1.02, boxShadow: '0 20px 40px -10px rgba(59,130,246,0.4)' }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
           >
             <span>Continue to Payment</span>
             <motion.div animate={{ x: [0, 4, 0] }} transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}>

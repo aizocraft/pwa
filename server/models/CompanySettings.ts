@@ -34,6 +34,7 @@ export interface ICompanySettings extends Document {
     url: string;
   }>;
   taxRate: number;
+  taxExemptCategories: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -102,7 +103,9 @@ const companySettingsSchema = new Schema<ICompanySettings>(
       default: 0.16,
       min: [0, 'Tax rate cannot be negative'],
       max: [1, 'Tax rate cannot exceed 100%']
-    },    logo: {
+    },   
+      taxExemptCategories: { type: [String], default: ['Solar Panels', 'Solar Lights', 'Inverters'] }, 
+    logo: {
       type: LogoSchema,
       default: () => ({
         type: 'url',

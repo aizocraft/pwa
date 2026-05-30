@@ -41,8 +41,20 @@ const OrderStatusBadge = ({ status }: { status: Order['status'] }) => {
 
 // Invoice/Receipt Content Component
 // Invoice/Receipt Content Component - Compact & Multi-Page Ready
+// Update the DocumentContent component to handle sellingPrice instead of price
+
 const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; settings: any; logoUrl: string | null; isPaid: boolean }) => {
-  const subtotal = order.subtotal || order.items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+  // Helper function to safely get price from order item
+  const getItemPrice = (item: any) => {
+    return item.sellingPrice || item.price || 0;
+  };
+
+  const getItemTotal = (item: any) => {
+    const price = getItemPrice(item);
+    return price * (item.qty || 0);
+  };
+
+  const subtotal = order.subtotal || order.items.reduce((sum, item) => sum + getItemTotal(item), 0);
   const shippingCost = order.shippingCost || 0;
   const tax = order.tax || 0;
   const total = order.total || subtotal + shippingCost + tax;
@@ -51,7 +63,7 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
   const companyEmail = settings?.email || '';
   const slogan = settings?.slogan || '';
 
-const customerName = order.user?.name || order.guestInfo?.name || order.shippingAddress?.fullName || 'Guest Customer';
+  const customerName = order.user?.name || order.guestInfo?.name || order.shippingAddress?.fullName || 'Guest Customer';
   const customerEmail = order.user?.email || order.guestInfo?.email || order.shippingAddress?.email || '';
   const customerPhone = order.guestInfo?.phone || order.shippingAddress?.phone || '';
 
@@ -131,7 +143,7 @@ const customerName = order.user?.name || order.guestInfo?.name || order.shipping
             </div>
           </div>
 
-          {/* Ship To - Compact */}
+          {/* Ship To */}
           <div>
             <div style={{ fontWeight: 'bold', color: '#1a472a', borderBottom: '1px solid #e0e0e0', paddingBottom: '4px', marginBottom: '6px' }}>
               SHIP TO
@@ -143,7 +155,6 @@ const customerName = order.user?.name || order.guestInfo?.name || order.shipping
                 {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zip}
               </div>
               <div style={{ fontSize: '8pt' }}>{order.shippingAddress.country}</div>
-              
             </div>
           </div>
         </div>
@@ -159,23 +170,31 @@ const customerName = order.user?.name || order.guestInfo?.name || order.shipping
             </tr>
           </thead>
           <tbody>
-            {itemChunks[0]?.map((item, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '8px 6px' }}>
-                  <div style={{ fontWeight: 'bold' }}>{item.name}</div>
-                  <div style={{ fontSize: '7pt', color: '#888' }}>{item.slug}</div>
-                </td>
-                <td style={{ padding: '8px 6px', textAlign: 'center' }}>{item.qty}</td>
-                <td style={{ padding: '8px 6px', textAlign: 'right' }}>Ksh {item.price.toLocaleString()}</td>
-                <td style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 'bold' }}>Ksh {(item.price * item.qty).toLocaleString()}</td>
-              </tr>
-            ))}
+            {itemChunks[0]?.map((item, idx) => {
+              const price = getItemPrice(item);
+              const itemTotal = getItemTotal(item);
+              return (
+                <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '8px 6px' }}>
+                    <div style={{ fontWeight: 'bold' }}>{item.name}</div>
+                    <div style={{ fontSize: '7pt', color: '#888' }}>{item.slug}</div>
+                  </td>
+                  <td style={{ padding: '8px 6px', textAlign: 'center' }}>{item.qty}</td>
+                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>
+                    Ksh {price.toLocaleString()}
+                  </td>
+                  <td style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 'bold' }}>
+                    Ksh {itemTotal.toLocaleString()}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
-        {/* Summary - Minimal */}
+        {/* Summary */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-            <div style={{ width: '220px', fontSize: '9pt' }}>
+          <div style={{ width: '220px', fontSize: '9pt' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
               <span style={{ color: '#666' }}>Subtotal:</span>
               <span>Ksh {subtotal.toLocaleString()}</span>
@@ -224,7 +243,7 @@ const customerName = order.user?.name || order.guestInfo?.name || order.shipping
           </div>
         </div>
 
-        {/* Payment Info - Compact Row */}
+        {/* Payment Info */}
         <div style={{ 
           display: 'flex', 
           gap: '20px', 
@@ -239,13 +258,13 @@ const customerName = order.user?.name || order.guestInfo?.name || order.shipping
           }</div>
           <div>
             <span style={{ fontWeight: 'bold' }}>Status:</span>{' '}
-            <span style={{ 
-              color: order.paymentStatus === 'completed' ? '#1a472a' : 
-                     order.paymentStatus === 'failed' ? '#dc2626' : '#d97706',
-              fontWeight: 'bold'
-            }}>
-              {order.paymentStatus?.toUpperCase() || 'PENDING'}
-            </span>
+<span style={{ 
+  color: (order.paymentStatus as string) === 'paid' ? '#1a472a' : 
+         (order.paymentStatus as string) === 'refunded' ? '#dc2626' : '#d97706',
+  fontWeight: 'bold'
+}}>
+  {order.paymentStatus?.toUpperCase() || 'PENDING'}
+</span>
           </div>
           {order.paymentDetails?.transactionId && (
             <div><span style={{ fontWeight: 'bold' }}>Txn:</span> <span style={{ fontFamily: 'monospace', fontSize: '7pt' }}>{order.paymentDetails.transactionId}</span></div>
@@ -255,7 +274,7 @@ const customerName = order.user?.name || order.guestInfo?.name || order.shipping
           )}
         </div>
 
-        {/* Footer - Phone, Email, Slogan, Thank You */}
+        {/* Footer */}
         <div style={{ 
           marginTop: '20px',
           paddingTop: '12px',
@@ -278,10 +297,10 @@ const customerName = order.user?.name || order.guestInfo?.name || order.shipping
         </div>
       </div>
 
-      {/* Subsequent Pages (if many products) */}
+      {/* Subsequent Pages */}
       {itemChunks.slice(1).map((chunk, pageIndex) => (
         <div key={pageIndex} style={{ pageBreakBefore: 'always', padding: '1.5cm' }}>
-          {/* Mini Header for continuation */}
+          {/* Mini Header */}
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -313,17 +332,25 @@ const customerName = order.user?.name || order.guestInfo?.name || order.shipping
               </tr>
             </thead>
             <tbody>
-              {chunk.map((item, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '8px 6px' }}>
-                    <div style={{ fontWeight: 'bold' }}>{item.name}</div>
-                    <div style={{ fontSize: '7pt', color: '#888' }}>{item.slug}</div>
-                   </td>
-                  <td style={{ padding: '8px 6px', textAlign: 'center' }}>{item.qty}</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>Ksh {item.price.toLocaleString()}</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 'bold' }}>Ksh {(item.price * item.qty).toLocaleString()}</td>
-                </tr>
-              ))}
+              {chunk.map((item, idx) => {
+                const price = getItemPrice(item);
+                const itemTotal = getItemTotal(item);
+                return (
+                  <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '8px 6px' }}>
+                      <div style={{ fontWeight: 'bold' }}>{item.name}</div>
+                      <div style={{ fontSize: '7pt', color: '#888' }}>{item.slug}</div>
+                    </td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{item.qty}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>
+                      Ksh {price.toLocaleString()}
+                    </td>
+                    <td style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 'bold' }}>
+                      Ksh {itemTotal.toLocaleString()}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 
@@ -575,15 +602,7 @@ export default function UserOrderDetails() {
       <div className="relative overflow-hidden border-b border-gray-200/50 dark:border-gray-800/50">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-blue-500/5 to-purple-500/10"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-<Link 
-              href="/orders"
-              className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-300 mb-6 group"
-            >
-              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-300" />
-              <span className="font-medium">Back to Orders</span>
-            </Link>
-          </motion.div>
+
 
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
@@ -758,14 +777,14 @@ export default function UserOrderDetails() {
                               {item.slug}
                             </p>
                             <div className="flex items-center justify-center sm:justify-start gap-3 text-sm">
-                              <span className="text-gray-600 dark:text-gray-300">Ksh {item.price.toLocaleString()}</span>
+                              <span className="text-gray-600 dark:text-gray-300">Ksh {item.sellingPrice}</span>
                               <span className="text-gray-400">×</span>
                               <span className="font-semibold text-gray-900 dark:text-white">{item.qty}</span>
                             </div>
                           </div>
                           <div className="text-center sm:text-right">
                             <div className="text-lg sm:text-xl font-black text-gray-900 dark:text-white">
-                              Ksh {(item.price * item.qty).toLocaleString()}
+                              Ksh {(item.sellingPrice * item.qty).toLocaleString()}
                             </div>
                           </div>
                         </div>

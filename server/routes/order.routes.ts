@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import OrderModel from '../models/Order';
 import TransactionModel from '../models/Transaction';
 import ProductModel from '../models/Product';
+import type { IProduct } from '../models/Product'
 import UserModel from '../models/User';
 import authMiddleware from '../middleware/auth';
 import optionalAuthMiddleware from '../middleware/optionalAuth';
@@ -171,11 +172,50 @@ router.post('/', optionalAuthMiddleware, async (req: Request & { user?: any }, r
       }
     }
 
-    const shippingCost = (shippingArea.freeThreshold > 0 && calculatedSubtotal >= shippingArea.freeThreshold) ? 0 : shippingArea.baseCost;
-    const settings = await CompanySettings.findOne();
-    const taxRate = settings?.taxRate ?? 0.16;
-    const tax = calculatedSubtotal * taxRate;
-    const finalTotal = calculatedSubtotal + shippingCost - discount + tax;
+// In src/routes/orderRoutes.ts, replace the tax calculation section
+
+const shippingCost = (shippingArea.freeThreshold > 0 && calculatedSubtotal >= shippingArea.freeThreshold) ? 0 : shippingArea.baseCost;
+
+// Get company settings for tax calculation
+const settings = await CompanySettings.findOne();
+const taxRate = settings?.taxRate ?? 0.16;
+const taxExemptCategories: string[] = settings?.taxExemptCategories ?? [];
+
+// Calculate tax based on product categories
+let taxableSubtotal = 0;
+let taxExemptSubtotal = 0;
+
+for (const item of orderItems) {
+  const product = await ProductModel.findById(item.productId) as IProduct | null;
+  
+  if (product) {
+    const categoryName = product.category || '';
+    const isTaxExempt = taxExemptCategories.some((cat: string) => 
+      categoryName.toLowerCase().includes(cat.toLowerCase())
+    );
+    
+    if (isTaxExempt) {
+      taxExemptSubtotal += item.sellingPrice * item.qty;
+    } else {
+      taxableSubtotal += item.sellingPrice * item.qty;
+    }
+  } else {
+    taxableSubtotal += item.sellingPrice * item.qty;
+  }
+}
+
+const tax = taxableSubtotal * taxRate;
+const finalTotal = calculatedSubtotal + shippingCost - discount + tax;
+
+console.log('Order Tax Calculation:', {
+  calculatedSubtotal,
+  taxableSubtotal,
+  taxExemptSubtotal,
+  taxRate,
+  tax,
+  taxExemptCategories,
+  finalTotal
+});
 
     // Create order
     const orderData: any = {

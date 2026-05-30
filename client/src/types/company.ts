@@ -24,8 +24,8 @@ export interface SocialLink {
 export interface CompanySettings {
   _id: string;
   companyName: string;
-  logo: CompanyLogo | null;  // ✅ Direct object, not nested
-  favicon: CompanyFavicon | null;  // ✅ Direct object, not nested
+  logo: CompanyLogo | null;
+  favicon: CompanyFavicon | null;
   slogan: string;
   description: string;
   address: string;
@@ -35,6 +35,7 @@ export interface CompanySettings {
   footerText: string;
   socialLinks: SocialLink[];
   taxRate: number;
+  taxExemptCategories: string[]; 
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +51,7 @@ export interface UpdateCompanyRequest {
   footerText?: string;
   socialLinks?: SocialLink[];
   taxRate?: number;
+  taxExemptCategories?: string[]; 
 }
 
 export interface UploadLogoResponse {

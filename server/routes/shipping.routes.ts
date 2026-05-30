@@ -61,14 +61,21 @@ router.post('/', authMiddleware, async (req: Request & { user?: any }, res: Resp
 
     const { name, regions, baseCost, freeThreshold, description } = req.body;
 
-    if (!name || !baseCost) {
-      return res.status(400).json({ error: 'Name and baseCost required' });
+    // Fix: Check for undefined/null instead of falsy (0 is valid)
+    if (!name || baseCost === undefined || baseCost === null) {
+      return res.status(400).json({ error: 'Name and baseCost are required' });
+    }
+
+    // Validate baseCost is a number
+    const parsedBaseCost = parseFloat(baseCost.toString());
+    if (isNaN(parsedBaseCost) || parsedBaseCost < 0) {
+      return res.status(400).json({ error: 'baseCost must be a valid number >= 0' });
     }
 
     const area = new ShippingAreaModel({
       name,
       regions: regions || [],
-      baseCost: parseFloat(baseCost.toString()),
+      baseCost: parsedBaseCost,
       freeThreshold: parseFloat(freeThreshold?.toString() || '0'),
       description,
       isActive: true
@@ -89,16 +96,28 @@ router.put('/:id', authMiddleware, async (req: Request & { user?: any }, res: Re
       return res.status(403).json({ error: 'Admin access required' });
     }
 
+    const { name, regions, baseCost, freeThreshold, description, isActive } = req.body;
+
+    // Validate baseCost if provided
+    let parsedBaseCost;
+    if (baseCost !== undefined) {
+      parsedBaseCost = parseFloat(baseCost.toString());
+      if (isNaN(parsedBaseCost) || parsedBaseCost < 0) {
+        return res.status(400).json({ error: 'baseCost must be a valid number >= 0' });
+      }
+    }
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (regions !== undefined) updateData.regions = regions;
+    if (baseCost !== undefined) updateData.baseCost = parsedBaseCost;
+    if (freeThreshold !== undefined) updateData.freeThreshold = parseFloat(freeThreshold.toString()) || 0;
+    if (description !== undefined) updateData.description = description;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
     const area = await ShippingAreaModel.findByIdAndUpdate(
       req.params.id,
-      {
-        name: req.body.name,
-        regions: req.body.regions,
-        baseCost: parseFloat(req.body.baseCost.toString()),
-        freeThreshold: parseFloat(req.body.freeThreshold?.toString() || '0'),
-        description: req.body.description,
-        isActive: req.body.isActive !== undefined ? req.body.isActive : undefined
-      },
+      updateData,
       { new: true, runValidators: true }
     );
 

@@ -1,3 +1,4 @@
+// src/components/CircularGallery.tsx 
 'use client';
 
 import { Camera, Mesh, Plane, Program, Renderer, Texture, Transform } from 'ogl';
