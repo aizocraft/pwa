@@ -1,3 +1,4 @@
+// src/routes/mpesa.routes.ts
 import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import TransactionModel from '../models/Transaction';
@@ -70,8 +71,9 @@ router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: 
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    if (order.paymentStatus !== 'unpaid') {
-      return res.status(400).json({ error: `Order cannot be paid. Current status: ${order.paymentStatus}` });
+    // Check if order is already paid
+    if (order.paymentStatus === 'paid') {
+      return res.status(400).json({ error: 'Order is already paid' });
     }
 
     // Check if there's already a pending transaction
@@ -107,6 +109,8 @@ router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: 
       TransactionDesc: `Payment for ${order.orderNumber}`
     };
 
+    console.log('STK Push Request:', stkPushRequest);
+
     // Make STK Push request
     const response = await axios.post(
       'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
@@ -120,7 +124,9 @@ router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: 
       }
     );
 
-    const { CheckoutRequestID, ResponseCode, ResponseDescription } = response.data;
+    console.log('STK Push Response:', response.data);
+
+    const { CheckoutRequestID, ResponseCode, ResponseDescription, CustomerMessage } = response.data;
 
     if (ResponseCode !== '0') {
       throw new Error(`STK Push failed: ${ResponseDescription}`);
@@ -146,7 +152,7 @@ router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: 
     res.json({
       success: true,
       checkoutRequestId: CheckoutRequestID,
-      message: 'STK Push initiated. Check your phone for M-PESA PIN prompt.',
+      message: CustomerMessage || 'STK Push initiated. Check your phone for M-PESA PIN prompt.',
       phoneNumber: normalizedPhone
     });
 
@@ -191,6 +197,12 @@ router.post('/callback', async (req: Request, res: Response) => {
       return res.status(404).json({ ResultCode: 1, ResultDesc: 'Transaction not found' });
     }
 
+    // Prevent duplicate processing
+    if (transaction.status === 'completed') {
+      console.log(`Transaction ${CheckoutRequestID} already completed`);
+      return res.json({ ResultCode: 0, ResultDesc: 'Already processed' });
+    }
+
     // Find associated order
     const order = await OrderModel.findById(transaction.orderId);
     if (!order) {
@@ -209,16 +221,14 @@ router.post('/callback', async (req: Request, res: Response) => {
 
       // Update transaction
       transaction.status = 'completed';
-      if (mpesaReceipt) {
-        transaction.mpesaReceipt = mpesaReceipt;
-        transaction.notes = `Payment completed. Receipt: ${mpesaReceipt}`;
-      } else {
-        transaction.notes = 'Payment completed (receipt unavailable)';
-      }
+      transaction.mpesaReceipt = mpesaReceipt || '';
+      transaction.notes = `Payment completed. Receipt: ${mpesaReceipt || 'N/A'}`;
+      transaction.paidAt = new Date();
       await transaction.save();
 
+      // Update order
       order.paymentStatus = 'paid';
-      order.status = 'processing'; // Order ready for fulfillment
+      order.status = 'processing';
       order.paymentDetails = {
         transactionId: CheckoutRequestID,
         mpesaReceipt: mpesaReceipt || '',
@@ -227,7 +237,7 @@ router.post('/callback', async (req: Request, res: Response) => {
       };
       await order.save();
 
-      // Send confirmation email (don't await)
+      // Send confirmation email
       const customerEmail = transaction.guestEmail || order.shippingAddress.email;
       if (customerEmail) {
         sendPaymentConfirmation({
@@ -235,7 +245,7 @@ router.post('/callback', async (req: Request, res: Response) => {
           customerName: transaction.customerName,
           orderNumber: order.orderNumber,
           amount: transaction.amount,
-          transactionId: mpesaReceipt || CheckoutRequestID || 'N/A',
+          transactionId: mpesaReceipt || CheckoutRequestID,
           paymentMethod: 'M-PESA',
           items: order.items.map(item => ({
             name: item.name,
@@ -245,7 +255,7 @@ router.post('/callback', async (req: Request, res: Response) => {
         }).catch(err => console.error('Failed to send payment confirmation:', err));
       }
 
-      console.log(`Payment successful: ${mpesaReceipt || CheckoutRequestID} for order ${order.orderNumber}`); 
+      console.log(`✅ Payment successful: ${mpesaReceipt} for order ${order.orderNumber}`); 
 
     } else {
       // Payment failed
@@ -253,7 +263,7 @@ router.post('/callback', async (req: Request, res: Response) => {
       transaction.notes = `Payment failed: ${ResultDesc}`;
       await transaction.save();
 
-      // FIXED: Use 'unpaid' instead of 'failed'
+      // Keep order as unpaid
       order.paymentStatus = 'unpaid';
       await order.save();
 
@@ -269,7 +279,7 @@ router.post('/callback', async (req: Request, res: Response) => {
         }).catch(err => console.error('Failed to send payment failure notification:', err));
       }
 
-      console.error(`Payment failed for order ${order.orderNumber}: ${ResultDesc}`);
+      console.error(`❌ Payment failed for order ${order.orderNumber}: ${ResultDesc}`);
     }
 
     res.json({ ResultCode: 0, ResultDesc: 'Success' });
@@ -322,7 +332,27 @@ router.post('/query', optionalAuthMiddleware, async (req: Request & { user?: any
 
     const { ResultCode, ResultDesc } = response.data;
 
+    // Update transaction status if needed
+    if (ResultCode === '0' && transaction.status === 'pending') {
+      // Payment completed but callback not yet received
+      transaction.status = 'completed';
+      await transaction.save();
+      
+      // Update order
+      const order = await OrderModel.findById(transaction.orderId);
+      if (order && order.paymentStatus !== 'paid') {
+        order.paymentStatus = 'paid';
+        order.status = 'processing';
+        await order.save();
+      }
+    } else if (ResultCode !== '0' && transaction.status === 'pending') {
+      transaction.status = 'failed';
+      transaction.notes = `Query failed: ${ResultDesc}`;
+      await transaction.save();
+    }
+
     res.json({
+      success: true,
       checkoutRequestId,
       status: transaction.status,
       resultCode: ResultCode,
@@ -338,6 +368,51 @@ router.post('/query', optionalAuthMiddleware, async (req: Request & { user?: any
   } catch (error: any) {
     console.error('STK Query error:', error);
     res.status(500).json({ error: 'Failed to query payment status' });
+  }
+});
+
+// GET /api/mpesa/payment-status/:orderId - Get payment status for an order
+router.get('/payment-status/:orderId', optionalAuthMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await OrderModel.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Check permission
+    let hasAccess = false;
+    if (req.user?.userId) {
+      hasAccess = order.userId?.toString() === req.user.userId || req.user.role === 'admin';
+    } else {
+      hasAccess = true;
+    }
+
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const transaction = await TransactionModel.findOne({ orderId: order._id }).sort({ createdAt: -1 });
+
+    res.json({
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      paymentStatus: order.paymentStatus,
+      orderStatus: order.status,
+      total: order.total,
+      transaction: transaction ? {
+        id: transaction._id,
+        status: transaction.status,
+        amount: transaction.amount,
+        mpesaReceipt: transaction.mpesaReceipt,
+        createdAt: transaction.createdAt
+      } : null
+    });
+
+  } catch (error: any) {
+    console.error('Payment status error:', error);
+    res.status(500).json({ error: 'Failed to fetch payment status' });
   }
 });
 

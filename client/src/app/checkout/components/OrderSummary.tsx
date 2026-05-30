@@ -1,10 +1,9 @@
 'use client'
 
-import { Package, Truck, CreditCard, Smartphone, Gift, MapPin, User, Landmark, Banknote } from 'lucide-react'
+import { Package, Truck, CreditCard, Smartphone, Gift, MapPin, User, Landmark, Banknote, Tag } from 'lucide-react'
 import { useCartStore } from '../../../store/cart'
 import { formatCurrency } from '../../../lib/utils'
 
-// Define the shipping address type
 interface ShippingAddress {
   fullName: string;
   address1: string;
@@ -30,7 +29,6 @@ interface OrderSummaryProps {
   guestPhone?: string
 }
 
-// Helper to get payment method icon and label
 const getPaymentMethodInfo = (method: string) => {
   switch (method) {
     case 'cash':
@@ -49,8 +47,6 @@ const getPaymentMethodInfo = (method: string) => {
 export default function OrderSummary({ 
   items, 
   subtotal, 
-  tax, 
-  total, 
   paymentMethod = "",
   step = "",
   shippingAddress,
@@ -60,20 +56,44 @@ export default function OrderSummary({
 }: OrderSummaryProps) {
   const cart = useCartStore()
   
-  const shippingCost = cart.totals.shippingCost || cart.shippingCost
-  const discount = cart.totals.discount || cart.discount
+  // Get values from cart store
+  const shippingCost = cart.totals.shippingCost || cart.shippingCost || 0
+  const discount = cart.totals.discount || cart.discount || 0
   const promoCode = cart.promoCode
   const promoValid = cart.promoValid
+  const taxRate = cart.taxRate || 0.16
+  
+  // IMPORTANT: Calculate taxable and tax-exempt subtotals directly from items
+  // This ensures the calculation is correct and matches what's displayed
+  let taxableTotal = 0
+  let taxExemptTotal = 0
+  
+  for (const item of items) {
+    const itemTotal = item.price * item.qty
+    if (item.isTaxExempt === true) {
+      taxExemptTotal += itemTotal
+    } else {
+      taxableTotal += itemTotal
+    }
+  }
+  
+  // Calculate tax ONLY on taxable items
+  const calculatedTax = taxableTotal * taxRate
+  const hasTaxExemptItems = taxExemptTotal > 0
+  const hasTaxableItems = taxableTotal > 0
+  
+  // Calculate total
+  const calculatedTotal = taxableTotal + taxExemptTotal + shippingCost + calculatedTax - discount
 
   const getDisplayEmail = () => {
-    if (!isGuest) return 'Your account email';
-    return guestEmail || 'Add guest email';
-  };
+    if (!isGuest) return 'Your account email'
+    return guestEmail || 'Add guest email'
+  }
 
   const getDisplayPhone = () => {
-    if (!isGuest) return 'Your account phone';
-    return guestPhone || 'Add guest phone';
-  };
+    if (!isGuest) return 'Your account phone'
+    return guestPhone || 'Add guest phone'
+  }
 
   const formatAddress = () => {
     const parts = [
@@ -82,12 +102,12 @@ export default function OrderSummary({
       shippingAddress.city,
       shippingAddress.state,
       `${shippingAddress.zip} ${shippingAddress.country}`
-    ].filter(Boolean).join(', ');
-    return parts || 'Address not complete';
-  };
+    ].filter(Boolean).join(', ')
+    return parts || 'Address not complete'
+  }
 
-  const paymentInfo = paymentMethod ? getPaymentMethodInfo(paymentMethod) : null;
-  const PaymentIcon = paymentInfo?.icon || Truck;
+  const paymentInfo = paymentMethod ? getPaymentMethodInfo(paymentMethod) : null
+  const PaymentIcon = paymentInfo?.icon || Truck
 
   return (
     <div className="sticky top-24 bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-lg overflow-hidden">
@@ -115,6 +135,7 @@ export default function OrderSummary({
                     {item.qty}
                   </div>
                 </div>
+
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-gray-900 dark:text-white text-sm leading-tight line-clamp-2">
@@ -126,6 +147,12 @@ export default function OrderSummary({
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {formatCurrency(item.price)} each × {item.qty}
                 </p>
+                {item.isTaxExempt && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] text-green-600 dark:text-green-400 mt-0.5">
+                    <Tag className="w-2.5 h-2.5" />
+                    Tax exempt
+                  </span>
+                )}
               </div>
             </div>
           ))}
@@ -144,23 +171,30 @@ export default function OrderSummary({
             <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
           </div>
           
+          {/* Tax Breakdown - Show ONLY when there are tax-exempt items */}
+          {hasTaxExemptItems && (
+            <div className="space-y-1 pl-2 border-l-2 border-green-500">
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>Taxable items</span>
+                <span>{formatCurrency(taxableTotal)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-green-600 dark:text-green-400">
+                <span>Tax-exempt items</span>
+                <span>{formatCurrency(taxExemptTotal)}</span>
+              </div>
+            </div>
+          )}
+          
           <div className="flex justify-between items-center text-sm p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl">
             <span className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
               <Truck className="w-4 h-4" />
               Shipping
             </span>
             <span className={`font-semibold ${shippingCost === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-white'}`}>
-              {shippingCost === 0 ? (
-                <>
-                  FREE <Gift className="w-3 h-3 inline -mt-0.5" />
-                </>
-              ) : (
-                formatCurrency(shippingCost)
-              )}
+              {shippingCost === 0 ? 'FREE' : formatCurrency(shippingCost)}
             </span>
           </div>
 
-          {/* Promo code display section */}
           {promoValid && discount > 0 && (
             <div className="flex justify-between items-center text-sm p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-xl border border-green-200 dark:border-green-800">
               <div className="flex items-center gap-2">
@@ -177,28 +211,43 @@ export default function OrderSummary({
             </div>
           )}
 
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600 dark:text-gray-400">Tax (VAT)</span>
-            <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(tax)}</span>
-          </div>
+          {/* Tax Display - Show only when there are taxable items */}
+          {hasTaxableItems && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">
+                Tax ({(taxRate * 100).toFixed(0)}% VAT)
+                {hasTaxExemptItems && <span className="text-xs text-gray-400 ml-1">on taxable items</span>}
+              </span>
+              <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(calculatedTax)}</span>
+            </div>
+          )}
+
+          {/* Show tax-exempt note when all items are tax-exempt */}
+          {!hasTaxableItems && hasTaxExemptItems && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Tax ({(taxRate * 100).toFixed(0)}% VAT)</span>
+              <span className="font-semibold text-green-600 dark:text-green-400">Ksh 0.00 (Exempt)</span>
+            </div>
+          )}
 
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-3 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-800/50 p-4 rounded-xl">
             <div className="flex justify-between items-end">
               <span className="text-xl font-bold text-gray-900 dark:text-white">Total</span>
               <div className="text-right">
                 <span className="text-3xl font-black bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 bg-clip-text text-transparent tracking-tight">
-                  {formatCurrency(total)}
+                  {formatCurrency(calculatedTotal)}
                 </span>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">incl. VAT</p>
+               
               </div>
             </div>
           </div>
 
+
           {/* Payment Method Display */}
           {step === "payment" && paymentMethod && (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className={`flex items-center justify-between p-3 bg-gradient-to-r from-${paymentInfo?.color}-50 to-${paymentInfo?.color}-100 dark:from-${paymentInfo?.color}-950/30 dark:to-${paymentInfo?.color}-900/20 rounded-xl`}>
-                <span className={`text-sm font-medium text-${paymentInfo?.color}-800 dark:text-${paymentInfo?.color}-300 flex items-center gap-2`}>
+              <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl">
+                <span className="text-sm font-medium text-blue-800 dark:text-blue-300 flex items-center gap-2">
                   <PaymentIcon className="w-4 h-4" />
                   {paymentInfo?.label}
                 </span>

@@ -34,6 +34,7 @@ import paymentRoutes from './routes/payment.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import supplierRoutes from './routes/supplier.routes';
 import profitRoutes from './routes/profit.routes';
+import mpesaRoutes from './routes/mpesa.routes';
 
 
 dotenv.config();
@@ -111,6 +112,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/profits', profitRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/mpesa', mpesaRoutes);
 app.use('/', healthzRoutes);
 
 

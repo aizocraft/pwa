@@ -28,7 +28,6 @@ interface CartTotals {
 }
 
 interface CartState {
-  // State
   items: CartItem[];
   totalItems: number;
   subtotal: number;
@@ -47,7 +46,6 @@ interface CartState {
   loading: boolean;
   isHydrated: boolean;
   
-  // Actions
   addItem: (product: Product, qty?: number, onSuccess?: () => void) => Promise<void>;
   updateQty: (id: string, qty: number) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
@@ -65,7 +63,6 @@ interface CartState {
   hydrateFromStorage: () => Promise<void>;
 }
 
-// Helper: Calculate shipping cost
 const calculateShippingCost = (selectedArea: ShippingArea | undefined, subtotal: number): number => {
   if (!selectedArea) return 0;
   const freeThreshold = selectedArea.freeThreshold || 0;
@@ -73,7 +70,6 @@ const calculateShippingCost = (selectedArea: ShippingArea | undefined, subtotal:
   return qualifiesForFree ? 0 : (selectedArea.baseCost || 0);
 };
 
-// Helper: Check if product category is tax-exempt
 const isProductTaxExempt = (category: string | undefined, taxExemptCategories: string[]): boolean => {
   if (!category || !taxExemptCategories.length) return false;
   return taxExemptCategories.some(exemptCat => 
@@ -81,13 +77,11 @@ const isProductTaxExempt = (category: string | undefined, taxExemptCategories: s
   );
 };
 
-// Global hydration lock
 let hydrationPromise: Promise<void> | null = null;
 
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
-      // Initial state
       items: [],
       totalItems: 0,
       subtotal: 0,
@@ -120,22 +114,19 @@ export const useCartStore = create<CartState>()(
           const settings = await getCompanySettings();
           const taxRate = settings?.taxRate ?? 0.16;
           const taxExemptCategories = settings?.taxExemptCategories ?? [];
-          
           set({ taxRate, taxExemptCategories });
           
-          // Update tax-exempt flags for all items
           const currentItems = get().items;
           if (currentItems.length > 0) {
             const updatedItems = currentItems.map(item => ({
               ...item,
               isTaxExempt: isProductTaxExempt(item.category, taxExemptCategories)
             }));
-            
             set({ items: updatedItems });
             await get().recalculateTotals();
           }
         } catch (error) {
-          console.warn('Failed to load tax settings, using defaults:', error);
+          console.warn('Failed to load tax settings:', error);
         }
       },
 
@@ -331,13 +322,12 @@ export const useCartStore = create<CartState>()(
           return;
         }
 
-        // Calculate taxable and tax-exempt subtotals
         let taxableSubtotal = 0;
         let taxExemptSubtotal = 0;
         
         for (const item of state.items) {
           const itemTotal = item.price * item.qty;
-          if (item.isTaxExempt) {
+          if (item.isTaxExempt === true) {
             taxExemptSubtotal += itemTotal;
           } else {
             taxableSubtotal += itemTotal;
@@ -346,26 +336,16 @@ export const useCartStore = create<CartState>()(
         
         const selectedArea = state.shippingAreas.find(area => area._id === state.selectedShippingAreaId);
         const shippingCost = calculateShippingCost(selectedArea, state.subtotal);
-        
-        // Calculate tax ONLY on taxable items
         const tax = taxableSubtotal * state.taxRate;
         const discount = state.promoValid ? state.discount : 0;
         const total = taxableSubtotal + taxExemptSubtotal + shippingCost + tax - discount;
-        
-        const newTotals = {
-          subtotal: state.subtotal,
-          shippingCost,
-          discount,
-          tax,
-          total
-        };
         
         set({
           shippingCost,
           discount,
           taxableSubtotal,
           taxExemptSubtotal,
-          totals: newTotals
+          totals: { subtotal: state.subtotal, shippingCost, discount, tax, total }
         });
       },
 
@@ -396,15 +376,11 @@ export const useCartStore = create<CartState>()(
       },
 
       async loadInitialData() {
-        if (get().isHydrated) {
-          return;
-        }
-
+        if (get().isHydrated) return;
         if (hydrationPromise) {
           await hydrationPromise;
           return;
         }
-
         hydrationPromise = this.hydrateFromStorage();
         await hydrationPromise;
         hydrationPromise = null;
@@ -415,101 +391,73 @@ export const useCartStore = create<CartState>()(
         
         try {
           const ls = localStorage.getItem('cart-storage');
-          if (ls) {
-            storedData = JSON.parse(ls);
-          }
-        } catch (e) {
-          console.warn('Error reading localStorage:', e);
-        }
+          if (ls) storedData = JSON.parse(ls);
+        } catch (e) {}
         
         if (!storedData) {
           try {
             const ss = sessionStorage.getItem('cart-session');
-            if (ss) {
-              storedData = JSON.parse(ss);
-            }
-          } catch (e) {
-            console.warn('Error reading sessionStorage:', e);
-          }
+            if (ss) storedData = JSON.parse(ss);
+          } catch (e) {}
         }
         
         if (!storedData) {
           try {
             const cookies = document.cookie.split('; ').find(row => row.startsWith('cartData='));
-            if (cookies) {
-              storedData = JSON.parse(decodeURIComponent(cookies.split('=')[1]));
-            }
-          } catch (e) {
-            console.warn('Error reading cookies:', e);
-          }
+            if (cookies) storedData = JSON.parse(decodeURIComponent(cookies.split('=')[1]));
+          } catch (e) {}
         }
         
         await get().loadTaxSettings();
+        const { taxExemptCategories } = get();
         
-        if (storedData && storedData.timestamp && Date.now() - storedData.timestamp < 24 * 60 * 60 * 1000) {
-          const isValid = storedData.items?.every((item: any) => 
-            item && item.id && typeof item.price === 'number' && typeof item.qty === 'number' && item.qty > 0
-          );
+        if (storedData?.items?.length && storedData.timestamp && Date.now() - storedData.timestamp < 86400000) {
+          const itemsWithFlags = storedData.items.map((item: any) => ({
+            ...item,
+            isTaxExempt: isProductTaxExempt(item.category, taxExemptCategories)
+          }));
           
-          if (isValid) {
-            const { taxExemptCategories } = get();
-            const itemsWithTaxExemptFlag = storedData.items.map((item: any) => ({
-              ...item,
-              isTaxExempt: isProductTaxExempt(item.category, taxExemptCategories)
-            }));
-            
-            const subtotal = itemsWithTaxExemptFlag.reduce((sum: number, item: any) => sum + item.price * item.qty, 0);
-            
-            set({
-              items: itemsWithTaxExemptFlag,
-              subtotal: subtotal,
-              totalItems: itemsWithTaxExemptFlag.reduce((sum: number, item: any) => sum + item.qty, 0),
-              selectedShippingAreaId: storedData.selectedShippingAreaId,
-              promoCode: storedData.promoCode,
-              promoValid: false,
-              discount: 0,
-              promoError: undefined,
-              shippingCost: storedData.shippingCost || 0,
-              totals: storedData.totals || { subtotal: 0, shippingCost: 0, discount: 0, tax: 0, total: 0 },
-              isHydrated: true
-            });
-            
-            await get().loadShippingAreas();
-            
-            if (storedData.promoCode && subtotal > 0) {
-              const { validatePromo } = await import('../lib/api');
-              try {
-                const result = await validatePromo(storedData.promoCode, subtotal);
-                if (result.valid && result.discount !== undefined) {
-                  set({
-                    promoValid: true,
-                    discount: result.discount,
-                    promoError: undefined
-                  });
-                } else {
-                  set({
-                    promoValid: false,
-                    discount: 0,
-                    promoError: result.error || 'Promo code is no longer valid'
-                  });
-                  get().syncToStorage();
-                }
-              } catch (error) {
-                console.warn('Promo validation error:', error);
-              }
-            }
-            
-            await get().recalculateTotals();
-          } else {
-            get().clearCart();
+          const subtotal = itemsWithFlags.reduce((s: number, i: any) => s + i.price * i.qty, 0);
+          
+          let taxable = 0, taxExempt = 0;
+          for (const item of itemsWithFlags) {
+            const total = item.price * item.qty;
+            if (item.isTaxExempt) taxExempt += total;
+            else taxable += total;
           }
+          
+          set({
+            items: itemsWithFlags,
+            subtotal,
+            totalItems: itemsWithFlags.reduce((s: number, i: any) => s + i.qty, 0),
+            selectedShippingAreaId: storedData.selectedShippingAreaId,
+            promoCode: storedData.promoCode,
+            taxableSubtotal: taxable,
+            taxExemptSubtotal: taxExempt,
+            isHydrated: true
+          });
+          
+          await get().loadShippingAreas();
+          
+          if (storedData.promoCode && subtotal > 0) {
+            const { validatePromo } = await import('../lib/api');
+            try {
+              const result = await validatePromo(storedData.promoCode, subtotal);
+              if (result.valid && result.discount) {
+                set({ promoValid: true, discount: result.discount });
+              } else {
+                set({ promoValid: false, discount: 0, promoError: result.error });
+              }
+            } catch (e) {}
+          }
+          
+          await get().recalculateTotals();
         } else {
           await get().loadShippingAreas();
           set({ isHydrated: true });
         }
       }
     }),
-
     {
       name: 'cart-storage',
       partialize: (state) => ({
@@ -523,14 +471,7 @@ export const useCartStore = create<CartState>()(
         totals: state.totals,
         taxableSubtotal: state.taxableSubtotal,
         taxExemptSubtotal: state.taxExemptSubtotal
-      }),
-      onRehydrateStorage: () => {
-        return (state, error) => {
-          if (error) {
-            console.error('Error rehydrating cart storage:', error);
-          }
-        };
-      }
+      })
     }
   )
 );

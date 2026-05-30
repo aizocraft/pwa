@@ -1672,5 +1672,50 @@ export async function getProductProfitStats(): Promise<{
   }
 }
 
+// M-PESA API functions
+export async function initiateMpesaPayment(orderId: string, phoneNumber: string): Promise<{
+  success: boolean;
+  checkoutRequestId: string;
+  message: string;
+}> {
+  try {
+    const response = await api.post('/mpesa/stk-push', { orderId, phoneNumber });
+    return response.data;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+export async function checkPaymentStatus(checkoutRequestId: string): Promise<{
+  checkoutRequestId: string;
+  status: string;
+  resultCode?: string;
+  resultDesc?: string;
+  transaction?: any;
+}> {
+  try {
+    const response = await api.post('/mpesa/query', { checkoutRequestId });
+    return response.data;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+export async function getOrderPaymentStatus(orderId: string): Promise<{
+  orderId: string;
+  orderNumber: string;
+  paymentStatus: string;
+  orderStatus: string;
+  total: number;
+  transaction?: any;
+}> {
+  try {
+    const response = await api.get(`/mpesa/payment-status/${orderId}`);
+    return response.data;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
 // Export the api instance
 export default api;

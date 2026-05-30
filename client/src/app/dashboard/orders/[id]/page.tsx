@@ -106,7 +106,7 @@ const InvoiceTemplate = ({ order, settings, logoUrl, isPaid }: { order: Order; s
   const companyPhone = settings?.phone || "";
   const companyEmail = settings?.email || "";
   const slogan = settings?.slogan || "";
-  const subtotal = order.subtotal || order.items.reduce((sum: number, item: any) => sum + (item.price * item.qty), 0);
+  const subtotal = order.subtotal || order.items.reduce((sum: number, item: any) => sum + (item.sellingPrice * item.qty), 0);
   const shippingCost = order.shippingCost || 0;
   const tax = order.tax || 0;
   const total = order.total || subtotal + shippingCost + tax;
@@ -235,8 +235,8 @@ const InvoiceTemplate = ({ order, settings, logoUrl, isPaid }: { order: Order; s
                   <div style={{ fontSize: "7pt", color: "#888" }}>{item.slug || 'N/A'}</div>
                  </td>
                 <td style={{ padding: "6px 6px", textAlign: "center" }}>{item.qty}</td>
-                <td style={{ padding: "6px 6px", textAlign: "right" }}>Ksh {item.price.toLocaleString()}</td>
-                <td style={{ padding: "6px 6px", textAlign: "right", fontWeight: "bold" }}>Ksh {(item.price * item.qty).toLocaleString()}</td>
+                <td style={{ padding: "6px 6px", textAlign: "right" }}>Ksh {item.sellingPrice.toLocaleString()}</td>
+                <td style={{ padding: "6px 6px", textAlign: "right", fontWeight: "bold" }}>Ksh {(item.sellingPrice * item.qty).toLocaleString()}</td>
                </tr>
             ))}
           </tbody>
@@ -369,8 +369,8 @@ const InvoiceTemplate = ({ order, settings, logoUrl, isPaid }: { order: Order; s
                     <div style={{ fontSize: "7pt", color: "#888" }}>{item.slug || 'N/A'}</div>
                    </td>
                   <td style={{ padding: "6px 6px", textAlign: "center" }}>{item.qty}</td>
-                  <td style={{ padding: "6px 6px", textAlign: "right" }}>Ksh {item.price.toLocaleString()}</td>
-                  <td style={{ padding: "6px 6px", textAlign: "right", fontWeight: "bold" }}>Ksh {(item.price * item.qty).toLocaleString()}</td>
+                  <td style={{ padding: "6px 6px", textAlign: "right" }}>Ksh {item.sellingPrice.toLocaleString()}</td>
+                  <td style={{ padding: "6px 6px", textAlign: "right", fontWeight: "bold" }}>Ksh {(item.sellingPrice * item.qty).toLocaleString()}</td>
                  </tr>
               ))}
             </tbody>
@@ -674,14 +674,14 @@ export default function AdminOrderDetails() {
                               </p>
                             )}
                             <div className="flex items-center justify-center sm:justify-start gap-2 text-xs sm:text-sm mt-1">
-                              <span className="text-gray-600 dark:text-gray-300">Ksh {item.price.toLocaleString()}</span>
+                              <span className="text-gray-600 dark:text-gray-300">Ksh {item.sellingPrice.toLocaleString()}</span>
                               <span className="text-gray-400">×</span>
                               <span className="font-semibold text-gray-900 dark:text-white">{item.qty}</span>
                             </div>
                           </div>
                           <div className="text-center sm:text-right mt-2 sm:mt-0">
                             <div className="text-base sm:text-lg font-black text-gray-900 dark:text-white">
-                              Ksh {(item.price * item.qty).toLocaleString()}
+                              Ksh {(item.sellingPrice * item.qty).toLocaleString()}
                             </div>
                             <Link 
                               href={`/products/${item.slug}`}

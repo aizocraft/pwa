@@ -1,12 +1,14 @@
+// src/app/checkout/page.tsx
 'use client'
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPin, CreditCard, CheckCircle, ArrowRight, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useCartStore } from "../../store/cart"
 import { formatCurrency } from "../../lib/utils"
-import { createOrder } from "../../lib/api"
+import { createOrder, initiateMpesaPayment, checkPaymentStatus } from "../../lib/api"
 import { getToken } from "../../lib/auth"
 import toast from "react-hot-toast"
 
@@ -21,6 +23,7 @@ import CardPayment from "./components/CardPayment"
 type PaymentMethod = "cash" | "mpesa" | "bank_transfer" | "card"
 
 export default function CheckoutPage() {
+  const router = useRouter()
   const cart = useCartStore()
   const { items, subtotal, shippingCost, discount, totals, clearCart } = cart
   const [loading, setLoading] = useState(false)
@@ -54,12 +57,12 @@ export default function CheckoutPage() {
   const [guestEmail, setGuestEmail] = useState("")
   const [guestPhone, setGuestPhone] = useState("")
   
-  // M-PESA state
+  // M-PESA state - Real integration
   const [mpesaPhone, setMpesaPhone] = useState("")
-  const [mpesaCode, setMpesaCode] = useState("")
-  const [mpesaStep, setMpesaStep] = useState<"request" | "verify" | "processing">("request")
+  const [mpesaStep, setMpesaStep] = useState<"idle" | "processing" | "pending" | "completed" | "failed">("idle")
   const [mpesaError, setMpesaError] = useState("")
-  const [countdown, setCountdown] = useState(60)
+  const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null)
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null)
   
   // Card payment state
   const [cardNumber, setCardNumber] = useState("")
@@ -110,66 +113,90 @@ export default function CheckoutPage() {
     return !!(guestEmail && guestPhone && guestEmail.includes("@"))
   }
 
-  // Handle M-PESA request
-  const handleMpesaRequest = () => {
-    if (!mpesaPhone || mpesaPhone.length < 10) {
-      setMpesaError("Please enter a valid phone number (e.g., 254700000000)")
-      return
-    }
-    
-    if (isSubmitting) return
-    
-    setMpesaError("")
-    setMpesaStep("processing")
-    
-    setTimeout(() => {
-      setMpesaStep("verify")
-      let timer = 60
-      const interval = setInterval(() => {
-        timer--
-        setCountdown(timer)
-        if (timer <= 0) {
-          clearInterval(interval)
-          setMpesaError("Code expired. Please request again.")
-          setMpesaStep("request")
-        }
-      }, 1000)
-      return () => clearInterval(interval)
-    }, 1500)
-  }
-
-  // Handle M-PESA verify
-  const handleMpesaVerify = async () => {
-    if (!mpesaCode || mpesaCode.length < 4) {
-      setMpesaError("Please enter the 4-digit verification code")
-      return
-    }
-    setMpesaError("")
-    
-    if (isSubmitting || loading) return
-    
-    setIsSubmitting(true)
-    setLoading(true)
-    
-    setTimeout(async () => {
-      if (mpesaCode.length === 4 && /^\d+$/.test(mpesaCode)) {
-        await handlePlaceOrder()
-      } else {
-        setMpesaError("Invalid verification code. Please try again.")
-        setIsSubmitting(false)
-        setLoading(false)
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval)
       }
-    }, 1500)
+    }
+  }, [pollingInterval])
+
+  // Start polling for M-PESA payment status
+  const startPolling = (requestId: string) => {
+    let attempts = 0
+    const maxAttempts = 30 // Poll for 30 times (90 seconds)
+    
+    const interval = setInterval(async () => {
+      attempts++
+      try {
+        const result = await checkPaymentStatus(requestId)
+        
+        if (result.status === 'completed') {
+          clearInterval(interval)
+          setPollingInterval(null)
+          setMpesaStep("completed")
+          toast.success('Payment successful!')
+          
+          // Clear cart and redirect to success
+          cart.clearCart()
+          setOrderSuccess(true)
+        } else if (result.status === 'failed' || attempts >= maxAttempts) {
+          clearInterval(interval)
+          setPollingInterval(null)
+          setMpesaStep("failed")
+          setMpesaError(result.resultDesc || 'Payment failed or timed out')
+          toast.error('Payment failed. Please try again.')
+        }
+      } catch (error) {
+        console.error('Polling error:', error)
+        if (attempts >= maxAttempts) {
+          clearInterval(interval)
+          setPollingInterval(null)
+          setMpesaStep("failed")
+          toast.error('Payment status check timed out')
+        }
+      }
+    }, 3000) // Poll every 3 seconds
+    
+    setPollingInterval(interval)
   }
 
-  // Handle card payment (coming soon)
-  const handleCardPayment = async () => {
-    setCardError("Card payments are coming soon. Please use Cash, M-PESA, or Bank Transfer.")
-    return
+  // Handle M-PESA payment initiation
+  const handleMpesaPayment = async () => {
+    if (!mpesaPhone || mpesaPhone.length < 10) {
+      setMpesaError("Please enter a valid phone number (e.g., 0712345678)")
+      return
+    }
+
+    if (!orderId) {
+      // First create the order
+      await handlePlaceOrder(true) // Pass flag to not clear cart yet
+      return
+    }
+
+    setMpesaStep("processing")
+    setMpesaError("")
+    
+    try {
+      const response = await initiateMpesaPayment(orderId, mpesaPhone)
+      setCheckoutRequestId(response.checkoutRequestId)
+      setMpesaStep("pending")
+      toast.success(response.message || 'STK Push sent! Check your phone.')
+      
+      // Start polling for payment status
+      startPolling(response.checkoutRequestId)
+    } catch (error: any) {
+      console.error('M-PESA initiation error:', error)
+      const errorMsg = error.response?.data?.error || 'Failed to initiate payment'
+      setMpesaError(errorMsg)
+      setMpesaStep("failed")
+      toast.error(errorMsg)
+    }
   }
 
-  // Handle place order for all payment methods
-  const handlePlaceOrder = async () => {
+  // Handle place order for non-MPESA methods
+  const handlePlaceOrder = async (skipCartClear: boolean = false) => {
     if (isSubmitting || loading) {
       toast.error('Please wait, order is already being processed...')
       return
@@ -238,43 +265,54 @@ export default function CheckoutPage() {
 
       setOrderId(newOrderId)
 
-      if (isGuestUser) {
-        const guestOrders = JSON.parse(localStorage.getItem("guest_orders") || "[]")
-        guestOrders.push({
-          ...response,
-          _id: newOrderId,
-          orderNumber: response.orderNumber || `ORD-${newOrderId.slice(-8).toUpperCase()}`,
-          subtotal,
-          shippingCost,
-          tax: calculatedTax,
-          total: totals.total
-        })
-        localStorage.setItem("guest_orders", JSON.stringify(guestOrders))
+      // For MPESA, don't clear cart yet - wait for payment confirmation
+      if (!skipCartClear && paymentMethod !== 'mpesa') {
+        cart.clearCart()
+        setOrderSuccess(true)
       }
 
-      cart.clearCart()
-      setOrderSuccess(true)
+      // For non-MPESA methods, clear cart and show success
+      if (paymentMethod !== 'mpesa') {
+        if (isGuestUser) {
+          const guestOrders = JSON.parse(localStorage.getItem("guest_orders") || "[]")
+          guestOrders.push({
+            ...response,
+            _id: newOrderId,
+            orderNumber: response.orderNumber || `ORD-${newOrderId.slice(-8).toUpperCase()}`,
+            subtotal,
+            shippingCost,
+            tax: calculatedTax,
+            total: totals.total
+          })
+          localStorage.setItem("guest_orders", JSON.stringify(guestOrders))
+        }
+        cart.clearCart()
+        setOrderSuccess(true)
+      }
       
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message || "Order failed"
-      
-      if (paymentMethod === "mpesa") {
-        setMpesaError(msg)
-      } else if (paymentMethod === "card") {
-        setCardError(msg)
-      }
-      
       toast.error(msg)
       setIsSubmitting(false)
       setLoading(false)
+      throw error
     }
   }
 
+  // Handle cash/bank transfer order
+  const handleCashOrder = async () => {
+    await handlePlaceOrder(false)
+  }
+
   const resetMpesa = () => {
-    setMpesaStep("request")
-    setMpesaCode("")
+    if (pollingInterval) {
+      clearInterval(pollingInterval)
+      setPollingInterval(null)
+    }
+    setMpesaStep("idle")
+    setMpesaPhone("")
     setMpesaError("")
-    setCountdown(60)
+    setCheckoutRequestId(null)
   }
 
   const clearSavedData = () => {
@@ -301,8 +339,11 @@ export default function CheckoutPage() {
       if (submitTimeout) {
         clearTimeout(submitTimeout)
       }
+      if (pollingInterval) {
+        clearInterval(pollingInterval)
+      }
     }
-  }, [submitTimeout])
+  }, [submitTimeout, pollingInterval])
 
   if (orderSuccess) return <OrderSuccess orderId={orderId} />
   if (items.length === 0) return <EmptyCart />
@@ -431,33 +472,26 @@ export default function CheckoutPage() {
                         <MpesaPayment
                           mpesaPhone={mpesaPhone}
                           setMpesaPhone={setMpesaPhone}
-                          mpesaCode={mpesaCode}
-                          setMpesaCode={setMpesaCode}
                           mpesaStep={mpesaStep}
                           mpesaError={mpesaError}
-                          countdown={countdown}
-                          loading={loading}
-                          onRequest={handleMpesaRequest}
-                          onVerify={handleMpesaVerify}
+                          loading={loading || isSubmitting}
+                          onRequest={handleMpesaPayment}
                           onReset={resetMpesa}
                           paymentMethod={paymentMethod}
                           total={total}
+                          orderId={orderId}
                         />
                       )}
 
                       {paymentMethod === "cash" && (
                         <MpesaPayment
-                          mpesaPhone={mpesaPhone}
-                          setMpesaPhone={setMpesaPhone}
-                          mpesaCode={mpesaCode}
-                          setMpesaCode={setMpesaCode}
-                          mpesaStep={mpesaStep}
-                          mpesaError={mpesaError}
-                          countdown={countdown}
+                          mpesaPhone=""
+                          setMpesaPhone={() => {}}
+                          mpesaStep="idle"
+                          mpesaError=""
                           loading={loading}
-                          onRequest={handlePlaceOrder}
-                          onVerify={handleMpesaVerify}
-                          onReset={resetMpesa}
+                          onRequest={handleCashOrder}
+                          onReset={() => {}}
                           paymentMethod={paymentMethod}
                           total={total}
                         />
@@ -465,17 +499,13 @@ export default function CheckoutPage() {
 
                       {paymentMethod === "bank_transfer" && (
                         <MpesaPayment
-                          mpesaPhone={mpesaPhone}
-                          setMpesaPhone={setMpesaPhone}
-                          mpesaCode={mpesaCode}
-                          setMpesaCode={setMpesaCode}
-                          mpesaStep={mpesaStep}
-                          mpesaError={mpesaError}
-                          countdown={countdown}
+                          mpesaPhone=""
+                          setMpesaPhone={() => {}}
+                          mpesaStep="idle"
+                          mpesaError=""
                           loading={loading}
-                          onRequest={handlePlaceOrder}
-                          onVerify={handleMpesaVerify}
-                          onReset={resetMpesa}
+                          onRequest={handleCashOrder}
+                          onReset={() => {}}
                           paymentMethod={paymentMethod}
                           total={total}
                         />
@@ -494,7 +524,7 @@ export default function CheckoutPage() {
                           cardError={cardError}
                           loading={loading}
                           total={total}
-                          onPay={handleCardPayment}
+                          onPay={() => toast.error("Card payments coming soon")}
                         />
                       )}
 
