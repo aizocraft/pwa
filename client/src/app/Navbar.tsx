@@ -84,7 +84,7 @@ export default function Navbar() {
     { href: '/solar-water-heaters', label: 'Solar Water Heaters', icon: Thermometer, description: 'Efficient water heating' },
     { href: '/solar-water-pumps', label: 'Solar Water Pumps', icon: Droplets, description: 'Solar-powered pumping' },
     { href: '/solar-backup-systems', label: 'Solar Backup Systems', icon: Battery, description: 'Reliable power backup' },
-    { href: '/solar-hybrid-systems', label: 'Hybrid Solar Systems', icon: SunIcon, description: 'Integrated power solutions' },
+   
   ]
 
   // Borehole Services Dropdown
@@ -94,7 +94,7 @@ export default function Navbar() {
     { href: '/borehole-drilling', label: 'Borehole Drilling', icon: BoreholeIcon, description: 'Professional drilling services' },
     { href: '/submersible-pumps', label: 'Submersible & Booster Pumps', icon: GitBranch, description: 'Pump installation & maintenance' },
     { href: '/borehole-rehabilitation', label: 'Borehole Rehabilitation', icon: Wrench, description: 'Restore & optimize boreholes' },
-    { href: '/geo-membrane-ponds', label: 'Geo-Membrane Ponds', icon: Waves, description: 'Water storage solutions' },
+    { href: '/water-towers', label: 'Water Towers', icon: Waves, description: 'Water storage solutions' },
   ]
 
   // Water Tower Solutions Dropdown
@@ -325,46 +325,6 @@ export default function Navbar() {
 </div>
 
 
-{/* Water Tower Solutions Dropdown - Desktop */}
-<div className="relative group/dropdown">
-  <button
-    className={`flex items-center gap-1.5 px-3 xl:px-4 h-10 rounded-xl text-sm xl:text-base font-medium transition-all duration-200 group whitespace-nowrap ${
-      waterTowerSolutions.some(s => pathname === s.href) || pathname === waterTowerHub
-        ? 'text-[#0043b3] dark:text-[#009dff]'
-        : 'text-gray-700 dark:text-gray-300 hover:text-[#0043b3] dark:hover:text-[#009dff]'
-    }`}
-  >
-    <span className="leading-none whitespace-nowrap">Water Towers</span>
-    <ChevronDown className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" />
-  </button>
-
-  <div className="absolute top-full left-0 mt-2 w-64 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 transform -translate-y-2 group-hover/dropdown:translate-y-0 z-50">
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <div className="py-2">
-        {waterTowerSolutions.map((tower) => (
-          <Link
-            key={tower.href}
-            href={tower.href}
-            className="flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-blue-50 dark:hover:bg-blue-950/30 group/item"
-          >
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover/item:text-[#0043b3] dark:group-hover/item:text-[#009dff] transition-colors">
-              {tower.label}
-            </span>
-            <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover/item:opacity-100 group-hover/item:translate-x-1 transition-all duration-200" />
-          </Link>
-        ))}
-        <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-        <Link
-          href={waterTowerHub}
-          className="flex items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-[#0043b3] dark:text-[#009dff] hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all duration-200 group/link"
-        >
-          <span>View All Towers</span>
-          <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover/link:translate-x-1" />
-        </Link>
-      </div>
-    </div>
-  </div>
-</div>
 
 
               {rightNavLinks.map(({ href, label }) => (
@@ -625,82 +585,96 @@ export default function Navbar() {
         </div>
       </div>
       
-      {/* Borehole Services Mobile Section - Clean Design */}
-      <div className="mt-1">
-        <button
-          onClick={() => toggleMobileDropdown('borehole')}
-          className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-        >
-          <span>Borehole Services</span>
-          <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${activeMobileDropdown === 'borehole' ? 'rotate-180' : ''}`} />
-        </button>
-        
-        <div className={`overflow-hidden transition-all duration-300 ${
-          activeMobileDropdown === 'borehole' ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
-        }`}>
-          <div className="ml-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-1 mt-1">
-            {boreholeServices.map((service) => (
-              <Link
-                key={service.href}
-                href={service.href}
-                className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <span className="font-medium">{service.label}</span>
-                <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
-              </Link>
-            ))}
-            <Link
-              href={boreholeHub}
-              className="flex items-center justify-between gap-2 mt-3 mx-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#000063] to-[#0043b3] text-white text-sm font-semibold transition-all duration-200 hover:shadow-lg group"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              <span>View All Services</span>
-              <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
-            </Link>
-          </div>
-        </div>
-      </div>
+{/* Borehole Services Mobile Section - Clean Design */}
+<div className="mt-1">
+  <button
+    onClick={() => toggleMobileDropdown('borehole')}
+    className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+  >
+    <span>Borehole Services</span>
+    <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${activeMobileDropdown === 'borehole' ? 'rotate-180' : ''}`} />
+  </button>
+  
+  <div className={`overflow-hidden transition-all duration-300 ${
+    activeMobileDropdown === 'borehole' ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'
+  }`}>
+    <div className="ml-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-1 mt-1">
+      {/* Hydro-Geological Survey */}
+      <Link
+        href="/hydro-geological-survey"
+        className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
+        onClick={() => setIsMenuOpen(false)}
+      >
+        <span className="font-medium">Hydro-Geological Survey</span>
+        <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+      </Link>
+      
+      {/* Environmental Impact Assessment */}
+      <Link
+        href="/environmental-impact-assessment"
+        className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
+        onClick={() => setIsMenuOpen(false)}
+      >
+        <span className="font-medium">Environmental Impact Assessment</span>
+        <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+      </Link>
+      
+      {/* Borehole Drilling */}
+      <Link
+        href="/borehole-drilling"
+        className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
+        onClick={() => setIsMenuOpen(false)}
+      >
+        <span className="font-medium">Borehole Drilling</span>
+        <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+      </Link>
+      
+      {/* Submersible & Booster Pumps */}
+      <Link
+        href="/submersible-pumps"
+        className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
+        onClick={() => setIsMenuOpen(false)}
+      >
+        <span className="font-medium">Submersible & Booster Pumps</span>
+        <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+      </Link>
+      
+      {/* Borehole Rehabilitation */}
+      <Link
+        href="/borehole-rehabilitation"
+        className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
+        onClick={() => setIsMenuOpen(false)}
+      >
+        <span className="font-medium">Borehole Rehabilitation</span>
+        <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+      </Link>
+      
+      {/* Water Towers - Placed after Borehole Rehabilitation */}
+      <Link
+        href="/water-towers"
+        className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
+        onClick={() => setIsMenuOpen(false)}
+      >
+        <span className="font-medium">Water Towers</span>
+        <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+      </Link>
+      
+      {/* View All Services Button */}
+      <Link
+        href={boreholeHub}
+        className="flex items-center justify-between gap-2 mt-3 mx-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#000063] to-[#0043b3] text-white text-sm font-semibold transition-all duration-200 hover:shadow-lg group"
+        onClick={() => setIsMenuOpen(false)}
+      >
+        <span>View All Services</span>
+        <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+      </Link>
+    </div>
+  </div>
+</div>
 
     
 
-      {/* Water Towers Mobile Section - Clean Design */}
-      <div>
-        <button
-          onClick={() => toggleMobileDropdown('watertower')}
-          className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-        >
-          <span>Water Towers</span>
-          <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${activeMobileDropdown === 'watertower' ? 'rotate-180' : ''}`} />
-        </button>
-        
-        <div className={`overflow-hidden transition-all duration-300 ${
-          activeMobileDropdown === 'watertower' ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'
-        }`}>
-          <div className="ml-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-1 mt-1">
-            {waterTowerSolutions.map((tower) => (
-              <Link
-                key={tower.href}
-                href={tower.href}
-                className="flex items-center justify-between px-4 py-3 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-[#0043b3] dark:hover:text-[#009dff] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 group"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <span className="font-medium">{tower.label}</span>
-                <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
-              </Link>
-            ))}
-            <Link
-              href={waterTowerHub}
-              className="flex items-center justify-between gap-2 mt-3 mx-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#000063] to-[#0043b3] text-white text-sm font-semibold transition-all duration-200 hover:shadow-lg group"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              <span>View All Towers</span>
-              <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
-            </Link>
-          </div>
-        </div>
-      </div>
-
+     
       {/* Projects and Contact for Mobile */}
       {rightNavLinks.map(({ href, label, icon: Icon }) => (
         <Link

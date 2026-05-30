@@ -203,7 +203,8 @@ export default function ShippingAreas({ areas, onUpdateAreas }: ShippingAreasPro
               <label className="block text-sm font-medium mb-2">Base Cost (KES) *</label>
               <input
                 type="number"
-                step="0.01"
+                min="0"
+                step="10"
                 value={editingArea?.baseCost || newArea.baseCost || ''}
                 onChange={(e) => {
                   const val = Number(e.target.value)

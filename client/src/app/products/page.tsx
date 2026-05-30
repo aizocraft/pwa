@@ -118,7 +118,7 @@ export default function ProductsPage() {
     
     if (search.trim()) params.q = search.trim()
     if (selectedCategory !== "all") params.category = selectedCategory
-    if (selectedBrand !== "all" && selectedBrand !== "") params.brand = selectedBrand  // FIXED: Ensure brand is sent correctly
+    if (selectedBrand !== "all" && selectedBrand !== "") params.brand = selectedBrand
     if (minPrice > 0 && !isNaN(minPrice)) params.minPrice = minPrice
     if (maxPrice < priceRange.max && !isNaN(maxPrice)) params.maxPrice = maxPrice
     if (showInStockOnly) params.minStock = 1
@@ -239,7 +239,7 @@ export default function ProductsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+     <div className="w-full px-[40px] py-6 sm:py-8 pt-8 md:pt-12 lg:pt-16">
         
         {/* Compact Filter Bar - Top */}
         <div className="mb-6 space-y-4">
@@ -316,7 +316,7 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            {/* Brand Dropdown - FIXED */}
+            {/* Brand Dropdown*/}
             <div className="relative group">
               <button className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-medium hover:border-blue-500 transition-colors">
                 {selectedBrand === "all" ? "All Brands" : selectedBrand}
@@ -452,7 +452,7 @@ export default function ProductsPage() {
         {/* Products Grid */}
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="animate-pulse">
                 <div className="aspect-[4/3] bg-gray-200 dark:bg-gray-700 rounded-xl mb-3"></div>
@@ -472,7 +472,7 @@ export default function ProductsPage() {
             </button>
           </div>
         ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {displayedProducts.map((product: Product) => (
               <ProductCard key={product._id} product={product} />
             ))}

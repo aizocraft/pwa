@@ -36,6 +36,10 @@ const faqs = [
     q: "Do you offer custom solutions?", 
     a: "Absolutely — every project is tailored for maximum efficiency and value specific to your site and needs. We conduct thorough assessments before proposing any solution." 
   },
+  { 
+  q: "How long does a borehole drilling project take?", 
+  a: "Most borehole drilling projects are completed within a few days, depending on site conditions, depth requirements, and geological factors. Our team conducts a site assessment and provides a clear project timeline before work begins." 
+},
 ];
 
 const feedbackCategories = [
@@ -64,7 +68,6 @@ export default function FAQ() {
   const toggleFAQ = (i: number) => setOpenIdx(openIdx === i ? null : i);
 
   const handleSubmitFeedback = async () => {
-    // Validate
     if (rating === 0) {
       setErrorMessage('Please select a rating');
       return;
@@ -93,7 +96,6 @@ export default function FAQ() {
 
       setStatus('success');
       
-      // Reset form after successful submission
       setTimeout(() => {
         setRating(0);
         setFeedbackText('');
@@ -109,7 +111,6 @@ export default function FAQ() {
       setStatus('error');
       setErrorMessage(error.response?.data?.error || 'Failed to submit feedback. Please try again.');
       
-      // Reset error status after 5 seconds
       setTimeout(() => {
         setStatus('idle');
         setErrorMessage('');
@@ -118,33 +119,34 @@ export default function FAQ() {
   };
 
   return (
-    <section className="py-20 md:py-28 bg-white dark:bg-gray-950 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 dark:bg-cyan-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-3xl" />
-      </div>
-
-      <div className="container mx-auto px-6 lg:px-16 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+    <section className="py-20 md:py-28 bg-white dark:bg-gray-950">
+    <div className="w-full px-4 sm:px-6 lg:px-32">
+        <div className="grid lg:grid-cols-2 gap-12">
           
-          {/* LEFT COLUMN - FAQ */}
+          {/* LEFT COLUMN - FAQ with larger text */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true }}
           >
-            <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-4">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-px bg-cyan-500" />
+              <span className="text-sm font-semibold tracking-[0.2em] uppercase text-cyan-600 dark:text-cyan-400">
+                Got Questions?
+              </span>
+            </div>
+
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-4">
               Frequently Asked{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600">
+              <span className="text-cyan-500 dark:text-cyan-400">
                 Questions
               </span>
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
+            <p className="text-gray-500 dark:text-gray-400 mb-8 text-base leading-relaxed">
               Find quick answers to common questions about our services, process, and how we can help you achieve water security.
             </p>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {faqs.map((f, i) => (
                 <motion.div
                   key={i}
@@ -156,14 +158,14 @@ export default function FAQ() {
                 >
                   <motion.button
                     onClick={() => toggleFAQ(i)}
-                    className={`w-full flex items-center justify-between p-4 text-left transition-all duration-300 ${
+                    className={`w-full flex items-center justify-between p-5 text-left transition-all duration-300 ${
                       openIdx === i
-                        ? 'bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30'
+                        ? 'bg-cyan-50 dark:bg-cyan-950/30'
                         : 'bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800'
                     }`}
                     whileHover={{ x: 4 }}
                   >
-                    <span className={`font-semibold text-sm pr-6 transition-colors duration-300 ${
+                    <span className={`font-semibold text-base md:text-lg pr-6 transition-colors duration-300 ${
                       openIdx === i
                         ? 'text-cyan-700 dark:text-cyan-400'
                         : 'text-gray-900 dark:text-white'
@@ -171,7 +173,7 @@ export default function FAQ() {
                       {f.q}
                     </span>
                     <motion.div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
+                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
                         openIdx === i
                           ? 'bg-gradient-to-r from-cyan-500 to-blue-600'
                           : 'bg-gray-100 dark:bg-gray-800'
@@ -179,9 +181,9 @@ export default function FAQ() {
                       animate={{ rotate: openIdx === i ? 180 : 0 }}
                     >
                       {openIdx === i ? (
-                        <Minus size={13} className="text-white" />
+                        <Minus size={16} className="text-white" />
                       ) : (
-                        <Plus size={13} className="text-gray-600 dark:text-gray-400" />
+                        <Plus size={16} className="text-gray-600 dark:text-gray-400" />
                       )}
                     </motion.div>
                   </motion.button>
@@ -195,7 +197,7 @@ export default function FAQ() {
                         transition={{ duration: 0.3, ease: "easeInOut" }}
                         className="overflow-hidden"
                       >
-                        <div className="px-4 pb-4 pt-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-700 leading-relaxed">
+                        <div className="px-5 pb-5 pt-2 text-base md:text-lg text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-700 leading-relaxed">
                           {f.a}
                         </div>
                       </motion.div>
@@ -205,19 +207,14 @@ export default function FAQ() {
               ))}
             </div>
 
-            {/* Contact Support Link */}
             <motion.a
               href="/contact"
-              className="inline-flex items-center gap-2 mt-6 text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-semibold group"
+              className="inline-flex items-center gap-2 mt-6 text-sm md:text-base text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-semibold group"
               whileHover={{ x: 4 }}
             >
-              <MessageCircle size={14} />
+              <MessageCircle size={16} />
               Still have questions? Contact our support team
-              <motion.span
-                className="inline-block transition-transform group-hover:translate-x-1"
-              >
-                →
-              </motion.span>
+              <motion.span className="inline-block transition-transform group-hover:translate-x-1">→</motion.span>
             </motion.a>
           </motion.div>
 
@@ -225,21 +222,27 @@ export default function FAQ() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true }}
             transition={{ delay: 0.2 }}
           >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-px bg-cyan-500" />
+              <span className="text-sm font-semibold tracking-[0.2em] uppercase text-cyan-600 dark:text-cyan-400">
+                We Value Your Opinion
+              </span>
+            </div>
 
-            <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-4">
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-4">
               Share Your{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600">
+              <span className="text-cyan-500 dark:text-cyan-400">
                 Experience
               </span>
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
+            <p className="text-gray-500 dark:text-gray-400 mb-8 text-base leading-relaxed">
               Help us improve by sharing your feedback. We value every opinion and use it to enhance our services.
             </p>
 
-            <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl p-7 shadow-lg">
+            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 md:p-8 shadow-lg">
               {status === 'success' ? (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -261,13 +264,12 @@ export default function FAQ() {
                 </motion.div>
               ) : (
                 <>
-                 
                   {/* Rating Stars */}
-                  <div className="text-center mb-4">
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                      Rating <span className="text-red-500">*</span>
+                  <div className="text-center mb-6">
+                    <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3">
+                      How would you rate your experience? <span className="text-red-500">*</span>
                     </label>
-                    <div className="flex justify-center gap-2">
+                    <div className="flex justify-center gap-3">
                       {[1, 2, 3, 4, 5].map((s) => (
                         <motion.button
                           key={s}
@@ -279,7 +281,7 @@ export default function FAQ() {
                           onClick={() => setRating(s)}
                         >
                           <Star
-                            size={32}
+                            size={36}
                             className={`transition-all duration-200 ${
                               (hoveredRating >= s || rating >= s)
                                 ? "fill-yellow-400 text-yellow-400"
@@ -293,7 +295,7 @@ export default function FAQ() {
                       <motion.p
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-xs text-green-600 dark:text-green-400 mt-2"
+                        className="text-sm text-green-600 dark:text-green-400 mt-3"
                       >
                         {rating === 5 && "Excellent! 🌟"}
                         {rating === 4 && "Good! 👍"}
@@ -305,14 +307,14 @@ export default function FAQ() {
                   </div>
 
                   {/* Category Select */}
-                  <div className="mb-4">
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                  <div className="mb-5">
+                    <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">
                       Category <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={feedbackCategory}
                       onChange={(e) => setFeedbackCategory(e.target.value)}
-                      className="w-full p-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none text-sm cursor-pointer transition-all duration-200"
+                      className="w-full p-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none text-base cursor-pointer transition-all duration-200"
                     >
                       {feedbackCategories.map((cat) => (
                         <option key={cat.value} value={cat.value}>
@@ -323,10 +325,10 @@ export default function FAQ() {
                   </div>
 
                   {/* Feedback Textarea */}
-                  <div className="mb-4">
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                  <div className="mb-5">
+                    <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">
                       Your Feedback <span className="text-red-500">*</span>
-                      <span className="text-gray-400 ml-2">
+                      <span className="text-gray-400 ml-2 text-xs">
                         ({feedbackText.length}/2000)
                       </span>
                     </label>
@@ -334,35 +336,64 @@ export default function FAQ() {
                       rows={4}
                       value={feedbackText}
                       onChange={(e) => setFeedbackText(e.target.value.slice(0, 2000))}
-                      className="w-full p-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none text-sm resize-none transition-all duration-200 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                      className="w-full p-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none text-base resize-none transition-all duration-200 placeholder:text-gray-400 dark:placeholder:text-gray-500"
                       placeholder="Tell us about your experience… What did we do well? What could be improved?"
                     />
                   </div>
 
-                  {/* Public Consent */}
-                  <div className="mb-5">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                  {/* Name & Email - Optional */}
+                  <div className="grid sm:grid-cols-2 gap-4 mb-5">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                        Name (Optional)
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={isPublic}
-                        onChange={(e) => setIsPublic(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500"
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full p-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none text-base transition-all duration-200"
+                        placeholder="Your name"
                       />
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        I consent to display my feedback publicly as a testimonial
-                      </span>
-                    </label>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                        Email (Optional)
+                      </label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full p-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none text-base transition-all duration-200"
+                        placeholder="your@email.com"
+                      />
+                    </div>
                   </div>
+                  {/* Public Testimonial Consent */}
+              {false && (
+                <div className="mb-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isPublic}
+                      onChange={(e) => setIsPublic(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500"
+                    />
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      I consent to display my feedback publicly as a testimonial
+                    </span>
+                  </label>
+                </div>
+              )}
 
                   {/* Error Message */}
                   {errorMessage && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 flex items-center gap-2"
+                      className="mb-5 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 flex items-center gap-2"
                     >
                       <XCircle size={16} className="text-red-500 shrink-0" />
-                      <span className="text-xs text-red-600 dark:text-red-400">{errorMessage}</span>
+                      <span className="text-sm text-red-600 dark:text-red-400">{errorMessage}</span>
                     </motion.div>
                   )}
 
@@ -370,7 +401,7 @@ export default function FAQ() {
                   <motion.button
                     onClick={handleSubmitFeedback}
                     disabled={status === 'submitting' || rating === 0 || !feedbackText.trim()}
-                    className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
+                    className={`w-full py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-all duration-200 ${
                       status === 'submitting' || rating === 0 || !feedbackText.trim()
                         ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                         : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg'
@@ -385,7 +416,7 @@ export default function FAQ() {
                       </>
                     ) : (
                       <>
-                        <Send size={14} />
+                        <Send size={16} />
                         Submit Feedback
                       </>
                     )}
@@ -394,7 +425,6 @@ export default function FAQ() {
               )}
             </div>
 
-            {/* Trust Badge */}
             <motion.div
               className="mt-6 flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-gray-500"
               initial={{ opacity: 0 }}

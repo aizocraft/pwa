@@ -122,8 +122,8 @@ const TiltCard3D = ({
   const mouseXSpring = useSpring(x, { stiffness: 300, damping: 25 });
   const mouseYSpring = useSpring(y, { stiffness: 300, damping: 25 });
   
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["5deg", "-5deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-5deg", "5deg"]);
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["8deg", "-8deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-8deg", "8deg"]);
   
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!ref.current) return;
@@ -228,7 +228,8 @@ const Services = () => {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl" />
       </div>
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-10">
+      {/* Content */}
+    <div className="px-2 sm:px-4 lg:max-w-8xl lg:mx-8 relative z-10">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -248,8 +249,8 @@ const Services = () => {
           </p>
         </motion.div>
 
-        {/* Desktop: 3D Tilt Cards - Description always visible */}
-        <div className="hidden lg:grid lg:grid-cols-3 gap-6 xl:gap-8">
+        {/* Desktop: 3D Tilt Cards - Larger cards with more padding */}
+        <div className="hidden lg:grid lg:grid-cols-3 gap-6 lg:gap-8 xl:gap-10">
           {services.map((service, index) => {
             const Icon = service.Icon;
             return (
@@ -262,35 +263,35 @@ const Services = () => {
               >
                 <TiltCard3D>
                   <div 
-                    className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer border border-gray-200 dark:border-gray-800"
+                    className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-xl hover:shadow-2xl transition-all duration-500 cursor-pointer border border-gray-200 dark:border-gray-800"
                     onClick={() => openModal(service)}
                   >
-                    {/* Image Section */}
-                    <div className="relative h-56 overflow-hidden">
+                    {/* Image Section - Taller for better visibility */}
+                    <div className="relative h-64 overflow-hidden">
                       <img
                         src={service.image}
                         alt={service.title}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-white/10 via-transparent to-transparent dark:from-gray-900/20" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
                     </div>
                     
-                    {/* Content */}
-                    <div className="p-6">
-                      <div className="flex items-start gap-3 mb-4">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl">
-                          <Icon className="h-6 w-6 text-white" />
+                    {/* Content - Larger padding for bigger cards */}
+                    <div className="p-8">
+                      <div className="flex items-start gap-4 mb-5">
+                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl">
+                          <Icon className="h-7 w-7 text-white" />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
+                          <h3 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight">
                             {service.title}
                           </h3>
-                          <div className="w-12 h-0.5 bg-gradient-to-r from-blue-500 to-blue-400 rounded-full mt-1.5 transition-all duration-300 group-hover:w-20" />
+                          <div className="w-16 h-0.5 bg-gradient-to-r from-blue-500 to-blue-400 rounded-full mt-2 transition-all duration-300 group-hover:w-24" />
                         </div>
                       </div>
                       
-                      {/* Description always visible on desktop */}
-                      <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-4">
+                      {/* Description - Larger text */}
+                      <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed mb-6">
                         {service.description}
                       </p>
 
@@ -299,10 +300,10 @@ const Services = () => {
                           e.stopPropagation();
                           openModal(service);
                         }}
-                        className="w-full h-11 mt-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold text-sm rounded-xl transition-all duration-300 flex items-center justify-center gap-2 group/btn shadow-md hover:shadow-lg"
+                        className="w-full h-12 mt-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold text-base rounded-xl transition-all duration-300 flex items-center justify-center gap-2 group/btn shadow-md hover:shadow-lg"
                       >
                         <span>Explore Service</span>
-                        <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                        <ArrowRight className="h-5 w-5 transition-transform group-hover/btn:translate-x-1" />
                       </Button>
                     </div>
                   </div>
@@ -312,7 +313,7 @@ const Services = () => {
           })}
         </div>
 
-        {/* Tablet Grid (md to lg) */}
+        {/* Tablet Grid (md to lg) - Larger cards */}
         <div className="hidden md:grid lg:hidden grid-cols-2 gap-5">
           {services.map((service, index) => {
             const Icon = service.Icon;
@@ -325,10 +326,10 @@ const Services = () => {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
               >
                 <Card
-                  className="group overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 shadow-md hover:shadow-xl transition-all duration-500 bg-white dark:bg-gray-900 hover:scale-[1.02] cursor-pointer h-full"
+                  className="group overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 shadow-lg hover:shadow-xl transition-all duration-500 bg-white dark:bg-gray-900 hover:scale-[1.02] cursor-pointer h-full"
                   onClick={() => openModal(service)}
                 >
-                  <div className="relative h-44 overflow-hidden">
+                  <div className="relative h-52 overflow-hidden">
                     <img
                       src={service.image}
                       alt={service.title}
@@ -336,22 +337,22 @@ const Services = () => {
                     />
                   </div>
 
-                  <CardContent className="p-5 space-y-4">
+                  <CardContent className="p-6 space-y-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
-                        <Icon className="h-5 w-5 text-white" />
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
+                        <Icon className="h-6 w-6 text-white" />
                       </div>
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{service.title}</h3>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">{service.title}</h3>
                     </div>
 
                     <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed line-clamp-2">
                       {service.description}
                     </p>
 
-                    <ul className="space-y-1.5">
+                    <ul className="space-y-2">
                       {service.features.slice(0, 3).map((feature, i) => (
-                        <li key={i} className="flex items-center text-gray-700 dark:text-gray-300 text-xs">
-                          <CheckCircle2 className="h-3 w-3 text-blue-500 mr-2 flex-shrink-0" />
+                        <li key={i} className="flex items-center text-gray-700 dark:text-gray-300 text-sm">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 mr-2 flex-shrink-0" />
                           <span className="truncate">{feature}</span>
                         </li>
                       ))}
@@ -365,7 +366,7 @@ const Services = () => {
                       className="w-full h-10 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg flex items-center justify-center gap-2 group/btn"
                     >
                       <span>Learn More</span>
-                      <ArrowRight className="h-3 w-3 transition-transform group-hover/btn:translate-x-1" />
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                     </Button>
                   </CardContent>
                 </Card>
@@ -374,8 +375,8 @@ const Services = () => {
           })}
         </div>
 
-        {/* Mobile Layout (below md) */}
-        <div className="grid md:hidden gap-4">
+        {/* Mobile Layout (below md) - Slightly larger cards */}
+        <div className="grid md:hidden gap-5">
           {services.map((service, index) => {
             const Icon = service.Icon;
             return (
@@ -387,10 +388,10 @@ const Services = () => {
                 transition={{ duration: 0.4, delay: index * 0.05 }}
               >
                 <Card
-                  className="group overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-lg transition-all duration-500 bg-white dark:bg-gray-900 cursor-pointer"
+                  className="group overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 shadow-md hover:shadow-lg transition-all duration-500 bg-white dark:bg-gray-900 cursor-pointer"
                   onClick={() => openModal(service)}
                 >
-                  <div className="relative h-40 overflow-hidden">
+                  <div className="relative h-48 overflow-hidden">
                     <img
                       src={service.image}
                       alt={service.title}
@@ -398,15 +399,15 @@ const Services = () => {
                     />
                   </div>
 
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                        <Icon className="h-4 w-4 text-white" />
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                        <Icon className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="text-base font-bold text-gray-900 dark:text-white">{service.title}</h3>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{service.title}</h3>
                     </div>
 
-                    <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed line-clamp-2">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed line-clamp-2">
                       {service.description}
                     </p>
 
@@ -415,10 +416,10 @@ const Services = () => {
                         e.stopPropagation();
                         openModal(service);
                       }}
-                      className="w-full h-8 px-3 text-xs font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg flex items-center justify-center gap-1"
+                      className="w-full h-9 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg flex items-center justify-center gap-2"
                     >
                       Details
-                      <ArrowRight className="h-3 w-3" />
+                      <ArrowRight className="h-3.5 w-3.5" />
                     </Button>
                   </CardContent>
                 </Card>
@@ -427,7 +428,7 @@ const Services = () => {
           })}
         </div>
 
-        {/* Modal with increased top margin */}
+        {/* Modal remains the same */}
         <AnimatePresence mode="wait">
           {isModalOpen && selectedService && (
             <motion.div
@@ -475,7 +476,7 @@ const Services = () => {
                   </div>
                 </div>
 
-                {/* Scrollable Body - No stats section */}
+                {/* Scrollable Body */}
                 <div className="overflow-y-auto max-h-[calc(90vh-80px)] sm:max-h-[calc(90vh-100px)]">
                   <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                     {/* Image */}

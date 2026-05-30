@@ -14,7 +14,6 @@ import {
   Github,
   Send,
   ArrowUpRight,
-  Heart,
   Sparkles,
   ChevronUp
 } from 'lucide-react'
@@ -60,6 +59,14 @@ export default function Footer() {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  // Split phone numbers if they contain commas
+  const getPhoneNumbers = (phoneString: string | undefined) => {
+    if (!phoneString) return []
+    return phoneString.split(',').map(phone => phone.trim()).filter(phone => phone)
+  }
+
+  const phoneNumbers = getPhoneNumbers(company?.phone)
 
   return (
     <>
@@ -119,19 +126,29 @@ export default function Footer() {
                     </span>
                   </div>
                 )}
-                {company?.phone && (
-                  <a 
-                    href={`tel:${company.phone}`} 
-                    className="flex items-center gap-2.5 text-xs md:text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all group"
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-all">
-                      <Phone className="w-3.5 h-3.5 group-hover:text-blue-600 transition-colors" />
-                    </div>
-                    <span className="group-hover:translate-x-0.5 transition-transform">
-                      {company.phone}
-                    </span>
-                  </a>
+                
+                {/* Multiple Phone Numbers */}
+                {phoneNumbers.length > 0 && (
+                  <div className="space-y-2">
+                    {phoneNumbers.map((phone, index) => (
+                      <a 
+                        key={index}
+                        href={`tel:${phone.replace(/\s/g, '')}`} 
+                        className="flex items-center gap-2.5 text-xs md:text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all group"
+                        onMouseEnter={() => setIsHovered(`phone-${index}`)}
+                        onMouseLeave={() => setIsHovered(null)}
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-all">
+                          <Phone className="w-3.5 h-3.5 group-hover:text-blue-600 transition-colors" />
+                        </div>
+                        <span className="group-hover:translate-x-0.5 transition-transform">
+                          {phone}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
                 )}
+                
                 {company?.email && (
                   <a 
                     href={`mailto:${company.email}`} 
@@ -149,29 +166,54 @@ export default function Footer() {
             </div>
 
             {/* Quick Links - 3 columns */}
-            <div className="md:col-span-3">
-              <h4 className="text-[11px] md:text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">
-                Quick Links
-              </h4>
-              <ul className="space-y-2.5">
-                {['Home', 'Products', 'Categories', 'Orders'].map((item, idx) => (
-                  <li key={idx}>
-                    <Link 
-                      href={item === 'Home' ? '/' : `/${item.toLowerCase()}`}
-                      className="group flex items-center gap-2 text-xs md:text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
-                      onMouseEnter={() => setIsHovered(item)}
-                      onMouseLeave={() => setIsHovered(null)}
-                    >
-                      <div className={`w-1 h-1 rounded-full bg-blue-500 transition-all duration-300 ${isHovered === item ? 'w-1.5 h-1.5' : ''}`} />
-                      <span className={`transition-all duration-300 ${isHovered === item ? 'translate-x-1' : ''}`}>
-                        {item}
-                      </span>
-                      <ArrowUpRight className={`w-3 h-3 transition-all duration-300 ${isHovered === item ? 'translate-x-0.5 -translate-y-0.5 opacity-100' : 'opacity-0'}`} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+<div className="md:col-span-3">
+  <h4 className="text-[11px] md:text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">
+    Quick Links
+  </h4>
+
+  <ul className="space-y-2.5">
+    {[
+      { name: 'Home', path: '/' },
+      { name: 'About', path: '/about' },
+      { name: 'Solar Solutions', path: '/solar-solutions' },
+      { name: 'Borehole Services', path: '/borehole-services' },
+      { name: 'Products', path: '/products' },
+      { name: 'Orders', path: '/orders' },
+      { name: 'Projects', path: '/projects' },
+    ].map((item, idx) => (
+      <li key={idx}>
+        <Link
+          href={item.path}
+          className="group flex items-center gap-2 text-xs md:text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
+          onMouseEnter={() => setIsHovered(item.name)}
+          onMouseLeave={() => setIsHovered(null)}
+        >
+          <div
+            className={`w-1 h-1 rounded-full bg-blue-500 transition-all duration-300 ${
+              isHovered === item.name ? 'w-1.5 h-1.5' : ''
+            }`}
+          />
+
+          <span
+            className={`transition-all duration-300 ${
+              isHovered === item.name ? 'translate-x-1' : ''
+            }`}
+          >
+            {item.name}
+          </span>
+
+          <ArrowUpRight
+            className={`w-3 h-3 transition-all duration-300 ${
+              isHovered === item.name
+                ? 'translate-x-0.5 -translate-y-0.5 opacity-100'
+                : 'opacity-0'
+            }`}
+          />
+        </Link>
+      </li>
+    ))}
+  </ul>
+</div>
 
             {/* Newsletter & Socials - 4 columns */}
             <div className="md:col-span-4">
@@ -239,21 +281,42 @@ export default function Footer() {
                 <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
                 <span className="font-medium">{company?.companyName || 'PlasmaWater Africa'}</span>
                 <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
-                <span className="inline-flex items-center gap-1">
-                  Made with 
-                  <Heart className="w-2.5 h-2.5 text-red-500 hover:scale-125 transition-transform duration-300" /> 
-                  by
-                </span>
-                <a 
-                  href="https://isaackariuki.vercel.app" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="relative font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all inline-flex items-center gap-0.5 group"
-                >
-                  aizocraft
-                  <ArrowUpRight className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-                </a>
+ <span className="inline-flex items-center gap-1">
+  Built in
+</span>
+<a 
+  href="https://nextjs.org" 
+  target="_blank" 
+  rel="noopener noreferrer"
+  className="relative font-medium text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-white transition-all inline-flex items-center gap-1 group"
+>
+  <svg 
+    className="w-3.5 h-3.5 transition-all duration-300 group-hover:scale-110" 
+    viewBox="0 0 180 180" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <mask id="nextjs-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="180" height="180">
+      <circle cx="90" cy="90" r="90" fill="white" />
+    </mask>
+    <g mask="url(#nextjs-mask)">
+      <circle cx="90" cy="90" r="90" fill="black" />
+      <path d="M149.508 157.52L69.142 54H54V125.97H66.1136V69.3836L139.999 164.845C143.333 162.614 146.509 160.165 149.508 157.52Z" fill="url(#nextjs-gradient)" />
+      <rect x="115" y="54" width="12" height="72" fill="url(#nextjs-gradient)" />
+    </g>
+    <defs>
+      <linearGradient id="nextjs-gradient" x1="109" y1="116.5" x2="144.5" y2="160.5" gradientUnits="userSpaceOnUse">
+        <stop stopColor="white" />
+        <stop offset="1" stopColor="white" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+  </svg>
+  Next.js
+  <ArrowUpRight className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+</a>
               </div>
+
+
               <div className="flex gap-4">
                 <Link 
                   href="/terms" 

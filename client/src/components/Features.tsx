@@ -143,7 +143,7 @@ const AnimatedText = ({
   )
 }
 
-// Animated Feature Card Component - Minimalistic
+// Animated Feature Card Component - Larger size
 const FeatureCard = memo(({ 
   feature, 
   index, 
@@ -162,25 +162,25 @@ const FeatureCard = memo(({
       }`}
       style={{ transitionDelay: `${index * 100}ms` }}
     >
-      <div className="text-center">
-        {/* Icon - Clean and minimal */}
-        <div className="flex justify-center mb-4">
+      <div className="text-center p-6 rounded-2xl bg-gradient-to-b from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-950 hover:shadow-xl transition-all duration-300">
+        {/* Icon - Larger size */}
+        <div className="flex justify-center mb-5">
           <div className="relative">
             <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <Icon className="h-12 w-12 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300" />
+            <Icon className="h-16 w-16 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300" />
           </div>
         </div>
         
-        {/* Title */}
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        {/* Title - Larger */}
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
           {feature.title}
         </h3>
         
         {/* Divider */}
-        <div className="w-12 h-0.5 bg-blue-500/50 mx-auto mb-3 group-hover:w-20 transition-all duration-300" />
+        <div className="w-16 h-0.5 bg-blue-500/50 mx-auto mb-4 group-hover:w-28 transition-all duration-300" />
         
-        {/* Description */}
-        <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-w-xs mx-auto">
+        {/* Description - Larger text */}
+        <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed max-w-xs mx-auto">
           {feature.description}
         </p>
       </div>
@@ -190,7 +190,7 @@ const FeatureCard = memo(({
 
 FeatureCard.displayName = 'FeatureCard'
 
-// Infinite Scrolling Logos Component
+// Infinite Scrolling Logos Component - Larger logos
 const InfiniteScrollingLogos = ({ 
   logos, 
   speed = 80,
@@ -217,7 +217,7 @@ const InfiniteScrollingLogos = ({
 
   return (
     <div 
-      className={`relative overflow-hidden ${fadeOut ? `before:absolute before:left-0 before:top-0 before:z-10 before:h-full before:w-20 before:bg-gradient-to-r before:${getFadeColor()} before:to-transparent before:content-[''] after:absolute after:right-0 after:top-0 after:h-full after:w-20 after:bg-gradient-to-l after:${getFadeColor()} after:to-transparent after:content-['']` : ''}`}
+      className={`relative overflow-hidden ${fadeOut ? `before:absolute before:left-0 before:top-0 before:z-10 before:h-full before:w-24 before:bg-gradient-to-r before:${getFadeColor()} before:to-transparent before:content-[''] after:absolute after:right-0 after:top-0 after:h-full after:w-24 after:bg-gradient-to-l after:${getFadeColor()} after:to-transparent after:content-['']` : ''}`}
       onMouseEnter={() => pauseOnHover && setIsPaused(true)}
       onMouseLeave={() => pauseOnHover && setIsPaused(false)}
     >
@@ -235,11 +235,11 @@ const InfiniteScrollingLogos = ({
         style={{
           animationPlayState: isPaused ? 'paused' : 'running',
         }}
-        className="flex flex-none gap-12 pr-12"
+        className="flex flex-none gap-16 pr-16"
       >
         {/* Double the logos for seamless loop */}
         {[...new Array(2)].fill(0).map((_, index) => (
-          <div key={index} className="flex gap-12">
+          <div key={index} className="flex gap-16">
             {logos.map((logo) => (
               <Link
                 key={`${logo.alt}-${index}`}
@@ -248,9 +248,7 @@ const InfiniteScrollingLogos = ({
                 rel="noopener noreferrer"
                 className="flex-shrink-0 transition-all duration-300 hover:scale-110 hover:opacity-100"
               >
-               <div className="relative h-20 w-40 sm:h-24 sm:w-48 lg:h-28 lg:w-56">
-
-
+               <div className="relative h-24 w-48 sm:h-28 sm:w-56 lg:h-32 lg:w-64">
                   <Image
                     src={logo.src}
                     alt={logo.alt}
@@ -291,37 +289,31 @@ const Features = () => {
   }, [])
 
   return (
-     <section ref={sectionRef} className="pt-0 pb-4 sm:pb-6 lg:pb-8 bg-white dark:bg-gray-950">
-
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+    <section ref={sectionRef} className="pt-0 pb-4 sm:pb-6 lg:pb-8 bg-white dark:bg-gray-950">
+      {/* Reduced margins - full width with max-width constraint */}
+      <div className="px-2 sm:px-4 lg:max-w-8xl lg:mx-auto">
         
-        {/* Header Section - Minimalistic */}
-        <div className="text-center mb-16 sm:mb-20">
-          <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-950/30 rounded-full px-4 py-1.5 mb-6">
-            <span className="text-xs font-medium text-blue-700 dark:text-blue-400 uppercase tracking-wider">
+        {/* Header Section - Larger spacing */}
+        <div className="text-center mb-12 sm:mb-16 lg:mb-10">
+          <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-950/30 rounded-full px-5 py-2 mb-6">
+            <span className="text-sm font-medium text-blue-700 dark:text-blue-400 uppercase tracking-wider">
               Why Choose Us
             </span>
           </div>
+
           
-          <AnimatedText
-            text="Premium Solutions Trusted Across Africa"
-            className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4"
-            tag="h2"
-            delay={100}
-          />
-          
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-3xl mx-auto">
             <AnimatedText
               text="Delivering excellence through expertise, quality, and unwavering commitment"
-              className="text-base sm:text-lg text-gray-600 dark:text-gray-400"
+              className="text-lg sm:text-xl text-gray-600 dark:text-gray-400"
               tag="p"
               delay={300}
             />
           </div>
         </div>
 
-        {/* Features Grid - Minimalistic Design */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-24">
+        {/* Features Grid */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 xl:gap-10 mb-28 lg:mb-10">
           {features.map((feature, index) => (
             <FeatureCard
               key={index}
@@ -332,18 +324,16 @@ const Features = () => {
           ))}
         </div>
 
-        {/* Partner Logos Section with Infinite Scrolling */}
-        <div className="pt-12 border-t border-gray-100 dark:border-gray-800">
+        {/* Partner Logos Section with Infinite Scrolling*/}
+        <div className="pt-16 border-t border-gray-100 dark:border-gray-800">
           <div className="text-center mb-12">
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Trusted by Industry Leaders
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-500">
+            <h3 className="text-xl sm:text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-3">
               Partnering with world-class brands for premium solutions
-            </p>
+            </h3>
+            
           </div>
           
-          <div className="relative py-8">
+          <div className="relative py-10">
             <InfiniteScrollingLogos 
               logos={partnerLogos}
               speed={60}

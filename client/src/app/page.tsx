@@ -15,7 +15,7 @@ export default function Home() {
   // Featured products query
   const { data: featuredData } = useQuery({
     queryKey: ["featured-products"],
-    queryFn: () => getProducts({ featured: true, limit: 8 }),
+    queryFn: () => getProducts({ featured: true, limit: 10 }),
     staleTime: 5 * 60 * 1000 
   })
 
@@ -53,14 +53,13 @@ export default function Home() {
 
       {/* Featured Products Section */}
       <section className="py-12 lg:py-16 bg-white dark:bg-gray-950">
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div className="px-2 sm:px-4 lg:max-w-8xl lg:mx-auto lg:mx-4 lg:px-16">
           <motion.div 
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 mb-12"
+            className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 mb-12 max-w-full"
           >
             <div>
               <div className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 rounded-full px-4 py-1.5 mb-4">
@@ -85,18 +84,20 @@ export default function Home() {
             </Link>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-            {featuredData?.products?.map((product, index) => (
+          {/* Grid for featured products */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-5">
+            {featuredData?.products?.slice(0, 5).map((product, index) => (
               <motion.div
                 key={product._id}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="min-w-0" // Prevents overflow
               >
                 <ProductCard product={product} />
               </motion.div>
-            )) || [...Array(4)].map((_, i) => (
+            )) || [...Array(5)].map((_, i) => (
               <div key={i} className="animate-pulse bg-gray-200 dark:bg-gray-800 rounded-2xl h-80" />
             ))}
           </div>
@@ -113,8 +114,6 @@ export default function Home() {
         </div>
       </section>
 
-   
-     
       {/* Features Component */}
       <Features />
 
@@ -185,8 +184,6 @@ export default function Home() {
                 Water & Energy Solutions?
               </span>
             </h2>
-            
-
             
             {/* CTA Buttons */}
             <div className="flex flex-wrap justify-center gap-4">
