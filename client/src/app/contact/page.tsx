@@ -517,17 +517,17 @@ export default function ContactPage() {
             viewport={{ once: true }}
             className="rounded-2xl overflow-hidden shadow-xl border border-gray-200 dark:border-gray-800"
           >
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3988.5!2d36.95!3d-1.15!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x182f13f3d5b5b5b5%3A0x5b5b5b5b5b5b5b5b!2sHurlingum%20Shopping%20Square%2C%20Nairobi!5e0!3m2!1sen!2ske!4v1700000000000"
-              width="100%"
-              height="350"
-              style={{ border: 0 }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              className="w-full"
-              title="Plasma Water Africa Location - Hurlingum Shopping Square, Nairobi"
-            />
+<iframe
+  src="https://maps.google.com/maps?q=Hurlingham%20Square%20Shopping%20Centre,%20Kangundo%20Road,%20Nairobi&t=&z=15&ie=UTF8&iwloc=&output=embed"
+  width="100%"
+  height="350"
+  style={{ border: 0 }}
+  allowFullScreen
+  loading="lazy"
+  referrerPolicy="no-referrer-when-downgrade"
+  className="w-full"
+  title="Plasma Water Africa Location - Hurlingham Square Shopping Centre, Nairobi"
+/>
           </motion.div>
         </div>
       </section>
