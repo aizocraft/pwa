@@ -1,4 +1,5 @@
-// src/routes/mpesa.routes.ts
+// src/routes/mpesa.routes.ts - Complete corrected version
+
 import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import TransactionModel from '../models/Transaction';
@@ -223,7 +224,8 @@ router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: 
       paymentMethod: 'mpesa',
       status: 'pending',
       transactionId: CheckoutRequestID,
-      notes: `STK Push initiated to ${normalizedPhone}`
+      notes: `STK Push initiated to ${normalizedPhone}`,
+      source: 'checkout'
     });
 
     await transaction.save();
@@ -272,7 +274,7 @@ router.post('/callback', async (req: Request, res: Response) => {
     const stkCallback = Body.stkCallback;
     const { ResultCode, ResultDesc, CheckoutRequestID, CallbackMetadata } = stkCallback;
 
-    console.log(`Processing callback for CheckoutRequestID: ${CheckoutRequestID}, ResultCode: ${ResultCode}`);
+    console.log(`Processing callback for ${CheckoutRequestID}, ResultCode: ${ResultCode}`);
 
     const transaction = await TransactionModel.findOne({ transactionId: CheckoutRequestID });
     
@@ -281,8 +283,9 @@ router.post('/callback', async (req: Request, res: Response) => {
       return res.status(200).json({ ResultCode: 0, ResultDesc: 'Transaction not found but acknowledged' });
     }
 
-    if (transaction.status === 'completed') {
-      console.log(`Transaction ${CheckoutRequestID} already completed`);
+    // Skip if already completed or failed
+    if (transaction.status !== 'pending') {
+      console.log(`Transaction ${CheckoutRequestID} already ${transaction.status}, skipping callback`);
       return res.status(200).json({ ResultCode: 0, ResultDesc: 'Already processed' });
     }
 
@@ -292,8 +295,8 @@ router.post('/callback', async (req: Request, res: Response) => {
       return res.status(200).json({ ResultCode: 0, ResultDesc: 'Order not found but acknowledged' });
     }
 
+    // Handle successful payment
     if (ResultCode === 0 && CallbackMetadata) {
-      // Payment successful
       const metadata = CallbackMetadata?.Item || [];
       
       const mpesaReceipt = metadata.find((item: any) => item.Name === 'MpesaReceiptNumber')?.Value;
@@ -303,7 +306,7 @@ router.post('/callback', async (req: Request, res: Response) => {
 
       transaction.status = 'completed';
       transaction.mpesaReceipt = mpesaReceipt || '';
-      transaction.notes = `Payment completed. Receipt: ${mpesaReceipt || 'N/A'}`;
+      transaction.notes = `Payment completed via callback. Receipt: ${mpesaReceipt || 'N/A'}`;
       transaction.paidAt = new Date();
       await transaction.save();
 
@@ -319,6 +322,7 @@ router.post('/callback', async (req: Request, res: Response) => {
 
       console.log(`✅ Payment successful: ${mpesaReceipt} for order ${order.orderNumber}`);
 
+      // Send confirmation email
       const customerEmail = transaction.guestEmail || order.shippingAddress.email;
       if (customerEmail) {
         sendPaymentConfirmation({
@@ -336,10 +340,19 @@ router.post('/callback', async (req: Request, res: Response) => {
         }).catch(err => console.error('Failed to send email:', err));
       }
 
-    } else {
-      // Payment failed
+    } 
+    // Handle timeout - transaction still processing
+    else if (ResultCode === 1037) {
+      console.log(`⚠️ M-PESA timeout for ${CheckoutRequestID}: ${ResultDesc}`);
+      // Keep transaction as pending - do NOT mark as failed
+      transaction.notes = `Callback timeout: ${ResultDesc}`;
+      await transaction.save();
+      
+    } 
+    // Handle other failures
+    else if (ResultCode !== 0) {
       transaction.status = 'failed';
-      transaction.notes = `Payment failed: ${ResultDesc}`;
+      transaction.notes = `Payment failed via callback: ${ResultDesc}`;
       await transaction.save();
 
       if (order.paymentStatus !== 'paid') {
@@ -387,6 +400,23 @@ router.post('/query', optionalAuthMiddleware, async (req: Request & { user?: any
       return res.status(404).json({ error: 'Transaction not found', code: 'NOT_FOUND' });
     }
 
+    // If already completed or failed, return immediately
+    if (transaction.status !== 'pending') {
+      return res.json({
+        success: true,
+        checkoutRequestId,
+        status: transaction.status,
+        resultCode: transaction.status === 'completed' ? '0' : '1',
+        resultDesc: transaction.status === 'completed' ? 'Payment completed' : 'Payment failed',
+        transaction: {
+          id: transaction._id,
+          amount: transaction.amount,
+          mpesaReceipt: transaction.mpesaReceipt,
+          createdAt: transaction.createdAt
+        }
+      });
+    }
+
     const token = await getMpesaToken();
     const { password, timestamp } = generateMpesaPassword();
     const urls = getMpesaUrls();
@@ -407,27 +437,54 @@ router.post('/query', optionalAuthMiddleware, async (req: Request & { user?: any
     });
 
     const { ResultCode, ResultDesc } = response.data;
+    
+    let status: 'pending' | 'completed' | 'failed' = transaction.status;
 
-    if (ResultCode === '0' && transaction.status === 'pending') {
-      transaction.status = 'completed';
-      await transaction.save();
-      
-      const order = await OrderModel.findById(transaction.orderId);
-      if (order && order.paymentStatus !== 'paid') {
-        order.paymentStatus = 'paid';
-        order.status = 'processing';
-        await order.save();
+    console.log(`Query result for ${checkoutRequestId}: ResultCode=${ResultCode}, ResultDesc=${ResultDesc}`);
+
+    // Handle different ResultCodes correctly
+    if (ResultCode === '0') {
+      // Payment completed successfully
+      if (transaction.status === 'pending') {
+        transaction.status = 'completed';
+        transaction.notes = `Payment completed via query. Result: ${ResultDesc}`;
+        transaction.paidAt = new Date();
+        await transaction.save();
+        
+        const order = await OrderModel.findById(transaction.orderId);
+        if (order && order.paymentStatus !== 'paid') {
+          order.paymentStatus = 'paid';
+          order.status = 'processing';
+          order.paymentDetails = {
+            transactionId: checkoutRequestId,
+            paidAt: new Date(),
+            phoneNumber: transaction.guestPhone || ''
+          };
+          await order.save();
+        }
       }
-    } else if (ResultCode !== '0' && transaction.status === 'pending') {
-      transaction.status = 'failed';
-      transaction.notes = `Query failed: ${ResultDesc}`;
-      await transaction.save();
+      status = 'completed';
+      
+    } else if (ResultCode === '1037') {
+      // Transaction is still being processed (timeout/pending)
+      // DO NOT mark as failed - keep as pending
+      status = 'pending';
+      console.log(`Transaction ${checkoutRequestId} is still pending (ResultCode: ${ResultCode})`);
+      
+    } else {
+      // Other error codes - mark as failed
+      if (transaction.status === 'pending') {
+        transaction.status = 'failed';
+        transaction.notes = `Payment failed via query: ${ResultDesc}`;
+        await transaction.save();
+      }
+      status = 'failed';
     }
 
     res.json({
       success: true,
       checkoutRequestId,
-      status: transaction.status,
+      status: status,
       resultCode: ResultCode,
       resultDesc: ResultDesc,
       transaction: {
@@ -440,7 +497,12 @@ router.post('/query', optionalAuthMiddleware, async (req: Request & { user?: any
 
   } catch (error: any) {
     console.error('Query error:', error);
-    res.status(500).json({ error: 'Failed to query payment status', code: 'QUERY_FAILED' });
+    // Don't mark as failed on network errors - keep as pending
+    res.status(500).json({ 
+      error: 'Failed to query payment status', 
+      code: 'QUERY_FAILED',
+      status: 'pending' // Tell frontend to keep polling
+    });
   }
 });
 

@@ -106,7 +106,7 @@ export default function DashboardProductsPage() {
     onSuccess: () => {
       setDeleteModalOpen(false)
       setProductToDelete(null)
-      toast.success('Product deleted successfully')
+   
     },
     onError: (err, variables, context) => {
       queryClient.setQueryData(['dashboard-products', buildQueryParams()], context?.previousData)

@@ -18,8 +18,8 @@ export interface IOrder extends Document {
   guestInfo?: { email: string; phone: string; name?: string; };
   items: IOrderItem[];
   subtotal: number;
-  totalCost: number; // Add this
-  totalProfit: number; // Add this
+  totalCost: number; 
+  totalProfit: number; 
   shippingCost: number;
   tax: number;
   discount: number;

@@ -1620,6 +1620,275 @@ export async function getSupplierStats(): Promise<{
 }
 
 // ========== INVENTORY API ==========
+
+// Export products to CSV/JSON/Excel
+export async function exportProducts(params?: {
+  format?: 'csv' | 'json';
+  category?: string;
+  supplier?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  search?: string;
+}): Promise<Blob> {
+  const query = new URLSearchParams();
+  query.append('format', params?.format || 'csv');
+  if (params?.category) query.append('category', params.category);
+  if (params?.supplier) query.append('supplier', params.supplier);
+  if (params?.minPrice) query.append('minPrice', String(params.minPrice));
+  if (params?.maxPrice) query.append('maxPrice', String(params.maxPrice));
+  if (params?.search) query.append('search', params.search);
+  
+  try {
+    const response = await api.get(`/inventory/export?${query.toString()}`, { 
+      responseType: 'blob' 
+    });
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to export products');
+    throw error;
+  }
+}
+
+// Download import template CSV
+export async function downloadImportTemplate(): Promise<Blob> {
+  try {
+    const response = await api.get('/inventory/export/template', { 
+      responseType: 'blob' 
+    });
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to download template');
+    throw error;
+  }
+}
+
+// Bulk import products from CSV
+export async function bulkImportProducts(file: File): Promise<{
+  success: boolean;
+  message: string;
+  results: {
+    imported: number;
+    errors: number;
+    duplicates: number;
+    totalProcessed: number;
+    successList: Array<{ product: string; sku: string; _id: string }>;
+    errorList: Array<{ row: any; error: string; productName: string }>;
+    duplicateList: Array<{ row: any; reason: string; productName: string }>;
+  };
+}> {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    const response = await api.post('/inventory/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    
+    const result = response.data;
+    if (result.success) {
+      if (result.results.imported > 0) {
+        toast.success(`Successfully imported ${result.results.imported} products`);
+      }
+      if (result.results.errors > 0) {
+        toast.error(`${result.results.errors} products failed to import`);
+      }
+    toast(`${result.results.duplicates} duplicate products skipped`, {
+      icon: "⚠️",
+    });
+    }
+    return result;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to import products');
+    throw error;
+  }
+}
+
+// Bulk update products
+export async function bulkUpdateProducts(updates: Array<{
+  productId: string;
+  price?: number;
+  buyingPrice?: number;
+  stock?: number;
+  category?: string;
+  brand?: string;
+  featured?: boolean;
+  [key: string]: any;
+}>): Promise<{
+  success: boolean;
+  message: string;
+  results: {
+    totalUpdated: number;
+    totalErrors: number;
+    success: Array<{ productId: string; name: string; sku: string }>;
+    errors: Array<{ update: any; error: string }>;
+  };
+}> {
+  try {
+    const response = await api.put('/inventory/bulk-update', { updates });
+    toast.success(response.data.message);
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to bulk update products');
+    throw error;
+  }
+}
+
+// Bulk delete products
+export async function bulkDeleteProducts(productIds: string[]): Promise<{
+  success: boolean;
+  message: string;
+  deletedCount: number;
+}> {
+  try {
+    const response = await api.delete('/inventory/bulk-delete', { 
+      data: { productIds } 
+    });
+    toast.success(response.data.message);
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to delete products');
+    throw error;
+  }
+}
+
+// Bulk stock adjustment
+export async function bulkAdjustStock(
+  adjustments: Array<{
+    productId: string;
+    quantity: number;
+    operation: 'add' | 'subtract' | 'set';
+  }>,
+  reason?: string
+): Promise<{
+  success: boolean;
+  message: string;
+  results: {
+    totalAdjusted: number;
+    totalErrors: number;
+    success: Array<{
+      productId: string;
+      name: string;
+      sku: string;
+      oldStock: number;
+      newStock: number;
+      change: number;
+    }>;
+    errors: Array<{ adjustment: any; error: string }>;
+  };
+}> {
+  try {
+    const response = await api.post('/inventory/bulk-adjust-stock', { adjustments, reason });
+    toast.success(response.data.message);
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to adjust stock');
+    throw error;
+  }
+}
+
+// Get inventory valuation report
+export async function getInventoryValuation(): Promise<{
+  summary: {
+    totalCostValue: number;
+    totalRetailValue: number;
+    totalPotentialProfit: number;
+    averageMargin: number;
+    productsWithData: number;
+    totalStockUnits: number;
+  };
+  topProductsByValue: Array<{
+    name: string;
+    sku: string;
+    category: string;
+    price: number;
+    buyingPrice: number;
+    stock: number;
+    inventoryValue: number;
+    costValue: number;
+    potentialProfit: number;
+  }>;
+  categoryBreakdown: Array<{
+    _id: string;
+    totalValue: number;
+    totalCost: number;
+    totalProfit: number;
+    productCount: number;
+    stockUnits: number;
+  }>;
+  generatedAt: string;
+}> {
+  try {
+    const response = await api.get('/inventory/valuation');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch inventory valuation:', error);
+    toast.error('Failed to load inventory valuation');
+    throw error;
+  }
+}
+
+// ========== INVENTORY DASHBOARD STATS ==========
+
+// Get inventory health metrics
+export async function getInventoryHealth(): Promise<{
+  healthScore: number;
+  turnoverRate: number;
+  daysOfStock: number;
+  deadStock: number;
+  slowMoving: number;
+  fastMoving: number;
+  recommendations: string[];
+}> {
+  try {
+    const response = await api.get('/inventory/health');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch inventory health:', error);
+    throw error;
+  }
+}
+
+// Get stock movement history
+export async function getStockMovements(params?: {
+  productId?: string;
+  startDate?: string;
+  endDate?: string;
+  type?: 'restock' | 'sale' | 'adjustment' | 'return';
+  page?: number;
+  limit?: number;
+}): Promise<{
+  movements: Array<{
+    _id: string;
+    productId: string;
+    productName: string;
+    productSku: string;
+    type: string;
+    quantity: number;
+    previousStock: number;
+    newStock: number;
+    reason: string;
+    performedBy: { name: string; email: string };
+    createdAt: string;
+  }>;
+  pagination: { page: number; limit: number; total: number; pages: number };
+}> {
+  const query = new URLSearchParams();
+  if (params?.productId) query.append('productId', params.productId);
+  if (params?.startDate) query.append('startDate', params.startDate);
+  if (params?.endDate) query.append('endDate', params.endDate);
+  if (params?.type) query.append('type', params.type);
+  if (params?.page) query.append('page', String(params.page));
+  if (params?.limit) query.append('limit', String(params.limit));
+  
+  try {
+    const response = await api.get(`/inventory/movements?${query.toString()}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch stock movements:', error);
+    throw error;
+  }
+}
+
 export async function getInventorySummary(): Promise<{
   summary: {
     totalStockValue: number;
