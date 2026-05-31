@@ -1,4 +1,6 @@
 // src/lib/auth.ts
+"use client";
+
 import { useQuery, useQueryClient, useQueryClient as useQC } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { User } from '@/types/user'
