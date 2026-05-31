@@ -1,14 +1,15 @@
-// src/app/checkout/page.tsx
+// src/app/checkout/page.tsx - Complete corrected version
+
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPin, CreditCard, CheckCircle, ArrowRight, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCartStore } from "../../store/cart"
 import { formatCurrency } from "../../lib/utils"
-import { createOrder, initiateMpesaPayment, checkPaymentStatus } from "../../lib/api"
+import { initiateMpesaPayment, checkPaymentStatus, createOrder, cancelOrder } from "../../lib/api"
 import { getToken } from "../../lib/auth"
 import toast from "react-hot-toast"
 
@@ -32,12 +33,9 @@ export default function CheckoutPage() {
   const cartStore = useCartStore()
   const [orderSuccess, setOrderSuccess] = useState(false)
   
-  // Auto-rehydrate and auto-select shipping area if missing
   useEffect(() => {
     const ensureCartReady = async () => {
       await cartStore.loadInitialData()
-      
-      // Auto-select first area if none selected but areas available
       if (!cartStore.selectedShippingAreaId && cartStore.shippingAreas.length > 0) {
         const firstActive = cartStore.shippingAreas.find(a => a.isActive)
         if (firstActive) {
@@ -46,18 +44,15 @@ export default function CheckoutPage() {
         }
       }
     }
-    
     ensureCartReady().catch(console.error)
   }, [cartStore])
   
   const [orderId, setOrderId] = useState("")
   const [isGuest, setIsGuest] = useState(false)
-  
-  // Guest info state
   const [guestEmail, setGuestEmail] = useState("")
   const [guestPhone, setGuestPhone] = useState("")
   
-  // M-PESA state - Real integration
+  // M-PESA state
   const [mpesaPhone, setMpesaPhone] = useState("")
   const [mpesaStep, setMpesaStep] = useState<"idle" | "processing" | "pending" | "completed" | "failed">("idle")
   const [mpesaError, setMpesaError] = useState("")
@@ -72,7 +67,6 @@ export default function CheckoutPage() {
   const [cardError, setCardError] = useState("")
 
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitTimeout, setSubmitTimeout] = useState<NodeJS.Timeout | null>(null)
   
   // Shipping address state
   const [shippingAddress, setShippingAddress] = useState({
@@ -86,7 +80,6 @@ export default function CheckoutPage() {
     phone: ""
   })
 
-  // Check guest status
   useEffect(() => {
     const token = getToken()
     setIsGuest(!token)
@@ -122,10 +115,62 @@ export default function CheckoutPage() {
     }
   }, [pollingInterval])
 
+  // Prepare order data for creation
+  const prepareOrderData = (paymentStatus: 'unpaid' | 'paid' = 'unpaid') => {
+    const token = getToken()
+    const isGuestUser = !token
+    
+    if (!cart.selectedShippingAreaId) {
+      throw new Error('Please select a shipping area')
+    }
+
+    const orderData: any = {
+      items: items.map((item) => ({
+        productId: item.id,
+        qty: item.qty,
+        price: item.price,
+        name: item.name,
+        image: item.image
+      })),
+      subtotal: Number(subtotal),
+      shippingCost: Number(shipping),
+      discount: Number(finalDiscount),
+      tax: Number(tax),
+      total: Number(totals.total),
+      shippingAreaId: cart.selectedShippingAreaId,
+      promoCode: cart.promoCode || "",
+      shippingAddress: {
+        fullName: shippingAddress.fullName.trim(),
+        address1: shippingAddress.address1.trim(),
+        address2: shippingAddress.address2?.trim() || "",
+        city: shippingAddress.city.trim(),
+        state: shippingAddress.state.trim(),
+        zip: shippingAddress.zip.trim(),
+        country: shippingAddress.country,
+        phone: shippingAddress.phone.trim(),
+        email: isGuestUser ? guestEmail.trim() : undefined
+      },
+      paymentMethod: "mpesa",
+      paymentStatus: paymentStatus,
+      status: paymentStatus === 'paid' ? 'processing' : 'pending',
+      notes: ""
+    }
+
+    if (isGuestUser) {
+      orderData.guestInfo = {
+        email: guestEmail,
+        phone: guestPhone,
+        name: shippingAddress.fullName
+      }
+    }
+    
+    return orderData
+  }
+
   // Start polling for M-PESA payment status
-  const startPolling = (requestId: string) => {
+  const startPolling = useCallback((requestId: string, orderIdParam: string) => {
     let attempts = 0
-    const maxAttempts = 30 // Poll for 30 times (90 seconds)
+    const maxAttempts = 30 // 90 seconds max
     
     const interval = setInterval(async () => {
       attempts++
@@ -135,18 +180,32 @@ export default function CheckoutPage() {
         if (result.status === 'completed') {
           clearInterval(interval)
           setPollingInterval(null)
-          setMpesaStep("completed")
-          toast.success('Payment successful!')
           
-          // Clear cart and redirect to success
+          // Payment successful - order already exists, backend callback will update it
+          setMpesaStep("completed")
+          toast.success('Payment confirmed! Your order is complete.', { id: 'payment-status' })
+          
+          // Clear cart and show success
           cart.clearCart()
           setOrderSuccess(true)
+          
         } else if (result.status === 'failed' || attempts >= maxAttempts) {
           clearInterval(interval)
           setPollingInterval(null)
           setMpesaStep("failed")
           setMpesaError(result.resultDesc || 'Payment failed or timed out')
           toast.error('Payment failed. Please try again.')
+          
+          // Cancel the pending order since payment failed
+          try {
+            await cancelOrder(orderIdParam, { 
+              email: isGuest ? guestEmail : undefined, 
+              phone: isGuest ? guestPhone : undefined 
+            })
+            toast.success('Pending order has been cancelled')
+          } catch (cancelError) {
+            console.error('Failed to cancel order:', cancelError)
+          }
         }
       } catch (error) {
         console.error('Polling error:', error)
@@ -157,21 +216,44 @@ export default function CheckoutPage() {
           toast.error('Payment status check timed out')
         }
       }
-    }, 3000) // Poll every 3 seconds
+    }, 3000)
     
     setPollingInterval(interval)
-  }
+  }, [cart, isGuest, guestEmail, guestPhone])
 
-  // Handle M-PESA payment initiation
+  // Handle M-PESA payment - CREATE ORDER FIRST as UNPAID
   const handleMpesaPayment = async () => {
-    if (!mpesaPhone || mpesaPhone.length < 10) {
-      setMpesaError("Please enter a valid phone number (e.g., 0712345678)")
+    // Format phone number to 2547XXXXXXXX
+    let formattedPhone = mpesaPhone.replace(/\D/g, '')
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '254' + formattedPhone.substring(1)
+    } else if (formattedPhone.startsWith('+254')) {
+      formattedPhone = formattedPhone.substring(1)
+    } else if (!formattedPhone.startsWith('254')) {
+      formattedPhone = '254' + formattedPhone
+    }
+    
+    if (formattedPhone.length !== 12 || !formattedPhone.startsWith('2547')) {
+      setMpesaError("Please enter a valid phone number (e.g., 0712345678 or 254712345678)")
       return
     }
 
-    if (!orderId) {
-      // First create the order
-      await handlePlaceOrder(true) // Pass flag to not clear cart yet
+    // Validate shipping and guest info before proceeding
+    if (!isShippingValid()) {
+      toast.error('Please complete shipping address')
+      setStep("shipping")
+      return
+    }
+    
+    if (isGuest && !isGuestInfoValid()) {
+      toast.error('Please complete guest information')
+      setStep("shipping")
+      return
+    }
+
+    if (!cart.selectedShippingAreaId) {
+      toast.error('Please select a shipping area')
+      setStep("shipping")
       return
     }
 
@@ -179,24 +261,35 @@ export default function CheckoutPage() {
     setMpesaError("")
     
     try {
-      const response = await initiateMpesaPayment(orderId, mpesaPhone)
+      // STEP 1: Create order FIRST with 'unpaid' status
+      const orderData = prepareOrderData('unpaid')
+      toast.loading('Creating order...', { id: 'order-creation' })
+      const createdOrder = await createOrder(orderData as any)
+      const realOrderId = createdOrder._id
+      setOrderId(realOrderId)
+      
+      toast.success('Order created! Initiating payment...', { id: 'order-creation' })
+      
+      // STEP 2: Initiate M-PESA payment with REAL order ID and formatted phone
+      const response = await initiateMpesaPayment(realOrderId, formattedPhone)
       setCheckoutRequestId(response.checkoutRequestId)
       setMpesaStep("pending")
-      toast.success(response.message || 'STK Push sent! Check your phone.')
+      toast.success('STK Push sent! Check your phone for the M-PESA prompt.')
       
-      // Start polling for payment status
-      startPolling(response.checkoutRequestId)
+      // STEP 3: Start polling for payment status
+      startPolling(response.checkoutRequestId, realOrderId)
+      
     } catch (error: any) {
-      console.error('M-PESA initiation error:', error)
-      const errorMsg = error.response?.data?.error || 'Failed to initiate payment'
+      console.error('M-PESA error:', error)
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to initiate payment'
       setMpesaError(errorMsg)
       setMpesaStep("failed")
       toast.error(errorMsg)
     }
   }
 
-  // Handle place order for non-MPESA methods
-  const handlePlaceOrder = async (skipCartClear: boolean = false) => {
+  // Handle cash/bank transfer order (create order immediately as paid/processing)
+  const handleCashOrder = async () => {
     if (isSubmitting || loading) {
       toast.error('Please wait, order is already being processed...')
       return
@@ -209,12 +302,8 @@ export default function CheckoutPage() {
       const token = getToken()
       const isGuestUser = !token
       
-      const calculatedTax = subtotal * cart.taxRate
-      
       if (!cart.selectedShippingAreaId) {
         toast.error('Please select a shipping area')
-        setIsSubmitting(false)
-        setLoading(false)
         return
       }
 
@@ -231,7 +320,7 @@ export default function CheckoutPage() {
         discount: Number(finalDiscount),
         tax: Number(tax),
         total: Number(totals.total),
-        shippingAreaId: cart.selectedShippingAreaId!,
+        shippingAreaId: cart.selectedShippingAreaId,
         promoCode: cart.promoCode || "",
         shippingAddress: {
           fullName: shippingAddress.fullName.trim(),
@@ -245,6 +334,8 @@ export default function CheckoutPage() {
           email: isGuestUser ? guestEmail.trim() : undefined
         },
         paymentMethod: paymentMethod,
+        paymentStatus: 'unpaid',
+        status: paymentMethod === 'cash' ? 'pending' : 'processing',
         notes: ""
       }
 
@@ -257,51 +348,19 @@ export default function CheckoutPage() {
       }
 
       const response = await createOrder(orderData as any)
-
       const newOrderId = response._id
-      if (!newOrderId) {
-        throw new Error("No order ID received")
-      }
-
       setOrderId(newOrderId)
-
-      // For MPESA, don't clear cart yet - wait for payment confirmation
-      if (!skipCartClear && paymentMethod !== 'mpesa') {
-        cart.clearCart()
-        setOrderSuccess(true)
-      }
-
-      // For non-MPESA methods, clear cart and show success
-      if (paymentMethod !== 'mpesa') {
-        if (isGuestUser) {
-          const guestOrders = JSON.parse(localStorage.getItem("guest_orders") || "[]")
-          guestOrders.push({
-            ...response,
-            _id: newOrderId,
-            orderNumber: response.orderNumber || `ORD-${newOrderId.slice(-8).toUpperCase()}`,
-            subtotal,
-            shippingCost,
-            tax: calculatedTax,
-            total: totals.total
-          })
-          localStorage.setItem("guest_orders", JSON.stringify(guestOrders))
-        }
-        cart.clearCart()
-        setOrderSuccess(true)
-      }
+      
+      cart.clearCart()
+      setOrderSuccess(true)
       
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message || "Order failed"
       toast.error(msg)
+    } finally {
       setIsSubmitting(false)
       setLoading(false)
-      throw error
     }
-  }
-
-  // Handle cash/bank transfer order
-  const handleCashOrder = async () => {
-    await handlePlaceOrder(false)
   }
 
   const resetMpesa = () => {
@@ -332,18 +391,6 @@ export default function CheckoutPage() {
     setGuestEmail("")
     setGuestPhone("")
   }
-
-  // Cleanup effect
-  useEffect(() => {
-    return () => {
-      if (submitTimeout) {
-        clearTimeout(submitTimeout)
-      }
-      if (pollingInterval) {
-        clearInterval(pollingInterval)
-      }
-    }
-  }, [submitTimeout, pollingInterval])
 
   if (orderSuccess) return <OrderSuccess orderId={orderId} />
   if (items.length === 0) return <EmptyCart />
@@ -455,9 +502,9 @@ export default function CheckoutPage() {
                   <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-lg overflow-hidden">
                     <div className="p-6 lg:p-8">
                       <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
-                       <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center">
-                        <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      </div>
+                        <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center">
+                          <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        </div>
                         Payment Method
                       </h2>
 

@@ -218,26 +218,28 @@ console.log('Order Tax Calculation:', {
 });
 
     // Create order
-    const orderData: any = {
-      items: orderItems,
-      subtotal: calculatedSubtotal,
-      totalCost: totalCost,
-      totalProfit: totalProfit,
-      shippingCost,
-      tax,
-      discount,
-      total: finalTotal,
-      selectedShippingArea: shippingArea._id,
-      appliedPromoCode: appliedPromo,
-      shippingAddress: {
-        ...shippingAddress,
-        email: shippingAddress.email || guestInfoData?.email
-      },
-      paymentMethod,
-      paymentStatus: 'unpaid',
-      status: paymentMethod === 'cod' ? 'pending' : 'processing',
-      notes: notes || null
-    };
+const orderData: any = {
+  items: orderItems,
+  subtotal: calculatedSubtotal,
+  totalCost: totalCost,
+  totalProfit: totalProfit,
+  shippingCost,
+  tax,
+  discount,
+  total: finalTotal,
+  selectedShippingArea: shippingArea._id,
+  appliedPromoCode: appliedPromo,
+  shippingAddress: {
+    ...shippingAddress,
+    email: shippingAddress.email || guestInfoData?.email
+  },
+  paymentMethod,
+  // ✅ Accept paymentStatus from request, default to 'unpaid'
+  paymentStatus: req.body.paymentStatus || 'unpaid',
+  // ✅ Accept status from request, default based on payment method
+  status: req.body.status || (paymentMethod === 'cod' ? 'pending' : 'processing'),
+  notes: notes || null
+};
 
     if (userId) {
       orderData.userId = userId;

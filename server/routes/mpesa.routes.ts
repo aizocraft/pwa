@@ -9,7 +9,53 @@ import { sendPaymentConfirmation, sendPaymentFailedNotification } from '../servi
 
 const router = Router();
 
-// Helper: Get M-PESA Access Token
+// ==================== CONFIGURATION ====================
+
+// Get M-PESA API URLs based on environment
+const getMpesaUrls = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isSandbox = process.env.MPESA_ENVIRONMENT === 'sandbox' || !isProduction;
+  
+  if (isSandbox) {
+    return {
+      auth: 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+      stkPush: 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+      query: 'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query',
+      register: 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl'
+    };
+  } else {
+    return {
+      auth: 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+      stkPush: 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+      query: 'https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query',
+      register: 'https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl'
+    };
+  }
+};
+
+// Validate M-PESA configuration
+function validateMpesaConfig(): boolean {
+  const required = [
+    'MPESA_CONSUMER_KEY',
+    'MPESA_CONSUMER_SECRET',
+    'MPESA_SHORTCODE',
+    'MPESA_PASSKEY'
+  ];
+  
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.error(`❌ Missing M-PESA environment variables: ${missing.join(', ')}`);
+    return false;
+  }
+  
+  const env = process.env.MPESA_ENVIRONMENT || 'sandbox';
+  console.log(`✅ M-PESA running in ${env.toUpperCase()} mode`);
+  
+  return true;
+}
+
+// Get M-PESA Access Token
 async function getMpesaToken(): Promise<string> {
   const consumerKey = process.env.MPESA_CONSUMER_KEY;
   const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
@@ -19,64 +65,102 @@ async function getMpesaToken(): Promise<string> {
   }
 
   const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+  const urls = getMpesaUrls();
   
-  const response = await axios.get(
-    'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
-    {
+  try {
+    const response = await axios.get(urls.auth, {
       headers: {
         Authorization: `Basic ${auth}`
       },
       timeout: 10000
-    }
-  );
-
-  return response.data.access_token;
+    });
+    return response.data.access_token;
+  } catch (error: any) {
+    console.error('Failed to get M-PESA token:', error.response?.data || error.message);
+    throw new Error('Failed to authenticate with M-PESA');
+  }
 }
 
-// Helper: Generate M-PESA Password
+// Generate M-PESA Password
 function generateMpesaPassword(): { password: string; timestamp: string } {
   const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
-  const str = `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`;
+  const shortcode = process.env.MPESA_SHORTCODE;
+  const passkey = process.env.MPESA_PASSKEY;
+  
+  if (!shortcode || !passkey) {
+    throw new Error('M-PESA shortcode or passkey not configured');
+  }
+  
+  const str = `${shortcode}${passkey}${timestamp}`;
   const password = Buffer.from(str).toString('base64');
   return { password, timestamp };
 }
 
-// Helper: Validate Kenyan phone number
+// Validate Kenyan phone number
 function validateKenyanPhone(phone: string): string | null {
-  let normalized = phone.replace(/^\+254/, '254').replace(/^0/, '254');
-  if (/^2547\d{8}$/.test(normalized)) {
-    return normalized;
+  let cleaned = phone.replace(/\D/g, '');
+  
+  if (cleaned.startsWith('0')) {
+    cleaned = '254' + cleaned.substring(1);
+  } else if (cleaned.startsWith('+254')) {
+    cleaned = cleaned.substring(1);
+  } else if (!cleaned.startsWith('254')) {
+    cleaned = '254' + cleaned;
   }
+  
+  if (/^254[17]\d{8}$/.test(cleaned)) {
+    return cleaned;
+  }
+  
   return null;
 }
 
-// POST /api/mpesa/stk-push - Initiate M-PESA STK Push
+// Format amount
+function formatAmount(amount: number): number {
+  return Math.round(amount);
+}
+
+// ==================== ROUTES ====================
+
+/**
+ * POST /api/mpesa/stk-push
+ * Initiate STK Push payment
+ */
 router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
+    if (!validateMpesaConfig()) {
+      return res.status(500).json({ 
+        error: 'Payment system not configured',
+        code: 'CONFIG_ERROR'
+      });
+    }
+
     const { orderId, phoneNumber } = req.body;
 
     if (!orderId || !phoneNumber) {
-      return res.status(400).json({ error: 'Order ID and phone number are required' });
+      return res.status(400).json({ 
+        error: 'Order ID and phone number required',
+        code: 'MISSING_FIELDS'
+      });
     }
 
-    // Validate phone
     const normalizedPhone = validateKenyanPhone(phoneNumber);
     if (!normalizedPhone) {
-      return res.status(400).json({ error: 'Invalid Kenyan phone number. Use format: 07XXXXXXXX or 2547XXXXXXXX' });
+      return res.status(400).json({ 
+        error: 'Invalid Kenyan phone number. Use 07XXXXXXXX or 2547XXXXXXXX',
+        code: 'INVALID_PHONE'
+      });
     }
 
-    // Find order
     const order = await OrderModel.findById(orderId);
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ error: 'Order not found', code: 'ORDER_NOT_FOUND' });
     }
 
-    // Check if order is already paid
     if (order.paymentStatus === 'paid') {
-      return res.status(400).json({ error: 'Order is already paid' });
+      return res.status(400).json({ error: 'Order already paid', code: 'ALREADY_PAID' });
     }
 
-    // Check if there's already a pending transaction
     const existingTransaction = await TransactionModel.findOne({
       orderId: order._id,
       status: 'pending',
@@ -86,45 +170,41 @@ router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: 
     if (existingTransaction) {
       return res.status(400).json({
         error: 'Payment already in progress',
-        checkoutRequestId: existingTransaction.transactionId
+        checkoutRequestId: existingTransaction.transactionId,
+        code: 'PAYMENT_IN_PROGRESS'
       });
     }
 
-    // Get M-PESA token
     const token = await getMpesaToken();
     const { password, timestamp } = generateMpesaPassword();
+    const urls = getMpesaUrls();
+    
+    const callbackUrl = process.env.MPESA_CALLBACK_URL || 
+                       `${process.env.BASE_URL || 'http://localhost:4000'}/api/mpesa/callback`;
 
-    // Prepare STK Push request
     const stkPushRequest = {
       BusinessShortCode: process.env.MPESA_SHORTCODE,
       Password: password,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
-      Amount: Math.round(order.total),
+      Amount: formatAmount(order.total),
       PartyA: normalizedPhone,
       PartyB: process.env.MPESA_SHORTCODE,
       PhoneNumber: normalizedPhone,
-      CallBackURL: `${process.env.BASE_URL || 'http://localhost:4000'}/api/mpesa/callback`,
-      AccountReference: order.orderNumber,
-      TransactionDesc: `Payment for ${order.orderNumber}`
+      CallBackURL: callbackUrl,
+      AccountReference: order.orderNumber.slice(-12),
+      TransactionDesc: `Payment for ${order.orderNumber.slice(-10)}`
     };
 
-    console.log('STK Push Request:', stkPushRequest);
+    console.log(`🔄 Initiating STK Push for order ${order.orderNumber} in ${process.env.MPESA_ENVIRONMENT || 'sandbox'} mode`);
 
-    // Make STK Push request
-    const response = await axios.post(
-      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
-      stkPushRequest,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 15000
-      }
-    );
-
-    console.log('STK Push Response:', response.data);
+    const response = await axios.post(urls.stkPush, stkPushRequest, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 15000
+    });
 
     const { CheckoutRequestID, ResponseCode, ResponseDescription, CustomerMessage } = response.data;
 
@@ -132,7 +212,6 @@ router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: 
       throw new Error(`STK Push failed: ${ResponseDescription}`);
     }
 
-    // Create transaction record
     const transaction = new TransactionModel({
       orderId: order._id,
       userId: req.user?.userId,
@@ -159,58 +238,61 @@ router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: 
   } catch (error: any) {
     console.error('STK Push error:', error);
     
-    // Handle specific errors
     if (error.response?.data) {
       return res.status(400).json({
         error: 'M-PESA service error',
-        details: error.response.data.errorMessage || error.response.data
+        details: error.response.data.errorMessage || error.response.data,
+        code: 'MPESA_ERROR'
       });
     }
 
     res.status(500).json({
       error: 'Failed to initiate STK Push',
-      message: error.message
+      message: error.message,
+      code: 'STK_PUSH_FAILED'
     });
   }
 });
 
-// POST /api/mpesa/callback - M-PESA Callback (Webhook)
+/**
+ * POST /api/mpesa/callback
+ * M-PESA Callback Webhook
+ */
 router.post('/callback', async (req: Request, res: Response) => {
   try {
-    console.log('M-PESA Callback received:', JSON.stringify(req.body, null, 2));
+    console.log('📞 M-PESA Callback received');
 
     const { Body } = req.body;
     
     if (!Body || !Body.stkCallback) {
       console.error('Invalid callback structure');
-      return res.status(400).json({ ResultCode: 1, ResultDesc: 'Invalid callback data' });
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Invalid data but acknowledged' });
     }
 
     const stkCallback = Body.stkCallback;
     const { ResultCode, ResultDesc, CheckoutRequestID, CallbackMetadata } = stkCallback;
 
-    // Find transaction
+    console.log(`Processing callback for CheckoutRequestID: ${CheckoutRequestID}, ResultCode: ${ResultCode}`);
+
     const transaction = await TransactionModel.findOne({ transactionId: CheckoutRequestID });
     
     if (!transaction) {
       console.error(`Transaction not found: ${CheckoutRequestID}`);
-      return res.status(404).json({ ResultCode: 1, ResultDesc: 'Transaction not found' });
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Transaction not found but acknowledged' });
     }
 
-    // Prevent duplicate processing
     if (transaction.status === 'completed') {
       console.log(`Transaction ${CheckoutRequestID} already completed`);
-      return res.json({ ResultCode: 0, ResultDesc: 'Already processed' });
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Already processed' });
     }
 
-    // Find associated order
     const order = await OrderModel.findById(transaction.orderId);
     if (!order) {
-      console.error(`Order not found for transaction: ${transaction.orderId}`);
-      return res.status(404).json({ ResultCode: 1, ResultDesc: 'Order not found' });
+      console.error(`Order not found: ${transaction.orderId}`);
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Order not found but acknowledged' });
     }
 
-    if (ResultCode === 0) {
+    if (ResultCode === 0 && CallbackMetadata) {
       // Payment successful
       const metadata = CallbackMetadata?.Item || [];
       
@@ -219,14 +301,12 @@ router.post('/callback', async (req: Request, res: Response) => {
       const phone = metadata.find((item: any) => item.Name === 'PhoneNumber')?.Value;
       const transactionDate = metadata.find((item: any) => item.Name === 'TransactionDate')?.Value;
 
-      // Update transaction
       transaction.status = 'completed';
       transaction.mpesaReceipt = mpesaReceipt || '';
       transaction.notes = `Payment completed. Receipt: ${mpesaReceipt || 'N/A'}`;
       transaction.paidAt = new Date();
       await transaction.save();
 
-      // Update order
       order.paymentStatus = 'paid';
       order.status = 'processing';
       order.paymentDetails = {
@@ -237,7 +317,8 @@ router.post('/callback', async (req: Request, res: Response) => {
       };
       await order.save();
 
-      // Send confirmation email
+      console.log(`✅ Payment successful: ${mpesaReceipt} for order ${order.orderNumber}`);
+
       const customerEmail = transaction.guestEmail || order.shippingAddress.email;
       if (customerEmail) {
         sendPaymentConfirmation({
@@ -252,10 +333,8 @@ router.post('/callback', async (req: Request, res: Response) => {
             quantity: item.qty,
             price: item.sellingPrice
           }))
-        }).catch(err => console.error('Failed to send payment confirmation:', err));
+        }).catch(err => console.error('Failed to send email:', err));
       }
-
-      console.log(`✅ Payment successful: ${mpesaReceipt} for order ${order.orderNumber}`); 
 
     } else {
       // Payment failed
@@ -263,11 +342,13 @@ router.post('/callback', async (req: Request, res: Response) => {
       transaction.notes = `Payment failed: ${ResultDesc}`;
       await transaction.save();
 
-      // Keep order as unpaid
-      order.paymentStatus = 'unpaid';
-      await order.save();
+      if (order.paymentStatus !== 'paid') {
+        order.paymentStatus = 'unpaid';
+        await order.save();
+      }
 
-      // Send failure notification
+      console.error(`❌ Payment failed: ${ResultDesc}`);
+
       const customerEmail = transaction.guestEmail || order.shippingAddress.email;
       if (customerEmail) {
         sendPaymentFailedNotification({
@@ -276,41 +357,40 @@ router.post('/callback', async (req: Request, res: Response) => {
           orderNumber: order.orderNumber,
           amount: transaction.amount,
           reason: ResultDesc
-        }).catch(err => console.error('Failed to send payment failure notification:', err));
+        }).catch(err => console.error('Failed to send email:', err));
       }
-
-      console.error(`❌ Payment failed for order ${order.orderNumber}: ${ResultDesc}`);
     }
 
-    res.json({ ResultCode: 0, ResultDesc: 'Success' });
+    res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
 
   } catch (error: any) {
-    console.error('M-PESA callback error:', error);
-    res.status(500).json({ ResultCode: 1, ResultDesc: 'Callback processing failed' });
+    console.error('Callback error:', error);
+    res.status(200).json({ ResultCode: 0, ResultDesc: 'Acknowledged' });
   }
 });
 
-// POST /api/mpesa/query - Query STK Push status
+/**
+ * POST /api/mpesa/query
+ * Query STK Push status
+ */
 router.post('/query', optionalAuthMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { checkoutRequestId } = req.body;
 
     if (!checkoutRequestId) {
-      return res.status(400).json({ error: 'CheckoutRequestID is required' });
+      return res.status(400).json({ error: 'CheckoutRequestID required', code: 'MISSING_ID' });
     }
 
-    // Find transaction
     const transaction = await TransactionModel.findOne({ transactionId: checkoutRequestId });
     
     if (!transaction) {
-      return res.status(404).json({ error: 'Transaction not found' });
+      return res.status(404).json({ error: 'Transaction not found', code: 'NOT_FOUND' });
     }
 
-    // Get M-PESA token
     const token = await getMpesaToken();
     const { password, timestamp } = generateMpesaPassword();
+    const urls = getMpesaUrls();
 
-    // Query status
     const queryRequest = {
       BusinessShortCode: process.env.MPESA_SHORTCODE,
       Password: password,
@@ -318,27 +398,20 @@ router.post('/query', optionalAuthMiddleware, async (req: Request & { user?: any
       CheckoutRequestID: checkoutRequestId
     };
 
-    const response = await axios.post(
-      'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query',
-      queryRequest,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      }
-    );
+    const response = await axios.post(urls.query, queryRequest, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000
+    });
 
     const { ResultCode, ResultDesc } = response.data;
 
-    // Update transaction status if needed
     if (ResultCode === '0' && transaction.status === 'pending') {
-      // Payment completed but callback not yet received
       transaction.status = 'completed';
       await transaction.save();
       
-      // Update order
       const order = await OrderModel.findById(transaction.orderId);
       if (order && order.paymentStatus !== 'paid') {
         order.paymentStatus = 'paid';
@@ -366,22 +439,24 @@ router.post('/query', optionalAuthMiddleware, async (req: Request & { user?: any
     });
 
   } catch (error: any) {
-    console.error('STK Query error:', error);
-    res.status(500).json({ error: 'Failed to query payment status' });
+    console.error('Query error:', error);
+    res.status(500).json({ error: 'Failed to query payment status', code: 'QUERY_FAILED' });
   }
 });
 
-// GET /api/mpesa/payment-status/:orderId - Get payment status for an order
+/**
+ * GET /api/mpesa/payment-status/:orderId
+ * Get payment status for an order
+ */
 router.get('/payment-status/:orderId', optionalAuthMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { orderId } = req.params;
 
     const order = await OrderModel.findById(orderId);
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ error: 'Order not found', code: 'NOT_FOUND' });
     }
 
-    // Check permission
     let hasAccess = false;
     if (req.user?.userId) {
       hasAccess = order.userId?.toString() === req.user.userId || req.user.role === 'admin';
@@ -390,7 +465,7 @@ router.get('/payment-status/:orderId', optionalAuthMiddleware, async (req: Reque
     }
 
     if (!hasAccess) {
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ error: 'Access denied', code: 'FORBIDDEN' });
     }
 
     const transaction = await TransactionModel.findOne({ orderId: order._id }).sort({ createdAt: -1 });
@@ -412,7 +487,75 @@ router.get('/payment-status/:orderId', optionalAuthMiddleware, async (req: Reque
 
   } catch (error: any) {
     console.error('Payment status error:', error);
-    res.status(500).json({ error: 'Failed to fetch payment status' });
+    res.status(500).json({ error: 'Failed to fetch payment status', code: 'STATUS_FETCH_FAILED' });
+  }
+});
+
+/**
+ * POST /api/mpesa/simulate
+ * Simulate payment (Sandbox only)
+ */
+router.post('/simulate', async (req: Request, res: Response) => {
+  const isSandbox = process.env.MPESA_ENVIRONMENT === 'sandbox' || process.env.NODE_ENV !== 'production';
+  
+  if (!isSandbox) {
+    return res.status(403).json({ error: 'Simulation only available in sandbox', code: 'NOT_IN_SANDBOX' });
+  }
+
+  try {
+    const { checkoutRequestId, amount, mpesaReceipt } = req.body;
+
+    if (!checkoutRequestId) {
+      return res.status(400).json({ error: 'checkoutRequestId required' });
+    }
+
+    const transaction = await TransactionModel.findOne({ transactionId: checkoutRequestId });
+    
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    if (transaction.status !== 'pending') {
+      return res.status(400).json({ error: `Transaction already ${transaction.status}` });
+    }
+
+    const order = await OrderModel.findById(transaction.orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Simulate successful payment
+    transaction.status = 'completed';
+    transaction.mpesaReceipt = mpesaReceipt || `SIM${Date.now()}`;
+    transaction.notes = 'Simulated payment';
+    transaction.paidAt = new Date();
+    await transaction.save();
+
+    order.paymentStatus = 'paid';
+    order.status = 'processing';
+    order.paymentDetails = {
+      transactionId: checkoutRequestId,
+      mpesaReceipt: transaction.mpesaReceipt,
+      paidAt: new Date(),
+      phoneNumber: transaction.guestPhone || ''
+    };
+    await order.save();
+
+    console.log(`✅ Simulated payment for order ${order.orderNumber}`);
+
+    res.json({
+      success: true,
+      message: 'Payment simulated successfully',
+      transaction: {
+        id: transaction._id,
+        status: transaction.status,
+        mpesaReceipt: transaction.mpesaReceipt
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Simulation error:', error);
+    res.status(500).json({ error: 'Failed to simulate payment', code: 'SIMULATION_FAILED' });
   }
 });
 
