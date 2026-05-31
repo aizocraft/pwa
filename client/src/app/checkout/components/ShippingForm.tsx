@@ -281,7 +281,21 @@ export default function ShippingForm({
             </div>
           </div>
 
-          {/* Phone field removed from bottom */}
+          {/* Phone field  */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Phone Number *  
+            </label>
+            <div className="relative">  
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="tel"                value={shippingAddress.phone}
+                onChange={handlePhoneChange}
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-shadow"
+                placeholder="254700000000"
+              />
+            </div>
+          </div>
 
           {/* Read-only: Shipping & Promo from Cart (No Edit) */}
     

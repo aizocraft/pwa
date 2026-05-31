@@ -930,4 +930,39 @@ router.get('/admin/stats/summary', authMiddleware, async (req: Request & { user?
   }
 });
 
+// GET /api/orders/:id/can-retry - Check if order can retry payment
+router.get('/:id/can-retry', optionalAuthMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const orderId = req.params.id;
+    
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+    
+    const order = await OrderModel.findById(orderId);
+    
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    // Check if order can retry payment
+    const canRetry = order.paymentStatus === 'unpaid';
+    const lastTransaction = await TransactionModel.findOne({ 
+      orderId: order._id 
+    }).sort({ createdAt: -1 });
+    
+    res.json({
+      canRetry,
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      paymentStatus: order.paymentStatus,
+      lastTransactionStatus: lastTransaction?.status || null
+    });
+    
+  } catch (error: any) {
+    console.error('Check retry error:', error);
+    res.status(500).json({ error: 'Failed to check retry status' });
+  }
+});
+
 export default router;

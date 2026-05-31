@@ -512,6 +512,29 @@ export async function cancelOrder(id: string, verification?: { email?: string; p
   }
 }
 
+// Check if payment can be retried for an order
+
+export async function checkCanRetry(orderId: string): Promise<{
+  canRetry: boolean;
+  orderId: string;
+  orderNumber: string;
+  paymentStatus: string;
+  lastTransactionStatus: string | null;
+}> {
+  try {
+    const response = await api.get(`/orders/${orderId}/can-retry`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to check retry status:', error);
+    return {
+      canRetry: false,
+      orderId,
+      orderNumber: '',
+      paymentStatus: '',
+      lastTransactionStatus: null
+    };
+  }
+}
 export async function retryPayment(orderId: string): Promise<{ success: boolean; message: string }> {
   try {
     const response = await api.post(`/orders/${orderId}/retry-payment`);

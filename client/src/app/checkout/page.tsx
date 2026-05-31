@@ -1,4 +1,4 @@
-// src/app/checkout/page.tsx - With Card Payment (Coming Soon)
+// src/app/checkout/page.tsx - Complete working version
 
 'use client'
 
@@ -6,10 +6,8 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPin, CreditCard, CheckCircle, ArrowRight, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useCartStore } from "../../store/cart"
-import { formatCurrency } from "../../lib/utils"
-import { initiateMpesaPayment, checkPaymentStatus, createOrder, cancelOrder } from "../../lib/api"
+import { initiateMpesaPayment, checkPaymentStatus, createOrder, checkCanRetry } from "../../lib/api"
 import { getToken } from "../../lib/auth"
 import toast from "react-hot-toast"
 
@@ -24,7 +22,6 @@ import CardPayment from "./components/CardPayment"
 type PaymentMethod = "mpesa" | "bank_transfer" | "card"
 
 export default function CheckoutPage() {
-  const router = useRouter()
   const cart = useCartStore()
   const { items, subtotal, shippingCost, discount, totals, clearCart } = cart
   const [loading, setLoading] = useState(false)
@@ -151,7 +148,7 @@ export default function CheckoutPage() {
         phone: shippingAddress.phone.trim(),
         email: isGuestUser ? guestEmail.trim() : undefined
       },
-      paymentMethod: paymentMethod,
+      paymentMethod: "mpesa",
       paymentStatus: paymentStatus,
       status: paymentStatus === 'paid' ? 'processing' : 'pending',
       notes: ""
@@ -168,7 +165,7 @@ export default function CheckoutPage() {
     return orderData
   }
 
-  // Start polling for M-PESA payment status
+  // Start polling for M-PESA payment status - IMPROVED LOGIC
   const startPolling = useCallback((requestId: string, orderIdParam: string) => {
     let attempts = 0
     const maxAttempts = 60 // 3 minutes
@@ -188,6 +185,7 @@ export default function CheckoutPage() {
         const result = await checkPaymentStatus(requestId)
         console.log(`📊 Status response:`, result.status, result.resultDesc)
         
+        // Case 1: Payment completed successfully
         if (result.status === 'completed') {
           isResolved = true
           clearInterval(interval)
@@ -203,6 +201,7 @@ export default function CheckoutPage() {
           return
         }
         
+        // Case 2: Payment failed - don't auto-cancel, just show error
         if (result.status === 'failed') {
           isResolved = true
           clearInterval(interval)
@@ -214,19 +213,22 @@ export default function CheckoutPage() {
           return
         }
         
+        // Case 3: Still pending - continue polling
         if (result.status === 'pending' && attempts < maxAttempts) {
+          console.log(`⏳ Payment still pending, continuing to poll...`)
           return
         }
         
+        // Case 4: Max attempts reached but still pending
         if (attempts >= maxAttempts && result.status === 'pending') {
           isResolved = true
           clearInterval(interval)
           pollingRef.current = null
           
+          // Keep as pending - don't mark as failed
           setMpesaStep("pending")
-          toast.error('⏳ Payment is taking longer than expected. Please check your M-PESA and refresh the page.', {
-            duration: 10000,
-            id: 'payment-timeout'
+          toast.error('⏳ Payment is taking longer than expected. Please check your M-PESA or contact support.', {
+            duration: 10000
           })
           return
         }
@@ -248,8 +250,9 @@ export default function CheckoutPage() {
     pollingRef.current = interval
   }, [cart])
 
-  // Handle M-PESA payment
+  // Handle M-PESA payment - CREATE ORDER FIRST as UNPAID
   const handleMpesaPayment = async () => {
+    // Format phone number to 2547XXXXXXXX
     let formattedPhone = mpesaPhone.replace(/\D/g, '')
     if (formattedPhone.startsWith('0')) {
       formattedPhone = '254' + formattedPhone.substring(1)
@@ -286,22 +289,40 @@ export default function CheckoutPage() {
     setMpesaError("")
     
     try {
-      const orderData = prepareOrderData('unpaid')
-      toast.loading('Creating order...', { id: 'order-creation' })
-      const createdOrder = await createOrder(orderData as any)
-      const realOrderId = createdOrder._id
-      const realOrderNumber = createdOrder.orderNumber
-      setOrderId(realOrderId)
-      setOrderNumber(realOrderNumber)
+      let existingOrderId = orderId
       
-      toast.success('Order created! Initiating payment...', { id: 'order-creation' })
+      // If no existing order, create a new one
+      if (!existingOrderId) {
+        const orderData = prepareOrderData('unpaid')
+        toast.loading('Creating order...', { id: 'order-creation' })
+        const createdOrder = await createOrder(orderData as any)
+        existingOrderId = createdOrder._id
+        const realOrderNumber = createdOrder.orderNumber
+        setOrderId(existingOrderId)
+        setOrderNumber(realOrderNumber)
+        toast.success('Order created! Initiating payment...', { id: 'order-creation' })
+      } else {
+        // Check if order can retry payment
+        const retryCheck = await checkCanRetry(existingOrderId)
+        if (!retryCheck.canRetry) {
+          toast.error('This order cannot be retried. Please create a new order.')
+          setMpesaStep("failed")
+          return
+        }
+        toast.loading('Initiating payment retry...', { id: 'payment-retry' })
+      }
       
-      const response = await initiateMpesaPayment(realOrderId, formattedPhone)
+      // Initiate M-PESA payment with the order ID
+      const response = await initiateMpesaPayment(existingOrderId, formattedPhone)
       setCheckoutRequestId(response.checkoutRequestId)
       setMpesaStep("pending")
-      toast.success('STK Push sent! Check your phone for the M-PESA prompt.', { duration: 5000 })
+      toast.success('STK Push sent! Check your phone for the M-PESA prompt.', { 
+        id: 'payment-init',
+        duration: 5000 
+      })
       
-      startPolling(response.checkoutRequestId, realOrderId)
+      // Start polling for payment status
+      startPolling(response.checkoutRequestId, existingOrderId)
       
     } catch (error: any) {
       console.error('M-PESA error:', error)
@@ -406,6 +427,7 @@ export default function CheckoutPage() {
     setMpesaPhone("")
     setMpesaError("")
     setCheckoutRequestId(null)
+    // Keep orderId for potential retry
   }
 
   const clearSavedData = () => {

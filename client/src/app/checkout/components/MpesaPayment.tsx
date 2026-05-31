@@ -1,7 +1,7 @@
 // src/app/checkout/components/MpesaPayment.tsx
 'use client'
 
-import { Smartphone, Clock, AlertCircle, CheckCircle, Copy, Loader2 } from 'lucide-react'
+import { Smartphone, Clock, AlertCircle, CheckCircle, Loader2, Copy } from 'lucide-react'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -51,12 +51,10 @@ export default function MpesaPayment({
   const validatePhoneInput = (value: string) => {
     let cleaned = value.replace(/\D/g, '')
     
-    // Limit to 12 digits max (254XXXXXXXXX)
     if (cleaned.length > 12) {
       cleaned = cleaned.slice(0, 12)
     }
     
-    // Auto-add 254 prefix if starting with 0
     if (cleaned.startsWith('0') && cleaned.length <= 10) {
       cleaned = '254' + cleaned.slice(1)
     }
@@ -114,7 +112,7 @@ export default function MpesaPayment({
     )
   }
 
-  // Show M-PESA UI (simplified - no Paybill display)
+  // Show M-PESA UI
   return (
     <div className="space-y-6 mb-8 p-6 rounded-2xl bg-gradient-to-br from-blue-50/50 to-white/50 dark:from-blue-950/20 dark:to-gray-800/50 border border-blue-200 dark:border-blue-800">
       {mpesaStep === 'idle' && (
@@ -139,7 +137,7 @@ export default function MpesaPayment({
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Format: 254XXXXXXXXX (12 digits total, 9 digits after 254)
+                Format: 254XXXXXXXXX (12 digits total)
               </p>
             </div>
             {mpesaError && (
@@ -153,7 +151,7 @@ export default function MpesaPayment({
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
-              <span>Pay with M-PESA</span>
+              <span>{orderId ? 'Retry Payment' : 'Pay with M-PESA'}</span>
             </button>
           </div>
         </>
@@ -162,7 +160,7 @@ export default function MpesaPayment({
       {mpesaStep === 'processing' && (
         <div className="text-center py-8">
           <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-700 dark:text-gray-300">Creating your order...</p>
+          <p className="text-gray-700 dark:text-gray-300">{orderId ? 'Processing payment retry...' : 'Creating your order...'}</p>
         </div>
       )}
 
@@ -194,12 +192,21 @@ export default function MpesaPayment({
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-gray-700 dark:text-gray-300 font-medium">Payment Failed</p>
           <p className="text-sm text-red-500 mt-1">{mpesaError || 'Please try again'}</p>
-          <button
-            onClick={onReset}
-            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Try Again
-          </button>
+          <div className="mt-4 space-y-2">
+            <button
+              onClick={onRequest}
+              disabled={loading}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              {orderId ? 'Retry Payment' : 'Try Again'}
+            </button>
+            <button
+              onClick={onReset}
+              className="px-6 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-sm block mx-auto"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>
