@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation'
 
 interface OrderSuccessProps {
   orderId: string
+  orderNumber?: string
 }
 
-export default function OrderSuccess({ orderId }: OrderSuccessProps) {
+export default function OrderSuccess({ orderId, orderNumber }: OrderSuccessProps) {
   const router = useRouter()
 
   return (
@@ -34,13 +35,13 @@ export default function OrderSuccess({ orderId }: OrderSuccessProps) {
           </p>
           
           <div className="mt-6 mb-8 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl inline-block mx-auto">
-            <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-              Order ID: <span className="font-bold text-gray-900 dark:text-white">{orderId}</span>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Order Number: <span className="font-bold text-gray-900 dark:text-white text-lg">{orderNumber || orderId}</span>
             </p>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
+            <button
               onClick={() => router.push(`/orders/${orderId}`)}
               className="px-6 py-3 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl hover:shadow-blue-500/25 hover:scale-[1.02] flex items-center justify-center gap-2 group"
             >

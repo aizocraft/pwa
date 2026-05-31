@@ -1,7 +1,7 @@
 // src/app/checkout/components/MpesaPayment.tsx
 'use client'
 
-import { Shield, Smartphone, Clock, AlertCircle, CheckCircle, Copy, Loader2, Banknote } from 'lucide-react'
+import { Smartphone, Clock, AlertCircle, CheckCircle, Copy, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -40,17 +40,33 @@ export default function MpesaPayment({
     branch: "Moi Avenue, Nairobi",
   }
 
-  // M-PESA Paybill details
-  const mpesaDetails = {
-    businessName: "PLASMA WATER AFRICA",
-    paybill: "9114123",
-  }
-
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text)
     setCopied(true)
     toast.success(`${label} copied!`)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  // Validate phone number as user types
+  const validatePhoneInput = (value: string) => {
+    let cleaned = value.replace(/\D/g, '')
+    
+    // Limit to 12 digits max (254XXXXXXXXX)
+    if (cleaned.length > 12) {
+      cleaned = cleaned.slice(0, 12)
+    }
+    
+    // Auto-add 254 prefix if starting with 0
+    if (cleaned.startsWith('0') && cleaned.length <= 10) {
+      cleaned = '254' + cleaned.slice(1)
+    }
+    
+    return cleaned
+  }
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = validatePhoneInput(e.target.value)
+    setMpesaPhone(formatted)
   }
 
   // Show Bank Transfer UI
@@ -98,45 +114,12 @@ export default function MpesaPayment({
     )
   }
 
-  // Show Cash on Delivery UI
-  if (paymentMethod === 'cash') {
-    return (
-      <div className="space-y-6 mb-8 p-6 rounded-2xl bg-gradient-to-br from-blue-50/50 to-white/50 dark:from-blue-950/20 dark:to-gray-800/50 border border-blue-200 dark:border-blue-800">
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-4">
-          <div className="flex justify-between items-center py-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Amount to Pay on Delivery:</span>
-            <span className="text-lg font-bold text-blue-600 dark:text-blue-400">KES {total?.toLocaleString()}</span>
-          </div>
-        </div>
-       
-        <button
-          onClick={onRequest}
-          disabled={loading}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-          <span>Place Order Now</span>
-        </button>
-      </div>
-    )
-  }
-
-  // Show M-PESA Paybill UI with real STK Push
+  // Show M-PESA UI (simplified - no Paybill display)
   return (
     <div className="space-y-6 mb-8 p-6 rounded-2xl bg-gradient-to-br from-blue-50/50 to-white/50 dark:from-blue-950/20 dark:to-gray-800/50 border border-blue-200 dark:border-blue-800">
       {mpesaStep === 'idle' && (
         <>
           <div className="bg-white dark:bg-gray-900 rounded-xl p-4 space-y-3 border border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-800">
-              <span className="text-sm text-gray-500 dark:text-gray-400">Paybill Number:</span>
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-mono font-bold text-blue-600 dark:text-blue-400">{mpesaDetails.paybill}</span>
-                <button onClick={() => copyToClipboard(mpesaDetails.paybill, "Paybill Number")} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
-                  <Copy className="w-3 h-3 text-gray-400" />
-                </button>
-              </div>
-            </div>
-
             <div className="flex justify-between items-center py-2">
               <span className="text-sm text-gray-500 dark:text-gray-400">Amount:</span>
               <span className="text-lg font-bold text-blue-600 dark:text-blue-400">KES {total?.toLocaleString()}</span>
@@ -144,13 +127,21 @@ export default function MpesaPayment({
           </div>
 
           <div className="space-y-3">
-            <input
-              type="tel"
-              value={mpesaPhone}
-              onChange={(e) => setMpesaPhone(e.target.value)}
-              placeholder="M-PESA Phone Number (e.g., 0712345678)"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                M-PESA Phone Number
+              </label>
+              <input
+                type="tel"
+                value={mpesaPhone}
+                onChange={handlePhoneChange}
+                placeholder="254712345678"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Format: 254XXXXXXXXX (12 digits total, 9 digits after 254)
+              </p>
+            </div>
             {mpesaError && (
               <p className="text-red-500 text-sm flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" /> {mpesaError}
@@ -158,8 +149,8 @@ export default function MpesaPayment({
             )}
             <button
               onClick={onRequest}
-              disabled={loading || !mpesaPhone}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
+              disabled={loading || !mpesaPhone || mpesaPhone.length !== 12}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
               <span>Pay with M-PESA</span>
