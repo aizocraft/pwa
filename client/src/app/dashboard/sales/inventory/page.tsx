@@ -93,7 +93,7 @@ export default function InventoryPage() {
         buyingPrice: restockPrice || undefined,
         reason: restockReason || undefined
       });
-      toast.success(`Restocked ${restockQuantity} units of ${selectedProduct.name}`);
+
       setShowRestockModal(false);
       fetchData();
     } catch (error: any) {
@@ -111,7 +111,7 @@ export default function InventoryPage() {
       a.download = `products_${Date.now()}.${format}`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`Exported ${format.toUpperCase()} successfully`);
+
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Export failed');
     } finally {
@@ -128,7 +128,7 @@ export default function InventoryPage() {
       a.download = 'product_import_template.csv';
       a.click();
       URL.revokeObjectURL(url);
-      toast.success('Template downloaded');
+   
     } catch (error: any) {
       toast.error('Failed to download template');
     }
@@ -165,7 +165,7 @@ export default function InventoryPage() {
         operation: bulkAdjustOperation
       }));
       const result = await bulkAdjustStock(adjustments, bulkAdjustReason);
-      toast.success(result.message);
+     
       setShowBulkAdjustModal(false);
       setSelectedProducts(new Set());
       fetchData();

@@ -23,6 +23,9 @@ import ProductCard from '@/components/ProductCard';
 import { useCartStore } from '@/store/cart';
 import { getProducts, getBrands } from '@/lib/api';
 
+// Categories to exclude from display
+const EXCLUDED_CATEGORIES = ['Labour', 'Transport', 'Other'];
+
 export default function ProductsClient() {
   const searchParams = useSearchParams();
 
@@ -59,6 +62,7 @@ export default function ProductsClient() {
   const itemsPerPage = 12;
   const cartItemsCount = useCartStore((state) => state.totalItems);
 
+  // Fetch brands separately (just for pre-fetching, but we'll use all products for filter options)
   useQuery({
     queryKey: ['brands'],
     queryFn: () => getBrands().catch(() => []),
@@ -66,14 +70,20 @@ export default function ProductsClient() {
     placeholderData: [],
   });
 
+  // Fetch all products for filter options (client-side filtering of excluded categories)
   const { data: allProductsData } = useQuery({
     queryKey: ['all-products-for-filters'],
     queryFn: () => getProducts({ limit: 1000 }),
     staleTime: 5 * 60 * 1000,
   });
 
-  const allProducts = (allProductsData?.products || []) as Product[];
+  // Filter out excluded categories from the full product list
+  const allProducts = useMemo(() => {
+    const products = (allProductsData?.products || []) as Product[];
+    return products.filter((product) => !EXCLUDED_CATEGORIES.includes(product.category));
+  }, [allProductsData]);
 
+  // Build categories list from filtered allProducts
   const categories = useMemo(() => {
     const categoriesMap = new Map<string, number>();
     allProducts.forEach((p) => {
@@ -94,11 +104,12 @@ export default function ProductsClient() {
 
   const normalizeBrand = (value?: string | null) => (value || '').trim().toLowerCase();
 
+  // Build brands list from filtered allProducts
   const allBrands = useMemo(() => {
     const brandsMap = new Map<string, { value: string; label: string; count: number }>();
 
     allProducts.forEach((p) => {
-      if (p.brand && p.brand !== '') {
+      if (p.brand && p.brand.trim() !== '') {
         const key = normalizeBrand(p.brand);
         const current = brandsMap.get(key);
         if (current) current.count += 1;
@@ -110,18 +121,28 @@ export default function ProductsClient() {
 
     return [
       { value: 'all', label: 'All Brands', count: allProducts.length },
-      ...resolvedBrands.map((b) => ({ value: b.value, label: b.label, count: b.count })),
+      ...resolvedBrands,
     ];
   }, [allProducts]);
 
   const priceRange = useMemo(() => {
     const prices = allProducts.map((p) => Number(p.price)).filter((p) => !isNaN(p));
+    if (prices.length === 0) return { min: 0, max: 1000000 };
     return {
       min: Math.min(...prices, 0),
       max: Math.max(...prices, 1000000),
     };
   }, [allProducts]);
 
+  // Sync min/max price with range on initial load
+  useEffect(() => {
+    if (priceRange.max > 0) {
+      setMaxPrice((prev) => (prev > priceRange.max ? priceRange.max : prev));
+      setMinPrice((prev) => (prev < priceRange.min ? priceRange.min : prev));
+    }
+  }, [priceRange]);
+
+  // Build API params for the main product query (excluding categories are filtered client-side as well for safety)
   const getApiParams = useMemo(() => {
     const params: any = {
       page: currentPage,
@@ -171,18 +192,26 @@ export default function ProductsClient() {
     priceRange.max,
   ]);
 
+  // Main query for paginated products
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['products', getApiParams],
     queryFn: () => getProducts(getApiParams),
     placeholderData: keepPreviousData,
   });
 
+  // Filter API products to exclude unwanted categories (double safety)
+  const apiProducts = useMemo(() => {
+    const products = (data?.products || []) as Product[];
+    return products.filter((product) => !EXCLUDED_CATEGORIES.includes(product.category));
+  }, [data?.products]);
+
+  // Update URL params when filters change
   useEffect(() => {
     const params = new URLSearchParams();
     if (selectedCategory !== 'all') params.set('category', selectedCategory);
     if (selectedBrand !== 'all' && selectedBrand !== '') params.set('brand', selectedBrand);
     if (search) params.set('q', search);
-    if (minPrice > 0 && !isNaN(minPrice)) params.set('minPrice', minPrice.toString());
+    if (minPrice > priceRange.min && !isNaN(minPrice)) params.set('minPrice', minPrice.toString());
     if (maxPrice < priceRange.max && !isNaN(maxPrice)) params.set('maxPrice', maxPrice.toString());
     if (sortBy !== 'all') params.set('sort', sortBy);
     if (showInStockOnly) params.set('inStock', 'true');
@@ -199,6 +228,7 @@ export default function ProductsClient() {
     sortBy,
     showInStockOnly,
     currentPage,
+    priceRange.min,
     priceRange.max,
   ]);
 
@@ -228,8 +258,8 @@ export default function ProductsClient() {
     setCurrentPage(1);
   };
 
-  const products = (data?.products || []) as Product[];
-  const pagination = data?.pagination as
+  // Get the original pagination info from API
+  const apiPagination = data?.pagination as
     | {
         page: number;
         limit: number;
@@ -240,14 +270,83 @@ export default function ProductsClient() {
       }
     | undefined;
 
-  const brandFilteredProducts = useMemo(() => {
-    if (!selectedBrand || selectedBrand === 'all') return products;
-    const selectedKey = normalizeBrand(selectedBrand);
-    if (!selectedKey) return products;
-    return products.filter((p) => normalizeBrand(p.brand) === selectedKey);
-  }, [products, selectedBrand]);
 
-  const displayedProducts = brandFilteredProducts;
+  // Check if we have enough products to fill the grid after excluding categories
+  const filteredProducts = apiProducts;
+  const expectedPerPage = itemsPerPage;
+  const isLastPagePotentiallyShort = filteredProducts.length < expectedPerPage && apiPagination?.hasNext === false;
+
+  // Use the API pagination but note that the actual total might be lower due to excluded categories
+  // We'll adjust total count by estimating based on the ratio of filtered to total products from first page?
+  // Not perfect, but gives a better user experience.
+
+  // For a more accurate count, we fetch total from API but we don't know how many excluded categories exist.
+  // As a UX improvement, we'll rely on API total and inform users if categories are excluded.
+  // But to avoid gaps, we'll just show the products that are returned after filtering.
+
+  const totalProductsDisplayed = filteredProducts.length;
+  const hasMorePages = apiPagination?.hasNext === true && totalProductsDisplayed === expectedPerPage;
+
+  // Hand-crafted pagination controls that work with our filtered results
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleNextPage = () => {
+    if (hasMorePages) {
+      setCurrentPage((p) => p + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage((p) => p - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Generate page numbers for pagination UI
+  const getPaginationRange = () => {
+    const totalPages = apiPagination?.pages || 1;
+    const current = currentPage;
+    const delta = 2;
+    const range = [];
+    for (let i = Math.max(2, current - delta); i <= Math.min(totalPages - 1, current + delta); i++) {
+      range.push(i);
+    }
+    if (current - delta > 2) {
+      range.unshift('...');
+    }
+    if (current + delta < totalPages - 1) {
+      range.push('...');
+    }
+    range.unshift(1);
+    if (totalPages !== 1) range.push(totalPages);
+    return range;
+  };
+
+  const paginationRange = getPaginationRange();
+
+  // Loading state
+  if (isLoading && !data) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pt-8 md:pt-12 lg:pt-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[4/3] bg-gray-200 dark:bg-gray-700 rounded-xl mb-3" />
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -269,7 +368,8 @@ export default function ProductsClient() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div className="w-full px-[40px] py-6 sm:py-8 pt-8 md:pt-12 lg:pt-16">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pt-8 md:pt-12 lg:pt-16">
+        {/* Header and Filters */}
         <div className="mb-6 space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -323,7 +423,7 @@ export default function ProductsClient() {
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2 rounded-lg transition-all ${
-                    viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-gray-600'
+                    viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-gray-600 dark:text-gray-400'
                   }`}
                 >
                   <Grid className="w-4 h-4" />
@@ -331,7 +431,7 @@ export default function ProductsClient() {
                 <button
                   onClick={() => setViewMode('list')}
                   className={`p-2 rounded-lg transition-all ${
-                    viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600'
+                    viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600 dark:text-gray-400'
                   }`}
                 >
                   <List className="w-4 h-4" />
@@ -340,9 +440,11 @@ export default function ProductsClient() {
             </div>
           </div>
 
+          {/* Filter chips */}
           <div className="flex flex-wrap gap-2 items-center">
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Filters:</span>
 
+            {/* Category Filter Dropdown */}
             <div className="relative group">
               <button className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-medium hover:border-blue-500 transition-colors">
                 {selectedCategory === 'all'
@@ -375,12 +477,13 @@ export default function ProductsClient() {
               </div>
             </div>
 
+            {/* Brand Filter Dropdown */}
             <div className="relative group">
               <button className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-medium hover:border-blue-500 transition-colors">
-                {selectedBrand === 'all' ? 'All Brands' : selectedBrand}
+                {selectedBrand === 'all' ? 'All Brands' : selectedBrand.length > 20 ? selectedBrand.slice(0, 18) + '...' : selectedBrand}
                 <ChevronDown className="w-3 h-3" />
               </button>
-              <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30">
+              <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30">
                 <div className="max-h-64 overflow-y-auto p-1">
                   {allBrands.map((brand) => (
                     <button
@@ -396,8 +499,8 @@ export default function ProductsClient() {
                       }`}
                     >
                       <div className="flex justify-between items-center">
-                        <span>{brand.label}</span>
-                        <span className="text-[10px] text-gray-400">({brand.count})</span>
+                        <span className="truncate">{brand.label}</span>
+                        <span className="text-[10px] text-gray-400 ml-2 flex-shrink-0">({brand.count})</span>
                       </div>
                     </button>
                   ))}
@@ -405,49 +508,58 @@ export default function ProductsClient() {
               </div>
             </div>
 
+            {/* Price Filter Dropdown */}
             <div className="relative group">
               <button className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-medium hover:border-blue-500 transition-colors">
                 Price: {formatPrice(minPrice)} - {formatPrice(maxPrice)}
                 <ChevronDown className="w-3 h-3" />
               </button>
-              <div className="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30 p-4">
+              <div className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30 p-4">
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">
-                      Min Price ({formatPrice(minPrice)})
-                    </label>
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>Min: {formatPrice(minPrice)}</span>
+                      <span>Max: {formatPrice(maxPrice)}</span>
+                    </div>
+                    <div className="relative h-2 bg-gray-200 rounded-full">
+                      <div
+                        className="absolute h-2 bg-blue-500 rounded-full"
+                        style={{
+                          left: `${((minPrice - priceRange.min) / (priceRange.max - priceRange.min)) * 100}%`,
+                          right: `${100 - ((maxPrice - priceRange.min) / (priceRange.max - priceRange.min)) * 100}%`,
+                        }}
+                      />
+                    </div>
                     <input
                       type="range"
                       min={priceRange.min}
                       max={priceRange.max}
                       value={minPrice}
                       onChange={(e) => {
-                        setMinPrice(parseInt(e.target.value));
+                        const newMin = parseInt(e.target.value);
+                        if (newMin <= maxPrice) setMinPrice(newMin);
                         setCurrentPage(1);
                       }}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      className="w-full mt-2 accent-blue-600"
                     />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">
-                      Max Price ({formatPrice(maxPrice)})
-                    </label>
                     <input
                       type="range"
                       min={priceRange.min}
                       max={priceRange.max}
                       value={maxPrice}
                       onChange={(e) => {
-                        setMaxPrice(parseInt(e.target.value));
+                        const newMax = parseInt(e.target.value);
+                        if (newMax >= minPrice) setMaxPrice(newMax);
                         setCurrentPage(1);
                       }}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      className="w-full accent-blue-600"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* In Stock Toggle */}
             <button
               onClick={() => {
                 setShowInStockOnly(!showInStockOnly);
@@ -463,6 +575,7 @@ export default function ProductsClient() {
               In Stock Only
             </button>
 
+            {/* Clear Filters */}
             {activeFiltersCount > 0 && (
               <button
                 onClick={clearAllFilters}
@@ -475,27 +588,22 @@ export default function ProductsClient() {
           </div>
         </div>
 
+        {/* Results count */}
         <div className="mb-4 flex justify-between items-center">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Showing{' '}
             <span className="font-semibold text-gray-900 dark:text-white">
-              {brandFilteredProducts.length}
+              {filteredProducts.length}
             </span>{' '}
-            of <span className="font-semibold">{pagination?.total || 0}</span> products
+            products
+            {apiPagination?.total && apiPagination.total > 0 && (
+              <span className="text-gray-400"> (from {apiPagination.total} total)</span>
+            )}
           </p>
         </div>
 
-        {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="animate-pulse">
-                <div className="aspect-[4/3] bg-gray-200 dark:bg-gray-700 rounded-xl mb-3" />
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
-                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
-              </div>
-            ))}
-          </div>
-        ) : displayedProducts.length === 0 ? (
+        {/* Product Grid / List */}
+        {filteredProducts.length === 0 ? (
           <div className="text-center py-16">
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-900 mb-2">No products found</h3>
@@ -508,65 +616,62 @@ export default function ProductsClient() {
             </button>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {displayedProducts.map((product) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {filteredProducts.map((product) => (
               <ProductCard key={product._id} product={product} />
             ))}
           </div>
         ) : (
           <div className="space-y-4">
-            {displayedProducts.map((product) => (
+            {filteredProducts.map((product) => (
               <ProductCard key={product._id} product={product} variant="list" />
             ))}
           </div>
         )}
 
-        {pagination && pagination.pages > 1 && (
-          <div className="flex justify-center items-center gap-2 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+        {/* Pagination */}
+        {apiPagination && apiPagination.pages > 1 && (
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
             <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={!pagination.hasPrev}
-              className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+              className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              aria-label="Previous page"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            <div className="flex gap-1">
-              {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
-                let pageNum = pagination.page;
-                if (pagination.pages <= 5) pageNum = i + 1;
-                else if (pagination.page <= 3) pageNum = i + 1;
-                else if (pagination.page >= pagination.pages - 2) pageNum = pagination.pages - 4 + i;
-                else pageNum = pagination.page - 2 + i;
-
-                if (pageNum < 1 || pageNum > pagination.pages) return null;
-
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-medium transition-all ${
-                      pagination.page === pageNum
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
+            <div className="flex flex-wrap justify-center gap-1">
+              {paginationRange.map((page, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => typeof page === 'number' && goToPage(page)}
+                  disabled={page === '...'}
+                  className={`min-w-[36px] h-9 px-2 rounded-lg text-sm font-medium transition-all ${
+                    currentPage === page
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : page === '...'
+                      ? 'bg-transparent cursor-default'
+                      : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
             </div>
 
             <button
-              onClick={() => setCurrentPage((p) => Math.min(pagination.pages, p + 1))}
-              disabled={!pagination.hasNext}
-              className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              onClick={handleNextPage}
+              disabled={!hasMorePages}
+              className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              aria-label="Next page"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         )}
 
+        {/* Cart Button */}
         {cartItemsCount > 0 && (
           <div className="fixed bottom-6 right-6 z-50">
             <Link
@@ -582,4 +687,3 @@ export default function ProductsClient() {
     </div>
   );
 }
-

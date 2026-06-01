@@ -26,7 +26,7 @@ export interface ISupplier extends Document {
 }
 
 const SupplierSchema = new Schema({
-  name: { type: String, required: true, unique: true, index: true },
+  name: { type: String, required: true, unique: true }, // REMOVED index:true
   email: { type: String, lowercase: true, trim: true },
   phone: { type: String, trim: true },
   address: {
@@ -38,7 +38,7 @@ const SupplierSchema = new Schema({
   },
   taxId: { type: String },
   paymentTerms: { type: String, default: 'Net 30' },
-  leadTime: { type: Number, default: 7 }, // Days
+  leadTime: { type: Number, default: 7 },
   notes: { type: String },
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   productsSupplied: [{ type: Schema.Types.ObjectId, ref: 'Product' }],
@@ -48,6 +48,11 @@ const SupplierSchema = new Schema({
 }, {
   timestamps: true
 });
+
+// Define indexes here (unique:true already creates index for 'name')
+SupplierSchema.index({ email: 1 });
+SupplierSchema.index({ phone: 1 });
+SupplierSchema.index({ status: 1 });
 
 const SupplierModel = mongoose.model<ISupplier>('Supplier', SupplierSchema);
 export default SupplierModel;

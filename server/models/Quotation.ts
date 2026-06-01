@@ -1,4 +1,3 @@
-// models/Quotation.ts - Updated with profit tracking
 import mongoose, { Document, Schema } from 'mongoose';
 import QuoteNumberCounterModel from './QuoteNumberCounter';
 
@@ -10,10 +9,10 @@ export interface IQuotationItem {
   name: string;
   slug?: string;
   qty: number;
-  price: number; // Selling price
-  buyingPrice: number; // Cost price for profit tracking
-  profitPerItem: number; // Profit per unit
-  totalProfit: number; // Total profit for this line item
+  price: number;
+  buyingPrice: number;
+  profitPerItem: number;
+  totalProfit: number;
   total: number;
   tax?: number;
   customPrice?: boolean;
@@ -33,19 +32,15 @@ export interface IQuotation extends Document {
   customerEmail?: string;
   customerPhone?: string;
   customerLocation?: string;
-
   createdBy: mongoose.Types.ObjectId;
   createdByName?: string;
-
   invoiceId?: mongoose.Types.ObjectId | string;
   invoiceNumber?: string;
   lastInvoiceCreatedAt?: Date;
-  
   items: IQuotationItem[];
-
   subtotal: number;
-  totalCost: number; // Total cost of goods
-  totalProfit: number; // Total profit for quotation
+  totalCost: number;
+  totalProfit: number;
   taxRate: number;
   tax: number;
   taxPerItem?: boolean;
@@ -57,20 +52,15 @@ export interface IQuotation extends Document {
   transportDescription?: string;
   estimatedDelivery?: string;
   total: number;
-
   quoteNumber: string;
-
   status: QuotationStatus;
   validUntil: Date;
-
   notes?: string;
   terms?: string;
-
   acceptedAt?: Date;
   sentAt?: Date;
   rejectedAt?: Date;
   rejectedReason?: string;
-
   createdAt: Date;
   updatedAt: Date;
 }
@@ -105,36 +95,22 @@ const transportInfoSchema = new Schema<ITransportInfo>(
 
 const quotationSchema = new Schema<IQuotation>(
   {
-    customerId: { type: Schema.Types.ObjectId, ref: 'SalesCustomer', required: true, index: true },
+    customerId: { type: Schema.Types.ObjectId, ref: 'SalesCustomer', required: true },
     customerName: { type: String, required: true },
     customerEmail: { type: String, lowercase: true, trim: true },
     customerPhone: { type: String, trim: true },
     customerLocation: { type: String, trim: true },
-
-    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     createdByName: { type: String },
-
-    invoiceId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Invoice',
-    required: false
-  },
-  invoiceNumber: {
-    type: String,
-    required: false
-  },
-  lastInvoiceCreatedAt: {
-    type: Date,
-    required: false
-  },
-
+    invoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice', required: false },
+    invoiceNumber: { type: String, required: false },
+    lastInvoiceCreatedAt: { type: Date, required: false },
     items: { type: [quotationItemSchema], required: true, validate: {
       validator: function(items: any[]) {
         return items && items.length > 0;
       },
       message: 'At least one item is required'
     } },
-
     subtotal: { type: Number, required: true, min: 0 },
     totalCost: { type: Number, default: 0, min: 0 },
     totalProfit: { type: Number, default: 0, min: 0 },
@@ -149,21 +125,15 @@ const quotationSchema = new Schema<IQuotation>(
     transportDescription: { type: String, trim: true },
     estimatedDelivery: { type: String, trim: true },
     total: { type: Number, required: true, min: 0 },
-
-    quoteNumber: { type: String, required: true, unique: true, index: true },
-
+    quoteNumber: { type: String, required: true, unique: true }, // unique creates index automatically
     status: {
       type: String,
       enum: ['draft', 'sent', 'accepted', 'rejected', 'expired'],
-      default: 'draft',
-      index: true
+      default: 'draft'
     },
-
-    validUntil: { type: Date, required: true, index: true },
-
+    validUntil: { type: Date, required: true },
     notes: { type: String, trim: true },
     terms: { type: String, trim: true },
-
     acceptedAt: { type: Date },
     sentAt: { type: Date },
     rejectedAt: { type: Date },
@@ -172,12 +142,19 @@ const quotationSchema = new Schema<IQuotation>(
   { timestamps: true }
 );
 
-// Pre-save middleware to calculate totals including profit
+// Only define NON-unique indexes here
+// DO NOT redefine quoteNumber since it already has 'unique: true'
+quotationSchema.index({ customerId: 1 });
+quotationSchema.index({ createdBy: 1 });
+quotationSchema.index({ status: 1 });
+quotationSchema.index({ validUntil: 1 });
+quotationSchema.index({ createdAt: -1 });
+
+// Pre-save middleware
 quotationSchema.pre('save', function(next) {
   if (this.isModified('items') || this.isModified('discount') || this.isModified('discountType') || 
       this.isModified('transportInfo') || this.isModified('taxPerItem')) {
     
-    // Calculate subtotal, totalCost, totalProfit
     this.subtotal = 0;
     this.totalCost = 0;
     this.totalProfit = 0;
@@ -196,13 +173,11 @@ quotationSchema.pre('save', function(next) {
       this.totalProfit += itemProfit;
     }
     
-    // Calculate discount
     let discountAmount = this.discount;
     if (this.discountType === 'percentage') {
       discountAmount = this.subtotal * (this.discount / 100);
     }
     
-    // Calculate tax
     let tax = 0;
     if (this.taxPerItem) {
       tax = this.items.reduce((sum, item) => sum + (item.tax || 0), 0);
@@ -212,14 +187,12 @@ quotationSchema.pre('save', function(next) {
     }
     this.tax = tax;
     
-    // Calculate final total
     const transportCost = this.transportInfo?.cost || this.transportCost || 0;
     this.total = this.subtotal - discountAmount + this.tax + transportCost;
   }
   next();
 });
 
-// Generate quote number in format: 0001-MM-PSMA/Q
 export async function generateQuoteNumber(date: Date = new Date()): Promise<string> {
   const year = date.getFullYear();
   const monthNumber = date.getMonth() + 1;

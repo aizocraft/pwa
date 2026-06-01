@@ -92,7 +92,7 @@ const orderItemSchema = new Schema({
 }, { _id: false });
 
 const orderSchema = new Schema<IOrder, IOrderModel>({
-  userId: { type: SchemaTypes.ObjectId, ref: 'User', required: false, index: true },
+  userId: { type: SchemaTypes.ObjectId, ref: 'User', required: false },
   guestInfo: {
     email: { type: String, lowercase: true, trim: true },
     phone: { type: String, trim: true },
@@ -100,8 +100,8 @@ const orderSchema = new Schema<IOrder, IOrderModel>({
   },
   items: [orderItemSchema],
   subtotal: { type: Number, required: true },
-  totalCost: { type: Number, default: 0 }, // Add this
-  totalProfit: { type: Number, default: 0 }, // Add this
+  totalCost: { type: Number, default: 0 },
+  totalProfit: { type: Number, default: 0 },
   shippingCost: { type: Number, default: 0 },
   tax: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },
@@ -130,8 +130,8 @@ const orderSchema = new Schema<IOrder, IOrderModel>({
     phoneNumber: { type: String }
   },
   
-  invoiceNumber: { type: String, unique: true, sparse: true, index: true },
-  quotationNumber: { type: String, index: true },
+  invoiceNumber: { type: String, unique: true, sparse: true }, // REMOVED index:true
+  quotationNumber: { type: String }, // REMOVED index:true from field
   invoiceDate: { type: Date, default: Date.now },
   dueDate: { type: Date },
   invoiceSentAt: Date,
@@ -164,12 +164,13 @@ const orderSchema = new Schema<IOrder, IOrderModel>({
   toObject: { virtuals: true }
 });
 
-// Indexes
+// All indexes defined here - NO duplicates
+orderSchema.index({ userId: 1 });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ 'guestInfo.email': 1 });
-orderSchema.index({ invoiceNumber: 1 });
-orderSchema.index({ quotationNumber: 1 });
+orderSchema.index({ invoiceNumber: 1 }); // Now only defined once
+orderSchema.index({ quotationNumber: 1 }); // Now only defined once
 
 // Virtual for order number
 orderSchema.virtual('orderNumber').get(function() {

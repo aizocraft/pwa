@@ -179,7 +179,7 @@ const AnimatedText = ({
   )
 }
 
-// Animated Feature Card Component - Larger size
+// Animated Feature Card Component 
 const FeatureCard = memo(({ 
   feature, 
   index, 

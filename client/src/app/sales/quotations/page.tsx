@@ -100,6 +100,7 @@ interface QuotationItemWithTax {
   qty: number;
   customPrice?: number;
   taxable: boolean;
+  name: string; // Custom name for this quotation item
 }
 
 // Product creation modal with full features
@@ -239,25 +240,28 @@ function CreateProductModal({ isOpen, onClose, onProductCreated, categories }: a
             <label className="block text-sm font-medium mb-1">Category *</label>
             <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" required>
               <option value="">Select a category</option>
-              <option value="solar-panels">Solar Panels</option>
-              <option value="inverters">Inverters</option>
-              <option value="batteries">Batteries</option>
-              <option value="water-pumps">Water Pumps</option>
-              <option value="cables-and-connectors">Cables & Connectors</option>
-              <option value="solar-lights">Solar Lights</option>
-              <option value="generators">Generators</option>
-              <option value="accessories">Accessories</option>
+              <option value="Solar Panels">Solar Panels</option>
+              <option value="Inverters">Inverters</option>
+              <option value="Batteries">Batteries</option>
+              <option value="Water Pumps">Water Pumps</option>
+              <option value="Cables & Connectors">Cables & Connectors</option>
+              <option value="Solar Lights">Solar Lights</option>
+              <option value="Generators">Generators</option>
+              <option value="Accessories">Accessories</option>
+              <option value="Labour">Labour</option>
+              <option value="Other">Other </option>
             </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Selling Price (KES) *</label>
-              <input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" required />
+              <input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" required step="10"
+                min="0"  />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Buying Price (KES)</label>
-              <input type="number" value={formData.buyingPrice} onChange={(e) => setFormData({ ...formData, buyingPrice: Number(e.target.value) })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" />
+              <input type="number" value={formData.buyingPrice} onChange={(e) => setFormData({ ...formData, buyingPrice: Number(e.target.value) })} className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800" step="10" min="0" />
             </div>
           </div>
 
@@ -398,19 +402,18 @@ export default function QuotationsPage() {
     qty: 1,
     customPrice: null as number | null,
     taxable: true,
+    name: '', // Custom name for the item
   });
 
-  // Improved debounced search handler - prevents refresh on each keystroke
+  // Improved debounced search handler
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     setCurrentPage(1);
     
-    // Clear existing timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
     
-    // Set new timeout for debounced search (500ms delay)
     searchTimeoutRef.current = setTimeout(() => {
       if (!isSearchingRef.current) {
         fetchData();
@@ -435,7 +438,7 @@ export default function QuotationsPage() {
     };
   }, []);
 
-  // Fetch data with proper loading state - only when searchTerm or filters change after debounce
+  // Fetch data with proper loading state
   const fetchData = useCallback(async () => {
     if (isSearchingRef.current) return;
     
@@ -590,7 +593,12 @@ export default function QuotationsPage() {
 
   const handleProductCreated = (newProduct: ProductWithStock) => {
     setProducts([newProduct, ...products]);
-    setTempItem({ ...tempItem, productId: newProduct._id });
+    // Set the temp item with the new product and allow custom name editing
+    setTempItem({ 
+      ...tempItem, 
+      productId: newProduct._id,
+      name: newProduct.name // Initialize with product name
+    });
     setProductSearchTerm(newProduct.name);
     setShowProductDropdown(false);
   };
@@ -638,7 +646,13 @@ export default function QuotationsPage() {
     try {
       const payload = {
         customerId: formData.customerId,
-        items: formData.items.map(item => ({ productId: item.productId, qty: item.qty, customPrice: item.customPrice, taxable: item.taxable })),
+        items: formData.items.map(item => ({ 
+          productId: item.productId, 
+          qty: item.qty, 
+          customPrice: item.customPrice, 
+          taxable: item.taxable, 
+          name: item.name || undefined // Send custom name if provided
+        })), 
         discount: formData.discount,
         discountType: formData.discountType,
         notes: formData.notes,
@@ -749,7 +763,7 @@ export default function QuotationsPage() {
       estimatedDelivery: '',
       taxPerItem: false,
     });
-    setTempItem({ productId: '', qty: 1, customPrice: null, taxable: true });
+    setTempItem({ productId: '', qty: 1, customPrice: null, taxable: true, name: '' });
     setNewCustomer({ name: '', email: '', phone: '', location: '' });
   };
 
@@ -757,27 +771,48 @@ export default function QuotationsPage() {
     if (!tempItem.productId || tempItem.qty <= 0) return;
     const product = products.find(p => p._id === tempItem.productId);
     if (product) {
+      // Use custom name if provided, otherwise use product name
+      const displayName = tempItem.name && tempItem.name.trim() ? tempItem.name : product.name;
       setFormData(prev => ({
         ...prev,
-        items: [...prev.items, { productId: tempItem.productId, qty: tempItem.qty, customPrice: tempItem.customPrice || undefined, taxable: tempItem.taxable }],
+        items: [
+          ...prev.items,
+          {
+            productId: tempItem.productId,
+            qty: tempItem.qty,
+            customPrice: tempItem.customPrice || undefined,
+            taxable: tempItem.taxable,
+            name: displayName,
+          },
+        ],
       }));
-      setTempItem({ productId: '', qty: 1, customPrice: null, taxable: true });
+      // Reset temp item but keep the name for next addition
+      setTempItem({ productId: '', qty: 1, customPrice: null, taxable: true, name: '' });
       setProductSearchTerm('');
       setShowProductDropdown(false);
     }
   };
 
   const removeItem = (index: number) => setFormData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+  
   const updateItemQty = (index: number, qty: number) => {
     const newItems = [...formData.items];
     newItems[index].qty = qty;
     setFormData(prev => ({ ...prev, items: newItems }));
   };
+  
   const updateItemPrice = (index: number, price: number) => {
     const newItems = [...formData.items];
     newItems[index].customPrice = price;
     setFormData(prev => ({ ...prev, items: newItems }));
   };
+
+  const updateItemName = (index: number, name: string) => {
+    const newItems = [...formData.items];
+    newItems[index].name = name;
+    setFormData(prev => ({ ...prev, items: newItems }));
+  };
+
   const toggleItemTax = (index: number) => {
     const newItems = [...formData.items];
     newItems[index].taxable = !newItems[index].taxable;
@@ -828,7 +863,7 @@ export default function QuotationsPage() {
           </div>
         </div>
 
-        {/* Filters - Improved debounced search */}
+        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -880,18 +915,17 @@ export default function QuotationsPage() {
                   const isAccepted = quote.status === 'accepted';
                   
                   return (
-
                     <tr key={quote._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-gray-400" />
                           <span className="text-sm font-medium">{quote.quoteNumber}</span>
                         </div>
-                      </td>
+                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium">{quote.customerName}</p>
                         <p className="text-xs text-gray-500">{quote.customerEmail}</p>
-                      </td>
+                       </td>
                       <td className="px-6 py-4 text-sm">{quote.items.length} items</td>
                       <td className="px-6 py-4 text-sm font-semibold">KES {quote.total?.toLocaleString() || 0}</td>
                       <td className="px-6 py-4">
@@ -903,7 +937,7 @@ export default function QuotationsPage() {
                             <Receipt className="w-3 h-3" /> Invoice Created
                           </span>
                         )}
-                      </td>
+                       </td>
                       <td className="px-6 py-4 text-sm">{new Date(quote.createdAt).toLocaleDateString()}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
@@ -919,9 +953,17 @@ export default function QuotationsPage() {
                           <button 
                             onClick={() => { 
                               setEditingQuote(quote); 
+                              // Load items with their stored custom names
+                              const loadedItems = quote.items.map((i: any) => ({ 
+                                productId: i.productId, 
+                                qty: i.qty, 
+                                customPrice: i.customPrice ? i.price : undefined, 
+                                taxable: i.taxable !== false, 
+                                name: i.name || '' // Load the custom name from database
+                              }));
                               setFormData({ 
                                 customerId: quote.customerId, 
-                                items: quote.items.map((i: any) => ({ productId: i.productId, qty: i.qty, customPrice: i.customPrice ? i.price : undefined, taxable: i.taxable !== false })), 
+                                items: loadedItems, 
                                 discount: quote.discount, 
                                 discountType: quote.discountType, 
                                 notes: quote.notes || '', 
@@ -932,6 +974,12 @@ export default function QuotationsPage() {
                                 estimatedDelivery: (quote as any).estimatedDelivery || '', 
                                 taxPerItem: (quote as any).taxPerItem || false 
                               }); 
+                              // Load the customer
+                              const customer = customers.find(c => c._id === quote.customerId);
+                              if (customer) {
+                                setSelectedCustomer(customer);
+                                setCustomerSearchTerm(customer.name);
+                              }
                               setShowModal(true); 
                             }} 
                             className="p-1.5 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-lg transition-colors" 
@@ -950,9 +998,8 @@ export default function QuotationsPage() {
                             </button>
                           )}
                           
-                          {/* Create New Invoice button - show for accepted quotations, allowing recreation */}
+                          {/* Create New Invoice button - show for accepted quotations */}
                           {isAccepted && (
-
                             <button 
                               onClick={() => handleCreateNewInvoiceFromQuote(quote._id)} 
                               disabled={creatingNewInvoiceId === quote._id} 
@@ -966,7 +1013,7 @@ export default function QuotationsPage() {
                             </button>
                           )}
                         </div>
-                      </td>
+                       </td>
                     </tr>
                   );
                 })}
@@ -1109,7 +1156,15 @@ export default function QuotationsPage() {
                       {showProductDropdown && filteredProducts.length > 0 && (
                         <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                           {filteredProducts.slice(0, 10).map(product => (
-                            <button key={product._id} type="button" onClick={() => { setTempItem({ ...tempItem, productId: product._id }); setProductSearchTerm(product.name); setShowProductDropdown(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                            <button key={product._id} type="button" onClick={() => {
+                              setTempItem({
+                                ...tempItem,
+                                productId: product._id,
+                                name: product.name, // Initialize with product name
+                              });
+                              setProductSearchTerm(product.name);
+                              setShowProductDropdown(false);
+                            }} className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                               <div className="flex justify-between items-center">
                                 <div>
                                   <span className="font-medium">{product.name}</span>
@@ -1135,15 +1190,45 @@ export default function QuotationsPage() {
                         </div>
                       )}
                     </div>
-                    <input type="number" placeholder="Qty" className="w-20 px-3 py-2 text-sm border rounded-lg dark:bg-gray-800 text-center" value={tempItem.qty} onChange={(e) => setTempItem({ ...tempItem, qty: Number(e.target.value) })} min="1" />
-                    <input type="number" placeholder="Custom price" className="w-32 px-3 py-2 text-sm border rounded-lg dark:bg-gray-800" value={tempItem.customPrice || ''} onChange={(e) => setTempItem({ ...tempItem, customPrice: e.target.value ? Number(e.target.value) : null })} />
+                    
+                    {/* Custom Name Input */}
+                    <input 
+                      type="text" 
+                      placeholder="Custom name (optional)" 
+                      className="flex-1 min-w-[150px] px-3 py-2 text-sm border rounded-lg dark:bg-gray-800"
+                      value={tempItem.name}
+                      onChange={(e) => setTempItem({ ...tempItem, name: e.target.value })}
+                    />
+                    
+                    <input 
+                      type="number" 
+                      placeholder="Qty" 
+                      className="w-20 px-3 py-2 text-sm border rounded-lg dark:bg-gray-800 text-center" 
+                      value={tempItem.qty} 
+                      onChange={(e) => setTempItem({ ...tempItem, qty: Number(e.target.value) })} 
+                      min="1" 
+                    />
+                    
+                    <input 
+                      type="number" 
+                      placeholder="Custom price" 
+                      className="w-32 px-3 py-2 text-sm border rounded-lg dark:bg-gray-800 s" 
+                      value={tempItem.customPrice || ''} 
+                      onChange={(e) => setTempItem({ ...tempItem, customPrice: e.target.value ? Number(e.target.value) : null })} 
+                        step="10"
+                        min="0"
+                      />
+                    
                     <div className="flex items-center gap-2">
                       <span className="text-xs">Taxable</span>
                       <button type="button" onClick={() => setTempItem({ ...tempItem, taxable: !tempItem.taxable })} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${tempItem.taxable ? 'bg-cyan-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${tempItem.taxable ? 'translate-x-6' : 'translate-x-1'}`} />
                       </button>
                     </div>
-                    <button type="button" onClick={addItem} disabled={!tempItem.productId} className="p-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors"><Plus className="w-5 h-5" /></button>
+                    
+                    <button type="button" onClick={addItem} disabled={!tempItem.productId} className="p-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors">
+                      <Plus className="w-5 h-5" />
+                    </button>
                   </div>
                 </div>
 
@@ -1153,7 +1238,7 @@ export default function QuotationsPage() {
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50 dark:bg-gray-800/50">
                         <tr>
-                          <th className="px-3 py-2 text-left">Product</th>
+                          <th className="px-3 py-2 text-left">Product Name</th>
                           <th className="px-3 py-2 text-center w-16">Qty</th>
                           <th className="px-3 py-2 text-right w-24">Price</th>
                           <th className="px-3 py-2 text-right w-28">Total</th>
@@ -1166,22 +1251,50 @@ export default function QuotationsPage() {
                           const product = products.find(p => p._id === item.productId);
                           const price = item.customPrice || product?.price || 0;
                           const itemTotal = price * item.qty;
-                          const itemTax = formData.taxPerItem && item.taxable ? itemTotal * taxRate : 0;
                           return (
                             <tr key={idx} className="border-t dark:border-gray-800">
                               <td className="px-3 py-2">
-                                <div className="font-medium">{product?.name}</div>
-                                {product?.sku && <div className="text-xs text-gray-500">{product.sku}</div>}
-                              </td>
-                              <td className="px-3 py-2"><input type="number" value={item.qty} onChange={(e) => updateItemQty(idx, Number(e.target.value))} className="w-16 px-2 py-1 border rounded dark:bg-gray-800 text-center" min="1" /></td>
-                              <td className="px-3 py-2"><input type="number" value={price} onChange={(e) => updateItemPrice(idx, Number(e.target.value))} className="w-24 px-2 py-1 border rounded dark:bg-gray-800 text-right" /></td>
+                                <input
+                                  type="text"
+                                  value={item.name || product?.name || ''}
+                                  onChange={(e) => updateItemName(idx, e.target.value)}
+                                  className="w-full px-2 py-1 border rounded dark:bg-gray-800 font-medium"
+                                  placeholder="Product name"
+                                />
+                                {product?.sku && <div className="text-xs text-gray-500 mt-1">{product.sku}</div>}
+                               </td>
+                              <td className="px-3 py-2">
+                                <input 
+                                  type="number" 
+                                  value={item.qty} 
+                                  onChange={(e) => updateItemQty(idx, Number(e.target.value))} 
+                                  className="w-16 px-2 py-1 border rounded dark:bg-gray-800 text-center" 
+                                  min="1" 
+                                />
+                               </td>
+                              <td className="px-3 py-2">
+                                <input 
+                                  type="number" 
+                                  value={price} 
+                                  onChange={(e) => updateItemPrice(idx, Number(e.target.value))} 
+                                  className="w-24 px-2 py-1 border rounded dark:bg-gray-800 text-right" 
+                                />
+                               </td>
                               <td className="px-3 py-2 text-right font-medium">KES {itemTotal.toLocaleString()}</td>
                               <td className="px-3 py-2 text-center">
-                                <button type="button" onClick={() => toggleItemTax(idx)} className={`px-2 py-1 text-xs rounded ${item.taxable ? 'bg-green-100 text-green-700 dark:bg-green-900/30' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                                <button 
+                                  type="button" 
+                                  onClick={() => toggleItemTax(idx)} 
+                                  className={`px-2 py-1 text-xs rounded ${item.taxable ? 'bg-green-100 text-green-700 dark:bg-green-900/30' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}
+                                >
                                   {item.taxable ? 'Yes' : 'No'}
                                 </button>
-                              </td>
-                              <td className="px-3 py-2 text-center"><button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button></td>
+                               </td>
+                              <td className="px-3 py-2 text-center">
+                                <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                               </td>
                             </tr>
                           );
                         })}

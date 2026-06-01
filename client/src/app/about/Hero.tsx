@@ -104,7 +104,7 @@ export default function Hero({ onOpenProfile }: HeroProps) {
       {/* ===== BACKGROUND IMAGE ===== */}
       <div className="absolute inset-0">
         <img
-          src="/borehole.jpeg"
+          src="/borehole.jpg"
           alt="Borehole drilling operations"
           className="w-full h-full object-cover object-center opacity-20 dark:opacity-10"
         />

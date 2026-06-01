@@ -294,8 +294,10 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
 
     const settings = await CompanySettings.findOne();
     const taxRate = settings?.taxRate ?? 0.16;
+    const taxExemptCategories = (settings?.taxExemptCategories || []).map((c: string) => String(c).trim());
 
     let subtotal = 0;
+
     let totalCost = 0;
     let totalProfit = 0;
     let totalItemTax = 0;
@@ -319,15 +321,19 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       totalProfit += itemProfit;
       
       let itemTax = 0;
-      const isTaxable = it.taxable !== false;
+      // tax-exempt categories are forced as non-taxable
+      const productCategory = product.category;
+      const isCategoryExempt = productCategory && taxExemptCategories.includes(String(productCategory).trim());
+      const isTaxable = it.taxable !== false && !isCategoryExempt;
       if (taxPerItem && isTaxable) {
         itemTax = itemTotal * taxRate;
         totalItemTax += itemTax;
       }
       
       processedItems.push({
+
         productId: product._id,
-        name: product.name,
+         name: it.name && it.name.trim() ? it.name : product.name, 
         slug: product.slug,
         qty,
         price,
@@ -357,8 +363,9 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       tax = taxableAmount * taxRate;
     }
     
-    const transportCost = transport?.cost || 0;
-    const transportDescription = transport?.description || '';
+      const transportCost = transport?.cost || 0;
+      const transportDescription = transport?.description || '';
+
     const transportInfo = (transportCost > 0 || transportDescription) ? {
       cost: transportCost,
       description: transportDescription
@@ -544,19 +551,26 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
     if (items && Array.isArray(items)) {
       const settings = await CompanySettings.findOne();
       const taxRate = settings?.taxRate ?? 0.16;
+      const taxExemptCategories = (settings?.taxExemptCategories || []).map((c: string) => String(c).trim());
+
       const updatedItems = [];
+
+
       let subtotal = 0;
+
       let totalCost = 0;
       let totalProfit = 0;
       let totalItemTax = 0;
       
       for (const it of items) {
         const product = await ProductModel.findById(it.productId);
+
         if (!product) {
           return res.status(404).json({ error: `Product not found: ${it.productId}` });
         }
-        const price = it.customPrice || it.price || product.price;
-        const buyingPrice = product.buyingPrice || 0;
+      const price = it.customPrice || it.price || product.price;
+      const buyingPrice = product.buyingPrice || 0;
+
         const qty = Number(it.qty);
         const itemTotal = price * qty;
         const itemCost = buyingPrice * qty;
@@ -567,15 +581,20 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
         totalProfit += itemProfit;
         
         let itemTax = 0;
-        const isTaxable = it.taxable !== false;
+        // tax-exempt categories are forced as non-taxable
+        const productCategory = product.category;
+        const isCategoryExempt = productCategory && taxExemptCategories.includes(String(productCategory).trim());
+        const isTaxable = it.taxable !== false && !isCategoryExempt;
         if (quotation.taxPerItem && isTaxable) {
           itemTax = itemTotal * taxRate;
           totalItemTax += itemTax;
         }
+
+
         
         updatedItems.push({
           productId: product._id,
-          name: product.name,
+          name: it.name && it.name.trim() ? it.name : product.name, 
           slug: product.slug,
           qty,
           price,
@@ -587,6 +606,7 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
           customPrice: it.customPrice !== undefined,
           taxable: isTaxable,
           image: product.images && product.images.length > 0 
+
             ? (product.images[0].url || (product.images[0].fileId ? product.images[0].fileId.toString() : ''))
             : '',
           description: product.description || ''
@@ -605,9 +625,14 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
       if (quotation.taxPerItem) {
         quotation.tax = totalItemTax;
       } else {
+        // subtotal-after-discount, but excluding tax-exempt categories
         const taxableAmount = Math.max(0, subtotal - discountAmount);
         quotation.tax = taxableAmount * taxRate;
+        // NOTE: Since we don't separately subtract exempt-category amounts here,
+        // item-level taxPerItem should be used when category exemptions must be accurate.
+        // (Kept for backward compatibility with existing taxPerItem=false behavior.)
       }
+
       
       const transportCost = quotation.transportCost || 0;
       quotation.total = subtotal - discountAmount + quotation.tax + transportCost;

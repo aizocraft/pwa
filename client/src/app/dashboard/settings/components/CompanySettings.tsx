@@ -339,7 +339,6 @@ export default function CompanySettings() {
                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
                   <p className="text-xs text-blue-700 dark:text-blue-300">
                     <strong>Note:</strong> Category matching is case-insensitive. Products with matching categories will have 0% tax.
-                    Example: "Solar Panels", "solar panels", "SOLAR PANELS" all match.
                   </p>
                 </div>
               </div>
