@@ -41,7 +41,43 @@ const partnerLogos = [
     href: "https://pedrollo.com",
     width: 160,
     height: 80
-  }
+  },
+  { 
+    src: "/logos/deye.png", 
+    alt: "Deye",
+    href: "https://www.deyeinverter.com",
+    width: 160,
+    height: 80
+  },  
+  { 
+    src: "/logos/doyin.png", 
+    alt: "Doyin",
+    href: "https://doyin.com",
+    width: 160,
+    height: 80
+  },
+  { 
+    src: "/logos/genvik.png", 
+    alt: "Genvik",
+    href: "https://genvik.com",
+    width: 160,
+    height: 80
+  },
+  { 
+    src: "/logos/megatank.png", 
+    alt: "Megatank",
+    href: "https://megatank.com",
+    width: 160,
+    height: 80
+  },
+  { 
+    src: "/logos/snre.png", 
+    alt: "SNRE",
+    href: "https://www.snre.com",
+    width: 160,
+    height: 80
+  },
+
 ]
 
 const features = [
