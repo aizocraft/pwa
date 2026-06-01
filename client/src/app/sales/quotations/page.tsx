@@ -880,6 +880,7 @@ export default function QuotationsPage() {
                   const isAccepted = quote.status === 'accepted';
                   
                   return (
+
                     <tr key={quote._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
@@ -949,8 +950,9 @@ export default function QuotationsPage() {
                             </button>
                           )}
                           
-                          {/* Create New Invoice button - show for accepted quotations that have an invoice, allowing recreation */}
-                          {isAccepted && hasInvoice && (
+                          {/* Create New Invoice button - show for accepted quotations, allowing recreation */}
+                          {isAccepted && (
+
                             <button 
                               onClick={() => handleCreateNewInvoiceFromQuote(quote._id)} 
                               disabled={creatingNewInvoiceId === quote._id} 
