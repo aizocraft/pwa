@@ -1,25 +1,12 @@
 // src/components/Services.tsx
 import { Card, CardContent } from "@/components/ui/card";
 import { 
-  Droplets, 
   Sun, 
-  Building2, 
   CheckCircle2, 
   X, 
   ArrowRight, 
   Shield, 
-  Zap,
-  Activity,
-  BarChart3,
-  Clock,
-  Award,
-  TrendingUp,
-  Users,
-  Wrench,
-  Calendar,
-  Gauge,
-  ShieldCheck,
-  Sparkles
+  Zap
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, Variants } from "framer-motion";

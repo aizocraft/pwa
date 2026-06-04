@@ -443,3 +443,9 @@ body {
   background-color: #009dff;
   color: white;
 }
+
+@media (max-width: 768px) {
+  .modal-high-z {
+    z-index: 99999 !important;
+  }
+}

@@ -200,7 +200,7 @@ export default function DashboardLayout({
 
         {/* Logout Confirmation Modal */}
         {showLogoutModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <div 
               className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity duration-300"
               onClick={() => setShowLogoutModal(false)}
@@ -209,7 +209,7 @@ export default function DashboardLayout({
             <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full transform transition-all duration-300 scale-100 opacity-100 animate-in slide-in-from-bottom-4">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-1000" />
               
-              <div className="relative bg-[hsl(var(--card))] text-[hsl(var(--foreground))] rounded-2xl p-6">
+              <div className="relative bg-[hsl(var(--card))] text-[hsl(var(--foreground))] rounded-2xl p-6" >
 
                 <div className="flex justify-center mb-4">
                   <div className="relative">

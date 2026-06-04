@@ -2,7 +2,7 @@
 'use client'
 
 import { Smartphone, Clock, AlertCircle, CheckCircle, Loader2, Copy } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 
 interface MpesaPaymentProps {
@@ -32,6 +32,15 @@ export default function MpesaPayment({
 }: MpesaPaymentProps) {
   const [copied, setCopied] = useState(false)
 
+  // 💾 Load saved phone number on mount
+  useEffect(() => {
+    const savedPhone = localStorage.getItem('mpesa_phone_number')
+    if (savedPhone && !mpesaPhone) {
+      setMpesaPhone(savedPhone)
+      toast.success('📱 Saved phone number loaded', { icon: '📱', duration: 2000 })
+    }
+  }, []) // Run only once on mount
+
   // Bank details for bank transfer
   const bankDetails = {
     bankName: "KENYA COMMERCIAL BANK (KCB)",
@@ -59,12 +68,30 @@ export default function MpesaPayment({
       cleaned = '254' + cleaned.slice(1)
     }
     
+    // Fix for 2540xxxxxx (extra zero)
+    if (cleaned.startsWith('2540')) {
+      cleaned = '254' + cleaned.slice(3)
+    }
+    
     return cleaned
   }
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = validatePhoneInput(e.target.value)
     setMpesaPhone(formatted)
+    
+    // 💾 Save to localStorage as user types
+    if (formatted.length === 12) {
+      localStorage.setItem('mpesa_phone_number', formatted)
+      console.log('💾 Phone saved to localStorage:', formatted)
+    }
+  }
+
+  // Function to clear saved phone (optional - add a clear button)
+  const clearSavedPhone = () => {
+    localStorage.removeItem('mpesa_phone_number')
+    setMpesaPhone('')
+    toast.success('Saved phone number cleared')
   }
 
   // Show Bank Transfer UI
@@ -126,9 +153,19 @@ export default function MpesaPayment({
 
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                M-PESA Phone Number
-              </label>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  M-PESA Phone Number
+                </label>
+                {localStorage.getItem('mpesa_phone_number') && (
+                  <button
+                    onClick={clearSavedPhone}
+                    className="text-xs text-red-500 hover:text-red-600 transition-colors"
+                  >
+                    Clear saved
+                  </button>
+                )}
+              </div>
               <input
                 type="tel"
                 value={mpesaPhone}
@@ -139,6 +176,11 @@ export default function MpesaPayment({
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Format: 254XXXXXXXXX (12 digits total)
               </p>
+              {localStorage.getItem('mpesa_phone_number') && !mpesaPhone && (
+                <p className="text-xs text-blue-500 mt-1">
+                  💾 Saved number will auto-load on next visit
+                </p>
+              )}
             </div>
             {mpesaError && (
               <p className="text-red-500 text-sm flex items-center gap-1">

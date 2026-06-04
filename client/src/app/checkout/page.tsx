@@ -1,8 +1,8 @@
-// src/app/checkout/page.tsx - Complete working version
+// src/app/checkout/page.tsx - COMPLETE WITH PHONE STORAGE
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, type SetStateAction } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPin, CreditCard, CheckCircle, ArrowRight, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
@@ -20,6 +20,14 @@ import MpesaPayment from "./components/MpesaPayment"
 import CardPayment from "./components/CardPayment"
 
 type PaymentMethod = "mpesa" | "bank_transfer" | "card"
+
+// 💾 Storage keys
+const STORAGE_KEYS = {
+  MPESA_PHONE: 'mpesa_phone_number',
+  SHIPPING_ADDRESS: 'saved_shipping_address',
+  GUEST_EMAIL: 'saved_guest_email',
+  GUEST_PHONE: 'saved_guest_phone'
+}
 
 export default function CheckoutPage() {
   const cart = useCartStore()
@@ -51,11 +59,40 @@ export default function CheckoutPage() {
   const [guestEmail, setGuestEmail] = useState("")
   const [guestPhone, setGuestPhone] = useState("")
   
-  // M-PESA state
+  // M-PESA state - with localStorage load
   const [mpesaPhone, setMpesaPhone] = useState("")
   const [mpesaStep, setMpesaStep] = useState<"idle" | "processing" | "pending" | "completed" | "failed">("idle")
   const [mpesaError, setMpesaError] = useState("")
   const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null)
+
+  // 💾 Load saved M-PESA phone on mount
+  useEffect(() => {
+    const savedPhone = localStorage.getItem(STORAGE_KEYS.MPESA_PHONE)
+    if (savedPhone && savedPhone.length === 12) {
+      setMpesaPhone(savedPhone)
+      console.log('📱 Loaded saved phone:', savedPhone)
+      // Optional: Show a toast notification
+      setTimeout(() => {
+        toast.success('📱 Saved phone number loaded', { duration: 2000 })
+      }, 500)
+    }
+  }, [])
+
+  // 💾 Save M-PESA phone to localStorage when it changes
+  const handleSetMpesaPhone = useCallback((phone: string) => {
+    setMpesaPhone(phone)
+    if (phone.length === 12) {
+      localStorage.setItem(STORAGE_KEYS.MPESA_PHONE, phone)
+      console.log('💾 Phone saved to localStorage:', phone)
+    }
+  }, [])
+
+  // 💾 Clear saved phone (optional helper)
+  const clearSavedPhone = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEYS.MPESA_PHONE)
+    setMpesaPhone('')
+    toast.success('Saved phone number cleared')
+  }, [])
 
   // Card payment state (for future Stripe implementation)
   const [cardNumber, setCardNumber] = useState("")
@@ -66,7 +103,7 @@ export default function CheckoutPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  // Shipping address state
+  // Shipping address state - with localStorage load
   const [shippingAddress, setShippingAddress] = useState({
     fullName: "",
     address1: "",
@@ -77,6 +114,57 @@ export default function CheckoutPage() {
     country: "Kenya",
     phone: ""
   })
+
+  // 💾 Load saved shipping address on mount
+  useEffect(() => {
+    const savedAddress = localStorage.getItem(STORAGE_KEYS.SHIPPING_ADDRESS)
+    if (savedAddress) {
+      try {
+        const parsed = JSON.parse(savedAddress)
+        setShippingAddress(prev => ({ ...prev, ...parsed }))
+        console.log('📍 Loaded saved shipping address')
+      } catch (e) {
+        console.error('Failed to load saved address:', e)
+      }
+    }
+    
+    const savedGuestEmail = localStorage.getItem(STORAGE_KEYS.GUEST_EMAIL)
+    const savedGuestPhone = localStorage.getItem(STORAGE_KEYS.GUEST_PHONE)
+    if (savedGuestEmail) setGuestEmail(savedGuestEmail)
+    if (savedGuestPhone) setGuestPhone(savedGuestPhone)
+  }, [])
+
+  // 💾 Save shipping address to localStorage when it changes
+const handleSetShippingAddress = useCallback((
+  address: typeof shippingAddress | ((prev: typeof shippingAddress) => typeof shippingAddress)
+) => {
+  const newAddress = typeof address === 'function' 
+    ? address(shippingAddress) 
+    : address;
+  
+  setShippingAddress(newAddress);
+  
+  // Save to localStorage only if valid
+  if (newAddress.fullName && newAddress.phone) {
+    localStorage.setItem(STORAGE_KEYS.SHIPPING_ADDRESS, JSON.stringify(newAddress));
+    console.log('📍 Shipping address saved:', newAddress.fullName);
+  }
+}, [shippingAddress]);
+
+  // 💾 Save guest info to localStorage
+  const handleSetGuestEmail = useCallback((email: string) => {
+    setGuestEmail(email)
+    if (email && email.includes('@')) {
+      localStorage.setItem(STORAGE_KEYS.GUEST_EMAIL, email)
+    }
+  }, [])
+
+  const handleSetGuestPhone = useCallback((phone: string) => {
+    setGuestPhone(phone)
+    if (phone && phone.length >= 10) {
+      localStorage.setItem(STORAGE_KEYS.GUEST_PHONE, phone)
+    }
+  }, [])
 
   useEffect(() => {
     const token = getToken()
@@ -165,67 +253,76 @@ export default function CheckoutPage() {
     return orderData
   }
 
-
-const startPolling = useCallback((requestId: string, orderIdParam: string) => {
-  let attempts = 0
-  const maxAttempts = 60
-  
-  if (pollingRef.current) {
-    clearInterval(pollingRef.current)
-  }
-  
-  const interval = setInterval(async () => {
-    attempts++
-    console.log(`📡 Polling (${attempts}/${maxAttempts}) for: ${requestId}`)
+  const startPolling = useCallback((requestId: string, orderIdParam: string) => {
+    let attempts = 0
+    const maxAttempts = 60
     
-    try {
-      // ✅ Query both transaction AND order status
-      const [txStatus, orderStatus] = await Promise.all([
-        checkPaymentStatus(requestId),
-        fetch(`/api/orders/${orderIdParam}`).then(r => r.json())
-      ])
-      
-      // ✅ Check order payment status, not just transaction
-      if (orderStatus.paymentStatus === 'paid' || txStatus.status === 'completed') {
-        clearInterval(interval)
-        pollingRef.current = null
-        
-        setMpesaStep("completed")
-        toast.success('✅ Payment confirmed!')
-        
-        // Wait a moment for database to settle
-        setTimeout(() => {
-          cart.clearCart()
-          setOrderSuccess(true)
-        }, 2000)
-        return
-      }
-      
-      if (txStatus.status === 'failed') {
-        clearInterval(interval)
-        pollingRef.current = null
-        setMpesaStep("failed")
-        setMpesaError(txStatus.resultDesc || 'Payment failed')
-        return
-      }
-      
-      if (attempts >= maxAttempts) {
-        clearInterval(interval)
-        pollingRef.current = null
-        toast.error('Payment taking longer than expected. Check your email for confirmation.')
-      }
-      
-    } catch (error) {
-      console.error('Polling error:', error)
-      if (attempts >= maxAttempts) {
-        clearInterval(interval)
-        pollingRef.current = null
-      }
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
     }
-  }, 3000)
-  
-  pollingRef.current = interval
-}, [cart])
+    
+    const interval = setInterval(async () => {
+      attempts++
+      console.log(`📡 Polling (${attempts}/${maxAttempts}) for: ${requestId}`)
+      
+      try {
+        // Query both transaction AND order status
+        const [txStatus, orderResponse] = await Promise.all([
+          checkPaymentStatus(requestId),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/orders/${orderIdParam}`)
+        ])
+        
+        const orderStatus = await orderResponse.json()
+        
+        // Debug logging
+        console.log('📊 Polling Results:', {
+          txStatus,
+          orderPaymentStatus: orderStatus.paymentStatus,
+          orderStatus: orderStatus.status
+        })
+        
+        // Check order payment status
+        if (orderStatus.paymentStatus === 'paid' || txStatus.status === 'completed') {
+          console.log('✅ Payment confirmed! Stopping polling.')
+          clearInterval(interval)
+          pollingRef.current = null
+          
+          setMpesaStep("completed")
+          toast.success('✅ Payment confirmed!')
+          
+          // Wait a moment for database to settle
+          setTimeout(() => {
+            cart.clearCart()
+            setOrderSuccess(true)
+          }, 2000)
+          return
+        }
+        
+        if (txStatus.status === 'failed') {
+          clearInterval(interval)
+          pollingRef.current = null
+          setMpesaStep("failed")
+          setMpesaError(txStatus.resultDesc || 'Payment failed')
+          return
+        }
+        
+        if (attempts >= maxAttempts) {
+          clearInterval(interval)
+          pollingRef.current = null
+          toast.error('Payment taking longer than expected. Check your email for confirmation.')
+        }
+        
+      } catch (error) {
+        console.error('Polling error:', error)
+        if (attempts >= maxAttempts) {
+          clearInterval(interval)
+          pollingRef.current = null
+        }
+      }
+    }, 3000)
+    
+    pollingRef.current = interval
+  }, [cart])
 
   // Handle M-PESA payment - CREATE ORDER FIRST as UNPAID
   const handleMpesaPayment = async () => {
@@ -239,10 +336,18 @@ const startPolling = useCallback((requestId: string, orderIdParam: string) => {
       formattedPhone = '254' + formattedPhone
     }
     
+    // Fix for 2540xxxxxx (extra zero)
+    if (formattedPhone.startsWith('2540')) {
+      formattedPhone = '254' + formattedPhone.slice(3)
+    }
+    
     if (formattedPhone.length !== 12 || !formattedPhone.startsWith('2547')) {
       setMpesaError("Please enter a valid phone number (e.g., 0712345678 or 254712345678)")
       return
     }
+
+    // 💾 Save the formatted phone number
+    localStorage.setItem(STORAGE_KEYS.MPESA_PHONE, formattedPhone)
 
     if (!isShippingValid()) {
       toast.error('Please complete shipping address')
@@ -401,16 +506,19 @@ const startPolling = useCallback((requestId: string, orderIdParam: string) => {
       pollingRef.current = null
     }
     setMpesaStep("idle")
-    setMpesaPhone("")
+    // Don't clear the phone number on reset - keep it for retry
     setMpesaError("")
     setCheckoutRequestId(null)
     // Keep orderId for potential retry
   }
 
   const clearSavedData = () => {
-    localStorage.removeItem("saved_shipping_address")
-    localStorage.removeItem("saved_guest_email")
-    localStorage.removeItem("saved_guest_phone")
+    // Clear all saved data
+    localStorage.removeItem(STORAGE_KEYS.SHIPPING_ADDRESS)
+    localStorage.removeItem(STORAGE_KEYS.GUEST_EMAIL)
+    localStorage.removeItem(STORAGE_KEYS.GUEST_PHONE)
+    localStorage.removeItem(STORAGE_KEYS.MPESA_PHONE)
+    
     setShippingAddress({
       fullName: "",
       address1: "",
@@ -423,7 +531,16 @@ const startPolling = useCallback((requestId: string, orderIdParam: string) => {
     })
     setGuestEmail("")
     setGuestPhone("")
+    setMpesaPhone("")
+    
+    toast.success('All saved data cleared')
   }
+
+  // Debug: Check if we have saved phone on load
+  useEffect(() => {
+    const savedPhone = localStorage.getItem(STORAGE_KEYS.MPESA_PHONE)
+    console.log('🔍 Debug - Saved phone on load:', savedPhone)
+  }, [])
 
   if (orderSuccess) return <OrderSuccess orderId={orderId} orderNumber={orderNumber} />
   if (items.length === 0) return <EmptyCart />
@@ -441,9 +558,9 @@ const startPolling = useCallback((requestId: string, orderIdParam: string) => {
               <button
                 onClick={clearSavedData}
                 className="text-xs text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors px-2 py-1 rounded"
-                title="Clear saved data"
+                title="Clear all saved data"
               >
-                Clear Data
+                Clear All Data
               </button>
               <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-blue-700 flex items-center justify-center shadow-lg ring-1 ring-blue-500/30">
                 <span className="text-white text-xs font-bold">{items.length}</span>
@@ -512,11 +629,11 @@ const startPolling = useCallback((requestId: string, orderIdParam: string) => {
                   <ShippingForm
                     isGuest={isGuest}
                     guestEmail={guestEmail}
-                    setGuestEmail={setGuestEmail}
+                    setGuestEmail={handleSetGuestEmail}
                     guestPhone={guestPhone}
-                    setGuestPhone={setGuestPhone}
+                    setGuestPhone={handleSetGuestPhone}
                     shippingAddress={shippingAddress}
-                    setShippingAddress={setShippingAddress}
+                    setShippingAddress={handleSetShippingAddress}
                     isShippingValid={isShippingValid}
                     isGuestInfoValid={isGuestInfoValid}
                     onContinue={() => setStep("payment")}
@@ -551,7 +668,7 @@ const startPolling = useCallback((requestId: string, orderIdParam: string) => {
                       {paymentMethod === "mpesa" && (
                         <MpesaPayment
                           mpesaPhone={mpesaPhone}
-                          setMpesaPhone={setMpesaPhone}
+                          setMpesaPhone={handleSetMpesaPhone}
                           mpesaStep={mpesaStep}
                           mpesaError={mpesaError}
                           loading={loading || isSubmitting}
@@ -627,4 +744,3 @@ const startPolling = useCallback((requestId: string, orderIdParam: string) => {
     </div>
   )
 }
-
