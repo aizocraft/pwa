@@ -53,7 +53,7 @@ const benefits = [
 
 export default function WaterTowersClient() {
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+    <div className="min-h-screen bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]">
       
       {/* Hero Section - Reduced height */}
       <section className="relative overflow-hidden pt-12 lg:pt-16 pb-8 lg:pb-12">

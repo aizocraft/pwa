@@ -99,8 +99,8 @@ export default function Hero({ onOpenProfile }: HeroProps) {
 
   if (!mounted) return null;
 
-  return (
-    <section className="relative min-h-[85vh] md:min-h-[90vh] lg:min-h-[92vh] flex flex-col justify-center overflow-hidden bg-white dark:bg-gray-950">
+return (
+    <section className="relative min-h-[85vh] md:min-h-[90vh] lg:min-h-[92vh] flex flex-col justify-center overflow-hidden bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]">
       {/* ===== BACKGROUND IMAGE ===== */}
       <div className="absolute inset-0">
         <img

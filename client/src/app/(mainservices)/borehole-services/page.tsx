@@ -122,7 +122,7 @@ const processSteps = [
 
 export default function BoreholeServicesPage() {
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+    <div className="min-h-screen bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]">
       
       {/* Hero Section - Minimal with reduced height */}
       <section className="relative overflow-hidden pt-16 lg:pt-20 pb-10 lg:pb-14">

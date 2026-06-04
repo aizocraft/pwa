@@ -98,7 +98,7 @@ const packageDetails = [
 
 export default function SolarHomeSystemsPage() {
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+    <div className="min-h-screen bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]">
       
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-20 lg:pt-24 pb-16 lg:pb-20">

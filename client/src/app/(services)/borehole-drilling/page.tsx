@@ -74,7 +74,7 @@ const drillingProcess = [
 
 export default function BoreholeDrillingPage() {
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+    <div className="min-h-screen bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]">
       
       {/* Hero Section */}
       <section className="pt-20 lg:pt-24 pb-16 lg:pb-20">
@@ -299,8 +299,8 @@ export default function BoreholeDrillingPage() {
             </div>
           </div>
         </div>
-      </section>s
-     
+      </section>
+    
     </div>
   );
 }

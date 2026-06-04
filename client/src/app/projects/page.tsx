@@ -389,7 +389,7 @@ const ProjectsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
+    <div className="min-h-screen bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]">
       {/* Hero Section */}
       <Hero />
 

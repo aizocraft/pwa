@@ -33,7 +33,7 @@ const values = [
 
 export default function Value() {
   return (
-    <section className="py-10 md:py-16 bg-white dark:bg-gray-950">
+<section className="py-10 md:py-16 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]">
       <div className="w-full px-4 sm:px-6 lg:px-32">
         {/* Section Header */}
         <motion.div

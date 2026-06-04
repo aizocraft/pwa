@@ -27,11 +27,10 @@ export default function Hero() {
   if (!mounted) return null;
 
   return (
-    <section className="relative pt-4 md:pt-8 lg:pt-12 overflow-hidden">
-      {/* Background */}
-      <div className={`absolute inset-0 transition-colors duration-500 ${
-        isDark ? "bg-gray-950" : "bg-gray-50"
-      }`} />
+    <section className="relative pt-4 md:pt-8 lg:pt-12 overflow-hidden bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]">
+      {/* Background (no gradients; relies on globals.css vars) */}
+      <div className="absolute inset-0" />
+
       
       {/* Content Container */}
       <div className="relative z-10 container mx-auto px-6 sm:px-8 lg:px-12">

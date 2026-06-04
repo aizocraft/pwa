@@ -1,17 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, 
-  Minus, 
-  Sparkles, 
-  Star, 
-  MessageCircle, 
+import {
+  Plus,
+  Minus,
+  Star,
+  MessageCircle,
   Send,
   CheckCircle,
   XCircle,
-  AlertCircle
 } from 'lucide-react';
 import { submitFeedback } from '@/lib/api';
 
@@ -249,14 +247,15 @@ export default function FAQ() {
                   animate={{ opacity: 1, scale: 1 }}
                   className="text-center py-8"
                 >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 400 }}
-                  className="w-16 h-16 rounded-full bg-[#10b981] flex items-center justify-center mx-auto mb-4"
-                >
-                  <CheckCircle size={32} className="text-white" />
-                </motion.div>
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 400 }}
+                    className="w-16 h-16 rounded-full bg-[#10b981] flex items-center justify-center mx-auto mb-4"
+                  >
+                    <CheckCircle size={32} className="text-white" />
+                  </motion.div>
+
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Thank You!</h3>
                   <p className="text-gray-500 dark:text-gray-400 text-sm">
                     Your feedback has been submitted successfully. We appreciate your input!
