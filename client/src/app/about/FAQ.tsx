@@ -175,11 +175,11 @@ export default function FAQ() {
                     <motion.div
                       className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
                         openIdx === i
-                          ? 'bg-gradient-to-r from-cyan-500 to-blue-600'
-                          : 'bg-gray-100 dark:bg-gray-800'
+                          ? 'bg-[#009dff]'
+                        : 'bg-gray-100 dark:bg-gray-800'
                       }`}
                       animate={{ rotate: openIdx === i ? 180 : 0 }}
-                    >
+                      >
                       {openIdx === i ? (
                         <Minus size={16} className="text-white" />
                       ) : (
@@ -249,14 +249,14 @@ export default function FAQ() {
                   animate={{ opacity: 1, scale: 1 }}
                   className="text-center py-8"
                 >
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 400 }}
-                    className="w-16 h-16 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center mx-auto mb-4"
-                  >
-                    <CheckCircle size={32} className="text-white" />
-                  </motion.div>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 400 }}
+                  className="w-16 h-16 rounded-full bg-[#10b981] flex items-center justify-center mx-auto mb-4"
+                >
+                  <CheckCircle size={32} className="text-white" />
+                </motion.div>
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Thank You!</h3>
                   <p className="text-gray-500 dark:text-gray-400 text-sm">
                     Your feedback has been submitted successfully. We appreciate your input!

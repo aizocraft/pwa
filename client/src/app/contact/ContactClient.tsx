@@ -153,12 +153,12 @@ export default function ContactClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-950 dark:to-gray-900">
+<div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Hero Section - Minimal */}
       <section className="relative pt-18 pb-12 md:pt-12 md:pb-8 overflow-hidden">
         <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 dark:bg-cyan-500/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 dark:bg-blue-500/5 rounded-full blur-3xl" />
+<div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+<div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
         </div>
 
         <div className="container mx-auto px-6 lg:px-16 relative z-10">
@@ -168,9 +168,9 @@ export default function ContactClient() {
             transition={{ duration: 0.6 }}
             className="text-center"
           >
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-gray-900 dark:text-white mb-4">
+<h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-gray-900 dark:text-white mb-4">
               Get In{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600">
+<span className="text-cyan-600">
                 Touch
               </span>
             </h1>
@@ -192,11 +192,11 @@ export default function ContactClient() {
             >
               {/* Location Card */}
               <div className="group relative bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-lg hover:shadow-xl transition-all duration-300 mb-6">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 rounded-bl-full" />
+<div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-bl-full" />
 
                 <div className="p-6 md:p-8">
                   <div className="flex items-start gap-4 mb-6">
-                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+<div className="w-14 h-14 rounded-xl bg-cyan-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                       <MapPin size={24} className="text-white" />
                     </div>
 
@@ -238,7 +238,7 @@ export default function ContactClient() {
               <div className="grid sm:grid-cols-2 gap-6 mb-6">
                 {/* Phone Card */}
                 <div className="group bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-md">
+<div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-md">
                     <Phone size={20} className="text-white" />
                   </div>
 
@@ -269,7 +269,7 @@ export default function ContactClient() {
 
                 {/* Email Card */}
                 <div className="group bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-md">
+<div className="w-12 h-12 rounded-xl bg-cyan-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-md">
                     <Mail size={20} className="text-white" />
                   </div>
 
@@ -332,7 +332,7 @@ export default function ContactClient() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="text-center py-12"
                   >
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center mx-auto mb-6 shadow-lg">
+<div className="w-20 h-20 rounded-full bg-emerald-600 flex items-center justify-center mx-auto mb-6 shadow-lg">
                       <CheckCircle size={40} className="text-white" />
                     </div>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
@@ -527,7 +527,7 @@ export default function ContactClient() {
                       className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
                         status === 'submitting'
                           ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                          : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl'
+: 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-lg hover:shadow-xl'
                       }`}
                       whileHover={status !== 'submitting' ? { scale: 1.01, y: -1 } : {}}
                       whileTap={status !== 'submitting' ? { scale: 0.99 } : {}}

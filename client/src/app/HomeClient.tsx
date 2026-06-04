@@ -93,7 +93,7 @@ export default function HomeClient() {
 
       <Features />
 
-      <section className="relative py-20 sm:py-24 lg:py-28 overflow-hidden bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900">
+<section className="relative py-20 sm:py-24 lg:py-28 overflow-hidden bg-blue-900">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
 
@@ -137,7 +137,7 @@ export default function HomeClient() {
 
             <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white mb-6 leading-tight">
               Ready to Transform Your{' '}
-              <span className="bg-gradient-to-r from-blue-200 to-blue-300 bg-clip-text text-transparent">
+<span className="text-blue-200">
                 Water & Energy Solutions?
               </span>
             </h2>
@@ -149,7 +149,7 @@ export default function HomeClient() {
                 whileTap={{ scale: 0.98 }}
                 className="group relative px-8 py-4 bg-white text-blue-700 font-bold text-base sm:text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden"
               >
-                <span className="absolute inset-0 bg-gradient-to-r from-gray-100 to-gray-200 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+<span className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                 <span className="relative z-10 flex items-center gap-2">
                   Contact Our Experts
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />

@@ -36,14 +36,9 @@ export default function DashboardLayout({
   const { data: unreadCountData, refetch: refetchUnreadCount } = useUnreadCount()
   const unreadCount = unreadCountData?.data?.unreadCount ?? 0
   
-  // Auto-refetch unread count every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetchUnreadCount()
-    }, 30000) // 30 seconds
-    
-    return () => clearInterval(interval)
-  }, [refetchUnreadCount])
+  // Unread count is already auto-refetched by React Query (see useUnreadCount())
+  // Keeping this interval here causes double-refreshes and visible UI resets.
+
   
   // Prevent multiple redirects
   const hasRedirected = useRef(false)
@@ -147,7 +142,8 @@ export default function DashboardLayout({
   // Show loading state
   if (authLoading || !isMounted || settingsLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-gray-950">
+      <div className="h-screen flex items-center justify-center bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
+
         <div className="text-center">
           <div className="relative w-20 h-20 mx-auto mb-4">
             <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
@@ -191,7 +187,8 @@ export default function DashboardLayout({
         }}
       />
       
-      <div className="h-screen flex overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-gray-950">
+      <div className="h-screen flex overflow-hidden bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
+
 
         {/* Mobile sidebar backdrop */}
         {sidebarOpen && (
@@ -212,7 +209,8 @@ export default function DashboardLayout({
             <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full transform transition-all duration-300 scale-100 opacity-100 animate-in slide-in-from-bottom-4">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-1000" />
               
-              <div className="relative bg-white dark:bg-gray-900 rounded-2xl p-6">
+              <div className="relative bg-[hsl(var(--card))] text-[hsl(var(--foreground))] rounded-2xl p-6">
+
                 <div className="flex justify-center mb-4">
                   <div className="relative">
                     <div className="absolute inset-0 bg-red-500 rounded-full blur-xl opacity-20 animate-pulse" />

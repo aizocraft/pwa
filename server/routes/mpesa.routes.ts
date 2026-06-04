@@ -264,129 +264,79 @@ router.post('/stk-push', optionalAuthMiddleware, async (req: Request & { user?: 
   }
 });
 
-/**
- * POST /api/mpesa/callback
- * M-PESA Callback Webhook - FIXED: Always process successful payments
- */
+// ==================== CALLBACK & QUERY ENDPOINTS ====================
 router.post('/callback', async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  console.log('📞 Callback received:', JSON.stringify(req.body).substring(0, 200));
+  
   try {
-    console.log('📞 M-PESA Callback received');
-
     const { Body } = req.body;
-    
-    if (!Body || !Body.stkCallback) {
-      console.error('Invalid callback structure');
-      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Invalid data but acknowledged' });
+    if (!Body?.stkCallback) {
+      console.error('❌ Invalid callback structure');
+      return res.status(400).json({ ResultCode: 1, ResultDesc: 'Invalid data' });
     }
-
-    const stkCallback = Body.stkCallback;
-    const { ResultCode, ResultDesc, CheckoutRequestID, CallbackMetadata } = stkCallback;
-
-    console.log(`Processing callback for ${CheckoutRequestID}, ResultCode: ${ResultCode}`);
-
-    const transaction = await TransactionModel.findOne({ transactionId: CheckoutRequestID });
+    
+    const { ResultCode, CheckoutRequestID, ResultDesc, CallbackMetadata } = Body.stkCallback;
+    
+    // Find transaction
+    const transaction = await TransactionModel.findOne({ 
+      transactionId: CheckoutRequestID 
+    });
     
     if (!transaction) {
-      console.error(`Transaction not found: ${CheckoutRequestID}`);
+      console.error(`❌ Transaction not found: ${CheckoutRequestID}`);
       return res.status(200).json({ ResultCode: 0, ResultDesc: 'Transaction not found but acknowledged' });
     }
-
-    const order = await OrderModel.findById(transaction.orderId);
-    if (!order) {
-      console.error(`Order not found: ${transaction.orderId}`);
-      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Order not found but acknowledged' });
+    
+    // ✅ Idempotency check
+    if (transaction.status === 'completed') {
+      console.log(`⚠️ Duplicate callback for ${CheckoutRequestID}`);
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Already processed' });
     }
-
-    // FIX: Always process successful payments regardless of current status
+    
+    // Process based on result code
     if (ResultCode === 0 && CallbackMetadata) {
-      // Payment successful - OVERWRITE any previous failed/pending status
-      const metadata = CallbackMetadata?.Item || [];
-      
-      const mpesaReceipt = metadata.find((item: any) => item.Name === 'MpesaReceiptNumber')?.Value;
-      const amount = metadata.find((item: any) => item.Name === 'Amount')?.Value;
-      const phone = metadata.find((item: any) => item.Name === 'PhoneNumber')?.Value;
-      const transactionDate = metadata.find((item: any) => item.Name === 'TransactionDate')?.Value;
-
-      // Update transaction - force to completed
+      // Success
       transaction.status = 'completed';
-      transaction.mpesaReceipt = mpesaReceipt || '';
-      transaction.notes = `Payment completed via callback. Receipt: ${mpesaReceipt || 'N/A'}`;
+      transaction.mpesaReceipt = CallbackMetadata.Item.find((i: any) => i.Name === 'MpesaReceiptNumber')?.Value;
       transaction.paidAt = new Date();
       await transaction.save();
-
-      // Update order
-      order.paymentStatus = 'paid';
-      order.status = 'processing';
-      order.paymentDetails = {
-        transactionId: CheckoutRequestID,
-        mpesaReceipt: mpesaReceipt || '',
-        paidAt: new Date(),
-        phoneNumber: phone || ''
-      };
-      await order.save();
-
-      console.log(`✅ Payment successful: ${mpesaReceipt} for order ${order.orderNumber}`);
-
-      // Send confirmation email
-      const customerEmail = transaction.guestEmail || order.shippingAddress.email;
-      if (customerEmail) {
-        sendPaymentConfirmation({
-          email: customerEmail,
-          customerName: transaction.customerName,
-          orderNumber: order.orderNumber,
-          amount: transaction.amount,
-          transactionId: mpesaReceipt || CheckoutRequestID,
-          paymentMethod: 'M-PESA',
-          items: order.items.map(item => ({
-            name: item.name,
-            quantity: item.qty,
-            price: item.sellingPrice
-          }))
-        }).catch(err => console.error('Failed to send email:', err));
-      }
-
-    } 
-    // Handle timeout - transaction still processing (don't mark as failed)
-    else if (ResultCode === 1037) {
-      console.log(`⚠️ M-PESA timeout for ${CheckoutRequestID}: ${ResultDesc}`);
-      // Only update notes, keep status as pending
-      transaction.notes = `Callback timeout: ${ResultDesc}`;
-      await transaction.save();
       
-    } 
-    // Handle real failures - only if not already completed
-    else if (ResultCode !== 0 && transaction.status !== 'completed') {
-      transaction.status = 'failed';
-      transaction.notes = `Payment failed via callback: ${ResultDesc}`;
-      await transaction.save();
-
-      if (order.paymentStatus !== 'paid') {
-        order.paymentStatus = 'unpaid';
+      // Update order
+      const order = await OrderModel.findById(transaction.orderId);
+      if (order) {
+        order.paymentStatus = 'paid';
+        order.amountPaid = (order.amountPaid || 0) + transaction.amount;
         await order.save();
       }
-
-      console.error(`❌ Payment failed: ${ResultDesc}`);
-
-      const customerEmail = transaction.guestEmail || order.shippingAddress.email;
-      if (customerEmail) {
-        sendPaymentFailedNotification({
-          email: customerEmail,
-          customerName: transaction.customerName,
-          orderNumber: order.orderNumber,
-          amount: transaction.amount,
-          reason: ResultDesc
-        }).catch(err => console.error('Failed to send email:', err));
-      }
+      
+      console.log(`✅ Payment completed: ${CheckoutRequestID}, Receipt: ${transaction.mpesaReceipt}`);
+      
+    } else if (ResultCode === 1037) {
+      // Timeout - keep pending
+      console.log(`⏳ Payment timeout: ${CheckoutRequestID} - ${ResultDesc}`);
+      transaction.notes = `Timeout: ${ResultDesc}`;
+      await transaction.save();
+      
+    } else if (ResultCode !== 0) {
+      // Failed
+      transaction.status = 'failed';
+      transaction.notes = `Failed: ${ResultDesc}`;
+      await transaction.save();
+      console.log(`❌ Payment failed: ${CheckoutRequestID} - ${ResultDesc}`);
     }
-
-    res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
-
-  } catch (error: any) {
-    console.error('Callback error:', error);
-    res.status(200).json({ ResultCode: 0, ResultDesc: 'Acknowledged' });
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Callback processed in ${duration}ms`);
+    
+    return res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
+    
+  } catch (error) {
+    console.error('❌ Callback error:', error);
+    // Return 200 anyway to stop M-PESA retries
+    return res.status(200).json({ ResultCode: 0, ResultDesc: 'Error but acknowledged' });
   }
 });
-
 /**
  * POST /api/mpesa/query
  * Query STK Push status - FIXED: Handle rate limiting and never mark as failed prematurely

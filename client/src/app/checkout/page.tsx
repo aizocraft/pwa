@@ -168,84 +168,61 @@ export default function CheckoutPage() {
 
 const startPolling = useCallback((requestId: string, orderIdParam: string) => {
   let attempts = 0
-  const maxAttempts = 60 // 3 minutes
-  let isResolved = false
+  const maxAttempts = 60
   
   if (pollingRef.current) {
     clearInterval(pollingRef.current)
   }
   
   const interval = setInterval(async () => {
-    if (isResolved) return
-    
     attempts++
-    console.log(`📡 Polling payment (${attempts}/${maxAttempts}) for: ${requestId}`)
+    console.log(`📡 Polling (${attempts}/${maxAttempts}) for: ${requestId}`)
     
     try {
-      const result = await checkPaymentStatus(requestId)
-      console.log(`📊 Status response:`, result.status, result.resultDesc)
+      // ✅ Query both transaction AND order status
+      const [txStatus, orderStatus] = await Promise.all([
+        checkPaymentStatus(requestId),
+        fetch(`/api/orders/${orderIdParam}`).then(r => r.json())
+      ])
       
-      // Case 1: Payment completed successfully
-      if (result.status === 'completed') {
-        isResolved = true
+      // ✅ Check order payment status, not just transaction
+      if (orderStatus.paymentStatus === 'paid' || txStatus.status === 'completed') {
         clearInterval(interval)
         pollingRef.current = null
         
         setMpesaStep("completed")
-        toast.success('✅ Payment confirmed! Your order is complete.', { duration: 5000 })
+        toast.success('✅ Payment confirmed!')
         
+        // Wait a moment for database to settle
         setTimeout(() => {
           cart.clearCart()
           setOrderSuccess(true)
-        }, 1500)
+        }, 2000)
         return
       }
       
-      // Case 2: Payment failed - user cancelled or insufficient funds
-      if (result.status === 'failed') {
-        isResolved = true
+      if (txStatus.status === 'failed') {
         clearInterval(interval)
         pollingRef.current = null
-        
         setMpesaStep("failed")
-        setMpesaError(result.resultDesc || 'Payment failed. Please try again.')
-        toast.error('❌ Payment failed. Please try again.')
+        setMpesaError(txStatus.resultDesc || 'Payment failed')
         return
       }
-      
-      // Case 3: Still pending - continue polling (even if resultCode is not 0)
-      if (result.status === 'pending' && attempts < maxAttempts) {
-        console.log(`⏳ Payment still pending, continuing to poll...`)
-        return
-      }
-      
-      // Case 4: Max attempts reached but still pending
-      if (attempts >= maxAttempts && result.status === 'pending') {
-        isResolved = true
-        clearInterval(interval)
-        pollingRef.current = null
-        
-        // Keep as pending - don't mark as failed
-        setMpesaStep("pending")
-        toast.error('⏳ Payment is taking longer than expected. Please check your M-PESA or contact support.', {
-          duration: 10000
-        })
-        return
-      }
-      
-    } catch (error) {
-      console.error('Polling error:', error)
       
       if (attempts >= maxAttempts) {
         clearInterval(interval)
         pollingRef.current = null
-        setMpesaStep("pending")
-        toast.error('Unable to verify payment status. Please check your order status manually.', {
-          duration: 8000
-        })
+        toast.error('Payment taking longer than expected. Check your email for confirmation.')
+      }
+      
+    } catch (error) {
+      console.error('Polling error:', error)
+      if (attempts >= maxAttempts) {
+        clearInterval(interval)
+        pollingRef.current = null
       }
     }
-  }, 3000) // Poll every 3 seconds
+  }, 3000)
   
   pollingRef.current = interval
 }, [cart])

@@ -66,9 +66,9 @@ export default function About() {
   };
 
   const PdfDownloadCard = () => (
-    <div className="bg-gradient-to-br from-white to-cyan-50/30 dark:from-gray-900 dark:to-cyan-950/30 rounded-2xl p-5 sm:p-6 border border-cyan-200/50 dark:border-cyan-800/50 shadow-xl">
+<div className="bg-white dark:bg-gray-900 rounded-2xl p-5 sm:p-6 border border-cyan-200/50 dark:border-cyan-800/50 shadow-xl">
       <div className="text-center mb-5">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mx-auto mb-3 shadow-lg">
+<div className="w-14 h-14 rounded-2xl bg-cyan-600 flex items-center justify-center mx-auto mb-3 shadow-lg">
           <FileText className="h-7 w-7 text-white" />
         </div>
         <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-1">{profilePdf.name}</h3>
@@ -80,8 +80,8 @@ export default function About() {
             <span>Downloading…</span><span>{downProg}%</span>
           </div>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-            <motion.div
-              className="bg-gradient-to-r from-cyan-500 to-blue-600 h-2 rounded-full"
+<motion.div
+              className="bg-cyan-600 h-2 rounded-full"
               initial={{ width: "0%" }}
               animate={{ width: `${downProg}%` }}
               transition={{ duration: 0.3 }}
@@ -93,7 +93,7 @@ export default function About() {
         <motion.button
           onClick={startDownload}
           disabled={downloading}
-          className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 transition-all duration-200"
+className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 transition-all duration-200"
           whileHover={{ scale: 1.02, y: -1 }}
           whileTap={{ scale: 0.98 }}
         >
@@ -300,7 +300,7 @@ export default function About() {
               transition={{ duration: 0.35, ease: "easeOut" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-gradient-to-r from-cyan-600 to-blue-700 p-4 flex items-center justify-between rounded-t-2xl">
+<div className="bg-cyan-700 p-4 flex items-center justify-between rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <FileText className="h-5 w-5 text-white" />
                   <h3 className="text-base font-bold text-white">Company Profile</h3>
