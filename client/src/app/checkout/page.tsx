@@ -269,7 +269,7 @@ const handleSetShippingAddress = useCallback((
         // Query both transaction AND order status
         const [txStatus, orderResponse] = await Promise.all([
           checkPaymentStatus(requestId),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/orders/${orderIdParam}`)
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/orders/${orderIdParam}`)
         ])
         
         const orderStatus = await orderResponse.json()
