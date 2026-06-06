@@ -14,24 +14,21 @@ import {
   TrendingDown,
   Clock,
   Shield,
-  Phone,
-  Calendar,
-  Sparkles,
   ThumbsUp,
-  DollarSign,
-  Users,
-  Settings,
   Gauge,
   CloudRain
 } from 'lucide-react';
 import CircularGallery from '@/components/CircularGallery';
 import { useTheme } from '@/context/ThemeContext';
+import { getProducts } from '@/lib/api';
+import ProductCard from '@/components/ProductCard';
+import type { Product } from '@/types/product';
 
 const pumpImages = [
-  { image: '/images/solar-image4.jpg', location: 'Kiambu', system: '3kW Solar Water Pump' },
-  { image: '/images/solar-image3.jpg', location: 'Machakos', system: '5kW Borehole Pump' },
-  { image: '/images/solar-image1.jpg', location: 'Thika', system: '2.5kW Irrigation Pump' },
-  { image: '/images/solar-image2.jpg', location: 'Nakuru', system: '7.5kW Solar Pump' },
+  { image: '/water-pump/dayliff-ddp-50a-domestic-pump-for-sale-nairobi-kenya.jpg', location: 'Kiambu', system: '50A Solar Water Pump' },
+  { image: '/water-pump/Electric-Booster-Pump.jpg', location: 'Machakos', system: 'Electric Booster Pump' },
+  { image: '/water-pump/solar-surface-pump.jpg', location: 'Thika', system: 'Solar Water Pump' },
+  { image: '/water-pump/solar-water-pump-kenya.jpg', location: 'Nakuru', system: 'Solar Water Pump' },
 ];
 
 const formattedGalleryItems = pumpImages.map(item => ({
@@ -77,10 +74,71 @@ export default function SolarWaterPumpsClient() {
   const { theme } = useTheme();
   const galleryTextColor = theme === 'dark' ? '#ffffff' : '#1f2937';
   const [mounted, setMounted] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+    fetchSolarWaterPumpProducts();
   }, []);
+
+  const fetchSolarWaterPumpProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await getProducts({
+        category: 'Water Pumps',
+        limit: 6,
+        sort: 'createdAt',
+        order: 'desc'
+      });
+      
+      // ProductListResponse has a 'products' property directly
+      const productsData = response.products || [];
+      setProducts(productsData);
+    } catch (error) {
+      console.error('Error fetching solar water pump products:', error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show loading skeleton
+  const LoadingSkeleton = () => (
+    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse">
+          <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-t-xl" />
+          <div className="p-4 space-y-3">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Show empty state when no products found
+  const EmptyState = () => (
+    <div className="text-center py-12">
+      <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
+        <Droplets className="h-8 w-8 text-gray-400" />
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        No Products Available
+      </h3>
+      <p className="text-gray-600 dark:text-gray-400 mb-6">
+        Solar water pump products are coming soon. Check back later!
+      </p>
+      <Link 
+        href="/contact" 
+        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-all"
+      >
+        Contact Us for Availability <ArrowRight className="h-4 w-4" />
+      </Link>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
@@ -132,7 +190,7 @@ export default function SolarWaterPumpsClient() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-xl">
                 <Image
-                  src="/images/solar-image4.jpg"
+                  src="/water-pump/solar-water-pumping-systems-in-Kenya.jpg"
                   alt="Solar water pump installation"
                   fill
                   className="object-cover"
@@ -179,50 +237,104 @@ export default function SolarWaterPumpsClient() {
         </div>
       </section>
 
-      {/* Applications Section */}
+      {/* Solar Water Pumps Products Section - ADDED */}
       <section className="py-20 lg:py-24 bg-white dark:bg-gray-950">
         <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-                Perfect for{' '}
-                <span className="text-blue-600 dark:text-blue-400">Every Application</span>
-              </h2>
-              <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                From small farms to large commercial operations, our solar water pumps provide reliable 
-                water supply without ongoing fuel costs.
-              </p>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {applications.map((app, i) => {
-                  const Icon = app.icon;
-                  return (
-                    <div key={i} className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-                      <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900 dark:text-white">{app.title}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">{app.description}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+              Our{' '}
+              <span className="text-blue-600 dark:text-blue-400">Products</span>
+            </h2>
+            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+              Explore our range of high-efficiency solar water pumps for every application
+            </p>
+            <div className="w-20 h-0.5 bg-blue-600 dark:bg-blue-400 mx-auto mt-4 rounded-full" />
+          </div>
+          
+          {loading ? (
+            <LoadingSkeleton />
+          ) : products.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+              {products.map((product) => (
+                <ProductCard 
+                  key={product._id} 
+                  product={product}
+                />
+              ))}
             </div>
-            
-            <div className="bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl p-8 text-white text-center">
-              <Zap className="h-16 w-16 mx-auto mb-4 text-yellow-300" />
-              <div className="text-3xl font-bold mb-2">Save 100%</div>
-              <p className="text-lg mb-4">on Pumping Energy Costs</p>
-              <div className="text-6xl font-bold mb-2">₿0</div>
-              <p className="text-blue-100">Monthly fuel/electricity bill for pumping</p>
+          ) : (
+            <EmptyState />
+          )}
+        </div>            
+      </section>
+
+{/* Applications Section */}
+<section className="py-20 lg:py-24 bg-gray-50 dark:bg-gray-900/30">
+  <div className="container mx-auto px-4">
+    <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <div>
+        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6">
+          Perfect for{' '}
+          <span className="text-blue-600 dark:text-blue-400">Every Application</span>
+        </h2>
+        <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+          From small farms to large commercial operations, our solar water pumps provide reliable 
+          water supply without ongoing fuel costs.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-4">
+          {applications.map((app, i) => {
+            const Icon = app.icon;
+            return (
+              <div key={i} className="flex items-center gap-3 p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:shadow-md transition-all group">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center group-hover:bg-blue-600 dark:group-hover:bg-blue-600 transition-colors">
+                  <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400 group-hover:text-white transition-colors" />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900 dark:text-white">{app.title}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{app.description}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      
+      <div className="relative">
+        <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+          <Image
+            src="/water-pump/Honda-Water-Pump.png"
+            alt="Dayliff DDP 50A Domestic Pump - Perfect for every application"
+            width={600}
+            height={500}
+            className="w-full h-auto object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+          
+          {/* Overlay Stats Card */}
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent">
+            <div className="flex flex-wrap justify-between items-center gap-4">
+              <div>
+                <div className="text-white text-sm font-medium">High Efficiency</div>
+                <div className="text-white text-2xl font-bold">Dayliff DDP 50A</div>
+              </div>
+              <div className="bg-blue-600 rounded-lg px-4 py-2">
+                <div className="text-white text-xs font-medium">Flow Rate</div>
+                <div className="text-white text-xl font-bold">50 L/min</div>
+              </div>
             </div>
           </div>
         </div>
-      </section>
+        
+        {/* Decorative Elements */}
+        <div className="absolute -top-4 -right-4 w-24 h-24 bg-blue-600/10 rounded-full blur-2xl"></div>
+        <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-cyan-600/10 rounded-full blur-2xl"></div>
+      </div>
+    </div>
+  </div>
+</section>
 
       {/* Benefits List Section */}
-      <section className="py-20 lg:py-24 bg-gray-50 dark:bg-gray-900/30">
+      <section className="py-20 lg:py-24 bg-white dark:bg-gray-950">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-center text-gray-900 dark:text-white mb-6">
@@ -234,7 +346,7 @@ export default function SolarWaterPumpsClient() {
             </p>
             <div className="grid md:grid-cols-2 gap-4">
               {whySolarPumpBenefits.map((benefit, i) => (
-                <div key={i} className="flex items-start gap-3 p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+                <div key={i} className="flex items-start gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
                   <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                   <span className="text-gray-700 dark:text-gray-300">{benefit}</span>
                 </div>
@@ -245,7 +357,7 @@ export default function SolarWaterPumpsClient() {
       </section>
 
       {/* Gallery Section */}
-      <section className="py-20 lg:py-24 bg-white dark:bg-gray-950">
+      <section className="py-20 lg:py-24 bg-gray-50 dark:bg-gray-900/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
@@ -281,7 +393,6 @@ export default function SolarWaterPumpsClient() {
       <section className="py-20 lg:py-24 bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-3xl mx-auto">
-           
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
               Pump Water with Free Solar Energy
             </h2>
@@ -299,8 +410,6 @@ export default function SolarWaterPumpsClient() {
           </div>
         </div>
       </section>
-
-    
     </div>
   );
 }

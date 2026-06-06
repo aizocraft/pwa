@@ -58,9 +58,9 @@ const generateSlug = (name: string): string => {
   return name
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '') // Remove special characters
-    .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 };
 
 // Helper function to ensure unique slug
@@ -76,7 +76,6 @@ const generateUniqueSlug = async (name: string, existingSlugs: Set<string>): Pro
   
   return slug;
 };
-
 
 // Helper to validate and parse product data
 const validateProductData = (data: any): string[] => {
@@ -104,6 +103,58 @@ const parseCSVBuffer = (buffer: Buffer): Promise<any[]> => {
       .on('error', (error) => reject(error));
   });
 };
+
+// Helper to check low stock and send notifications
+const checkLowStockAndNotify = async (product: any, oldStock: number, newStock: number) => {
+  const threshold = 10;
+  
+  // If stock crossed below threshold
+  if (oldStock > threshold && newStock <= threshold && newStock > 0) {
+    const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+    if (adminUsers.length > 0) {
+      await Promise.all(adminUsers.map(admin =>
+        createNotification({
+          userId: admin._id.toString(),
+          type: 'stock',
+          title: `⚠️ Low Stock Alert: ${product.name}`,
+          message: `${product.name} is running low. Only ${newStock} units left. Consider restocking soon.`,
+          actionUrl: `/dashboard/inventory/products/${product._id}`,
+          metadata: {
+            productId: product._id,
+            productName: product.name,
+            sku: product.sku,
+            currentStock: newStock,
+            threshold
+          }
+        })
+      ));
+    }
+  }
+  
+  // If out of stock
+  if (oldStock > 0 && newStock === 0) {
+    const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+    if (adminUsers.length > 0) {
+      await Promise.all(adminUsers.map(admin =>
+        createNotification({
+          userId: admin._id.toString(),
+          type: 'stock',
+          title: `❌ Out of Stock: ${product.name}`,
+          message: `${product.name} is now out of stock. Immediate restock recommended.`,
+          actionUrl: `/dashboard/inventory/products/${product._id}`,
+          metadata: {
+            productId: product._id,
+            productName: product.name,
+            sku: product.sku,
+            currentStock: 0
+          }
+        })
+      ));
+    }
+  }
+};
+
+// ==================== INVENTORY ROUTES WITH NOTIFICATIONS ====================
 
 // GET /api/inventory/summary - Inventory value summary
 router.get('/summary', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
@@ -171,14 +222,14 @@ router.get('/summary', authMiddleware, async (req: Request & { user?: any }, res
   }
 });
 
-// GET /api/inventory/low-stock - Get low stock products
+// GET /api/inventory/low-stock - Get low stock products (with optional notification)
 router.get('/low-stock', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
     if (!isAdmin(req)) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const { threshold = '10', category, supplier } = req.query;
+    const { threshold = '10', category, supplier, notify = 'false' } = req.query;
     const stockThreshold = parseInt(threshold as string);
 
     const query: any = { stock: { $lte: stockThreshold } };
@@ -189,6 +240,28 @@ router.get('/low-stock', authMiddleware, async (req: Request & { user?: any }, r
       .select('name sku category brand price buyingPrice stock supplierName')
       .sort({ stock: 1 })
       .lean();
+
+    // Send notification if requested
+    if (notify === 'true' && products.length > 0) {
+      const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+      if (adminUsers.length > 0) {
+        const lowStockNames = products.slice(0, 5).map(p => `${p.name} (${p.stock})`).join(', ');
+        await Promise.all(adminUsers.map(admin =>
+          createNotification({
+            userId: admin._id.toString(),
+            type: 'stock',
+            title: `⚠️ Low Stock Report: ${products.length} Products`,
+            message: `Products below threshold (${stockThreshold}): ${lowStockNames}${products.length > 5 ? ` and ${products.length - 5} more` : ''}`,
+            actionUrl: '/dashboard/inventory/low-stock',
+            metadata: {
+              productCount: products.length,
+              threshold: stockThreshold,
+              products: products.map(p => ({ id: p._id, name: p.name, stock: p.stock }))
+            }
+          })
+        ));
+      }
+    }
 
     res.json({
       products,
@@ -201,7 +274,7 @@ router.get('/low-stock', authMiddleware, async (req: Request & { user?: any }, r
   }
 });
 
-// POST /api/inventory/restock/:productId - Record restock
+// POST /api/inventory/restock/:productId - Record restock with notification
 router.post('/restock/:productId', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
     if (!isAdmin(req)) {
@@ -215,6 +288,7 @@ router.post('/restock/:productId', authMiddleware, async (req: Request & { user?
       return res.status(404).json({ error: 'Product not found' });
     }
 
+    const oldStock = product.stock;
     const newQuantity = parseInt(quantity);
     if (isNaN(newQuantity) || newQuantity <= 0) {
       return res.status(400).json({ error: 'Valid quantity required' });
@@ -222,11 +296,14 @@ router.post('/restock/:productId', authMiddleware, async (req: Request & { user?
 
     product.stock += newQuantity;
 
+    let priceUpdated = false;
     if (buyingPrice && buyingPrice !== product.buyingPrice) {
       if (typeof product.updateBuyingPrice === 'function') {
         await product.updateBuyingPrice(buyingPrice, req.user.userId, reason || 'Restock');
+        priceUpdated = true;
       } else {
         product.buyingPrice = buyingPrice;
+        priceUpdated = true;
       }
     }
 
@@ -239,6 +316,36 @@ router.post('/restock/:productId', authMiddleware, async (req: Request & { user?
       details: `Restocked ${newQuantity} units of ${product.name}. New stock: ${product.stock}`,
       skipIfNoUser: false
     });
+
+    // ✅ NOTIFICATION: Notify all admins about restock
+    try {
+      const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+      if (adminUsers.length > 0) {
+        await Promise.all(adminUsers.map(admin =>
+          createNotification({
+            userId: admin._id.toString(),
+            type: 'stock',
+            title: `📦 Product Restocked: ${product.name}`,
+            message: `${product.name} restocked with +${newQuantity} units. New stock: ${product.stock}${priceUpdated ? '. Buying price updated.' : ''}`,
+            actionUrl: `/dashboard/inventory/products/${product._id}`,
+            metadata: {
+              productId: product._id,
+              productName: product.name,
+              sku: product.sku,
+              oldStock: oldStock,
+              newStock: product.stock,
+              quantityAdded: newQuantity,
+              buyingPriceUpdated: priceUpdated,
+              newBuyingPrice: buyingPrice || product.buyingPrice,
+              restockedBy: req.user.email || req.user.name,
+              reason: reason || 'Manual restock'
+            }
+          })
+        ));
+      }
+    } catch (notificationErr) {
+      console.error('Failed to send restock notification:', notificationErr);
+    }
 
     res.json({
       success: true,
@@ -312,6 +419,14 @@ router.get('/export', authMiddleware, async (req: Request & { user?: any }, res:
     if (exportData.length === 0) {
       return res.status(404).json({ error: 'No products found to export' });
     }
+
+    // ✅ NOTIFICATION: Log export activity (optional - can be commented if too noisy)
+    await createAuditLog(req as any, {
+      action: 'export',
+      resource: 'product',
+      details: `Exported ${exportData.length} products to ${format}`,
+      skipIfNoUser: false
+    });
 
     if (format === 'json') {
       res.setHeader('Content-Type', 'application/json');
@@ -407,11 +522,9 @@ router.post('/import', authMiddleware, upload.single('file'), async (req: Reques
       totalDuplicates: 0
     };
 
-    // Get existing products to check for duplicates - filter out undefined slugs
     const existingProducts = await ProductModel.find({}, 'sku name slug');
     const existingSkus = new Set(existingProducts.map(p => p.sku).filter((sku): sku is string => !!sku));
     const existingNames = new Set(existingProducts.map(p => p.name.toLowerCase()).filter((name): name is string => !!name));
-    // Filter out undefined slugs and cast to Set<string>
     const existingSlugs = new Set<string>(
       existingProducts.map(p => p.slug).filter((slug): slug is string => !!slug)
     );
@@ -427,7 +540,6 @@ router.post('/import', authMiddleware, upload.single('file'), async (req: Reques
           continue;
         }
         
-        // Check for duplicate SKU
         const providedSku = row['SKU (Optional)'] || row['SKU'] || '';
         let sku = providedSku;
         
@@ -437,14 +549,12 @@ router.post('/import', authMiddleware, upload.single('file'), async (req: Reques
           continue;
         }
         
-        // Check for duplicate name
         if (existingNames.has(productName.toLowerCase())) {
           results.duplicates.push({ row, reason: `Product name "${productName}" already exists`, productName });
           results.totalDuplicates++;
           continue;
         }
         
-        // Auto-generate SKU if not provided
         if (!sku || sku.trim() === '') {
           const category = row['Category'] || 'GEN';
           const existingSkusForCategory = await ProductModel.find({
@@ -455,11 +565,9 @@ router.post('/import', authMiddleware, upload.single('file'), async (req: Reques
           sku = await generateSKU(category, skuList);
         }
         
-        // Generate unique slug from product name
         const slug = await generateUniqueSlug(productName, existingSlugs);
-        existingSlugs.add(slug); // Add to set to prevent duplicates within this import
+        existingSlugs.add(slug);
         
-        // Parse image URLs
         const imageUrls: Image[] = [];
         if (row['Image URLs']) {
           const urls = row['Image URLs'].split(';').map((url: string) => url.trim());
@@ -470,11 +578,9 @@ router.post('/import', authMiddleware, upload.single('file'), async (req: Reques
           }
         }
         
-        // Parse tags
         const tags = row['Tags'] ? row['Tags'].split(',').map((tag: string) => tag.trim().toLowerCase()) : [];
         const featured = row['Featured']?.toLowerCase() === 'yes' || row['Featured']?.toLowerCase() === 'true';
         
-        // Handle supplier
         let supplierId = null;
         if (row['Supplier Name']) {
           let supplier = await SupplierModel.findOne({ 
@@ -491,16 +597,14 @@ router.post('/import', authMiddleware, upload.single('file'), async (req: Reques
           supplierId = supplier._id;
         }
         
-        // Parse prices
         const price = parseFloat(row['Price (KES)'] || 0);
         const buyingPrice = parseFloat(row['Buying Price (KES)'] || 0);
         const compareAtPrice = row['Compare At Price (KES)'] ? parseFloat(row['Compare At Price (KES)']) : null;
         const stock = parseInt(row['Stock'] || 0);
         
-        // Prepare product data with slug
         const productData: any = {
           name: productName,
-          slug: slug, // Add generated slug
+          slug: slug,
           sku: sku,
           category: row['Category'] || '',
           brand: row['Brand'] || '',
@@ -526,7 +630,6 @@ router.post('/import', authMiddleware, upload.single('file'), async (req: Reques
           productData.supplier = supplierId;
         }
         
-        // Validate required fields
         const validationErrors = validateProductData(productData);
         if (validationErrors.length > 0) {
           results.errors.push({ row, errors: validationErrors, productName });
@@ -534,11 +637,9 @@ router.post('/import', authMiddleware, upload.single('file'), async (req: Reques
           continue;
         }
         
-        // Create product
         const product = new ProductModel(productData);
         await product.save();
         
-        // Update supplier's products list if supplier exists
         if (supplierId) {
           await SupplierModel.findByIdAndUpdate(supplierId, {
             $addToSet: { productsSupplied: product._id }
@@ -566,7 +667,7 @@ router.post('/import', authMiddleware, upload.single('file'), async (req: Reques
       }
     }
     
-    // Create notification for bulk import
+    // ✅ NOTIFICATION: Bulk import completion
     try {
       const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
       if (adminUsers.length > 0) {
@@ -582,7 +683,8 @@ router.post('/import', authMiddleware, upload.single('file'), async (req: Reques
               imported: results.totalImported,
               errors: results.totalErrors,
               duplicates: results.totalDuplicates,
-              importedBy: req.user.email || req.user.name
+              importedBy: req.user.email || req.user.name,
+              fileName: req.file?.originalname
             }
           })
         ));
@@ -639,6 +741,8 @@ router.put('/bulk-update', authMiddleware, async (req: Request & { user?: any },
       totalErrors: 0
     };
     
+    const updatedProductsInfo: any[] = [];
+    
     for (const update of updates) {
       try {
         const { productId, ...updateData } = update;
@@ -656,6 +760,8 @@ router.put('/bulk-update', authMiddleware, async (req: Request & { user?: any },
           continue;
         }
         
+        const oldStock = product.stock;
+        
         if (updateData.price !== undefined) {
           updateData.price = parseFloat(updateData.price);
         }
@@ -671,10 +777,21 @@ router.put('/bulk-update', authMiddleware, async (req: Request & { user?: any },
         if (updateData.stock !== undefined) {
           const newStock = parseInt(updateData.stock);
           product.stock = newStock;
+          
+          // Check for low stock
+          await checkLowStockAndNotify(product, oldStock, newStock);
         }
         
         Object.assign(product, updateData);
         await product.save();
+        
+        updatedProductsInfo.push({
+          id: product._id,
+          name: product.name,
+          sku: product.sku,
+          oldStock,
+          newStock: product.stock
+        });
         
         results.success.push({ productId: product._id, name: product.name, sku: product.sku });
         results.totalUpdated++;
@@ -682,6 +799,32 @@ router.put('/bulk-update', authMiddleware, async (req: Request & { user?: any },
       } catch (error: any) {
         results.errors.push({ update, error: error.message });
         results.totalErrors++;
+      }
+    }
+    
+    // ✅ NOTIFICATION: Bulk update completion
+    if (results.totalUpdated > 0) {
+      try {
+        const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+        if (adminUsers.length > 0) {
+          await Promise.all(adminUsers.map(admin =>
+            createNotification({
+              userId: admin._id.toString(),
+              type: 'system',
+              title: `📝 Bulk Product Update Completed`,
+              message: `Updated ${results.totalUpdated} products. ${results.totalErrors} errors.`,
+              actionUrl: '/dashboard/inventory',
+              metadata: {
+                updatedCount: results.totalUpdated,
+                errorCount: results.totalErrors,
+                updatedBy: req.user.email || req.user.name,
+                products: updatedProductsInfo.slice(0, 5)
+              }
+            })
+          ));
+        }
+      } catch (notificationErr) {
+        console.error('Failed to send bulk update notification:', notificationErr);
       }
     }
     
@@ -725,6 +868,7 @@ router.delete('/bulk-delete', authMiddleware, async (req: Request & { user?: any
     
     const productsToDelete = await ProductModel.find({ _id: { $in: validIds } });
     const deletedCount = productsToDelete.length;
+    const deletedProductNames = productsToDelete.map(p => p.name);
     
     if (deletedCount === 0) {
       return res.status(404).json({ error: 'No products found to delete' });
@@ -732,17 +876,46 @@ router.delete('/bulk-delete', authMiddleware, async (req: Request & { user?: any
     
     await ProductModel.deleteMany({ _id: { $in: validIds } });
     
+    // ✅ NOTIFICATION: Bulk delete - notify all admins except the one who deleted
+    try {
+      const adminUsers = await UserModel.find({ 
+        role: 'admin', 
+        isActive: true,
+        _id: { $ne: req.user.userId }
+      });
+      if (adminUsers.length > 0) {
+        await Promise.all(adminUsers.map(admin =>
+          createNotification({
+            userId: admin._id.toString(),
+            type: 'system',
+            title: `🗑️ Bulk Products Deleted`,
+            message: `${deletedCount} products were deleted by ${req.user.email || req.user.name}: ${deletedProductNames.slice(0, 3).join(', ')}${deletedProductNames.length > 3 ? ` and ${deletedProductNames.length - 3} more` : ''}`,
+            actionUrl: '/dashboard/inventory',
+            metadata: {
+              deletedCount,
+              deletedBy: req.user.email || req.user.name,
+              productIds: validIds,
+              productNames: deletedProductNames
+            }
+          })
+        ));
+      }
+    } catch (notificationErr) {
+      console.error('Failed to send bulk delete notification:', notificationErr);
+    }
+    
     await createAuditLog(req as any, {
       action: 'bulk_delete',
       resource: 'product',
-      details: `Bulk deleted ${deletedCount} products`,
+      details: `Bulk deleted ${deletedCount} products: ${deletedProductNames.join(', ')}`,
       skipIfNoUser: false
     });
     
     res.json({
       success: true,
       message: `Successfully deleted ${deletedCount} products`,
-      deletedCount
+      deletedCount,
+      deletedProducts: deletedProductNames
     });
     
   } catch (error: any) {
@@ -771,6 +944,8 @@ router.post('/bulk-adjust-stock', authMiddleware, async (req: Request & { user?:
       totalAdjusted: 0,
       totalErrors: 0
     };
+    
+    const adjustedProducts: any[] = [];
     
     for (const adjustment of adjustments) {
       try {
@@ -812,6 +987,19 @@ router.post('/bulk-adjust-stock', authMiddleware, async (req: Request & { user?:
         
         await product.save();
         
+        // Check for low stock after adjustment
+        await checkLowStockAndNotify(product, oldStock, product.stock);
+        
+        adjustedProducts.push({
+          id: product._id,
+          name: product.name,
+          sku: product.sku,
+          operation,
+          oldStock,
+          newStock: product.stock,
+          change: product.stock - oldStock
+        });
+        
         await createAuditLog(req as any, {
           action: 'bulk_stock_adjustment',
           resource: 'product',
@@ -836,6 +1024,34 @@ router.post('/bulk-adjust-stock', authMiddleware, async (req: Request & { user?:
       }
     }
     
+    // ✅ NOTIFICATION: Bulk stock adjustment completion
+    if (results.totalAdjusted > 0) {
+      try {
+        const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+        if (adminUsers.length > 0) {
+          const summary = adjustedProducts.slice(0, 5).map(p => `${p.name}: ${p.oldStock} → ${p.newStock}`).join(', ');
+          await Promise.all(adminUsers.map(admin =>
+            createNotification({
+              userId: admin._id.toString(),
+              type: 'stock',
+              title: `📊 Bulk Stock Adjustment Completed`,
+              message: `Updated stock for ${results.totalAdjusted} products. ${results.totalErrors} errors. ${summary}${adjustedProducts.length > 5 ? ` and ${adjustedProducts.length - 5} more` : ''}`,
+              actionUrl: '/dashboard/inventory',
+              metadata: {
+                adjustedCount: results.totalAdjusted,
+                errorCount: results.totalErrors,
+                adjustedBy: req.user.email || req.user.name,
+                reason: reason || 'Bulk adjustment',
+                products: adjustedProducts
+              }
+            })
+          ));
+        }
+      } catch (notificationErr) {
+        console.error('Failed to send bulk stock adjustment notification:', notificationErr);
+      }
+    }
+    
     await createAuditLog(req as any, {
       action: 'bulk_stock_adjustment',
       resource: 'product',
@@ -855,7 +1071,7 @@ router.post('/bulk-adjust-stock', authMiddleware, async (req: Request & { user?:
   }
 });
 
-// ========== INVENTORY VALUATION REPORT (FIXED - NO DIVISION BY ZERO) ==========
+// ========== INVENTORY VALUATION REPORT ==========
 
 router.get('/valuation', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
@@ -863,12 +1079,10 @@ router.get('/valuation', authMiddleware, async (req: Request & { user?: any }, r
       return res.status(403).json({ error: 'Admin access required' });
     }
     
-    // Get all products for valuation
     const products = await ProductModel.find({})
       .select('name sku category price buyingPrice stock')
       .lean();
     
-    // Initialize totals
     let totalCostValue = 0;
     let totalRetailValue = 0;
     let totalPotentialProfit = 0;
@@ -888,7 +1102,6 @@ router.get('/valuation', authMiddleware, async (req: Request & { user?: any }, r
       const retailValue = price * stock;
       const profit = retailValue - costValue;
       
-      // Only calculate margin if price is not zero to avoid division by zero
       let margin = 0;
       if (price > 0) {
         margin = ((price - buyingPrice) / price) * 100;
@@ -903,7 +1116,6 @@ router.get('/valuation', authMiddleware, async (req: Request & { user?: any }, r
       totalPotentialProfit += profit;
       totalStockUnits += stock;
       
-      // Track top products (only if they have stock)
       if (stock > 0) {
         topProducts.push({
           name: product.name,
@@ -918,7 +1130,6 @@ router.get('/valuation', authMiddleware, async (req: Request & { user?: any }, r
         });
       }
       
-      // Category breakdown
       const category = product.category || 'Uncategorized';
       if (!categoryMap.has(category)) {
         categoryMap.set(category, {
@@ -939,14 +1150,9 @@ router.get('/valuation', authMiddleware, async (req: Request & { user?: any }, r
       cat.stockUnits += stock;
     }
     
-    // Sort top products by inventory value
     topProducts.sort((a, b) => b.inventoryValue - a.inventoryValue);
     const top10Products = topProducts.slice(0, 10);
-    
-    // Convert category map to array and sort
     const categoryBreakdown = Array.from(categoryMap.values()).sort((a, b) => b.totalValue - a.totalValue);
-    
-    // Calculate average margin safely
     const averageMargin = marginCount > 0 ? marginSum / marginCount : 0;
     
     res.json({

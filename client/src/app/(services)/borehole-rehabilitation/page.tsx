@@ -7,11 +7,6 @@ import {
   ArrowRight, 
   CheckCircle, 
   Droplets, 
-  Zap,
-  Phone,
-  Calendar,
-  Sparkles,
-  Shield,
   Clock,
   TrendingUp,
   AlertCircle,
@@ -87,7 +82,7 @@ export default function BoreholeRehabilitationPage() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-lg">
                 <Image
-                  src="/images/borehole.jpg"
+                  src="/images/Borehole-rehabilitation.jpg"
                   alt="Borehole rehabilitation"
                   fill
                   className="object-cover"

@@ -1,4 +1,4 @@
-// src/routes/sales.ts - Updated with profit tracking
+// src/routes/sales.ts - Complete with all notifications
 import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import authMiddleware from '../middleware/auth';
@@ -13,6 +13,8 @@ import ShippingAreaModel from '../models/ShippingArea';
 import PromoCodeModel from '../models/PromoCode';
 import { CompanySettings } from '../models/CompanySettings';
 import { sendQuotation, sendInvoice } from '../services/email.service';
+import { createNotification } from '../services/notification.service';
+import UserModel from '../models/User';
 
 const router = Router();
 
@@ -23,6 +25,31 @@ const requireSalesRole = (req: Request & { user?: any }, res: Response, next: an
     return res.status(403).json({ error: 'Sales/admin access required' });
   }
   next();
+};
+
+// Helper to send notifications to all admins
+const notifyAdmins = async (title: string, message: string, actionUrl: string, metadata: any = {}) => {
+  try {
+    const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+    if (adminUsers.length > 0) {
+      await Promise.all(adminUsers.map(admin =>
+        createNotification({
+          userId: admin._id.toString(),
+          type: 'system',
+          title,
+          message,
+          actionUrl,
+          metadata: {
+            ...metadata,
+            timestamp: new Date().toISOString()
+          }
+        })
+      ));
+      console.log(`✅ Sales notification sent to ${adminUsers.length} admin(s): ${title}`);
+    }
+  } catch (error) {
+    console.error('Failed to send admin notification:', error);
+  }
 };
 
 // Helper function to create order from invoice with profit tracking
@@ -145,7 +172,7 @@ async function createOrderFromInvoice(invoice: any, user: any) {
 }
 
 // =====================
-// Customers
+// Customers with Notifications
 // =====================
 
 router.post('/customers', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
@@ -186,6 +213,22 @@ router.post('/customers', authMiddleware, requireSalesRole, async (req: Request 
       details: `Sales customer created: ${customer.name}`,
       skipIfNoUser: false,
     });
+
+    // ✅ NOTIFICATION: New customer created
+    await notifyAdmins(
+      '👤 New Customer Added',
+      `${req.user.email || req.user.name} added customer: ${customer.name}`,
+      `/dashboard/sales/customers/${customer._id}`,
+      {
+        action: 'create_customer',
+        createdBy: req.user.email || req.user.name,
+        customerId: customer._id,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        customerLocation: customer.location
+      }
+    );
 
     res.status(201).json({ customer });
   } catch (e: any) {
@@ -245,6 +288,14 @@ router.patch('/customers/:id', authMiddleware, requireSalesRole, async (req: Req
       return res.status(403).json({ error: 'Not allowed' });
     }
 
+    const changes: string[] = [];
+    if (name !== undefined && name !== customer.name) changes.push(`name: "${customer.name}" → "${name}"`);
+    if (email !== undefined && email !== customer.email) changes.push(`email: "${customer.email}" → "${email}"`);
+    if (phone !== undefined && phone !== customer.phone) changes.push(`phone: "${customer.phone}" → "${phone}"`);
+    if (location !== undefined && location !== customer.location) changes.push(`location updated`);
+    if (notes !== undefined && notes !== customer.notes) changes.push(`notes updated`);
+    if (status !== undefined && status !== customer.status) changes.push(`status: ${customer.status} → ${status}`);
+
     if (name !== undefined) customer.name = String(name).trim();
     if (email !== undefined) customer.email = typeof email === 'string' ? email.toLowerCase().trim() : undefined;
     if (phone !== undefined) customer.phone = typeof phone === 'string' ? phone.trim() : undefined;
@@ -254,6 +305,22 @@ router.patch('/customers/:id', authMiddleware, requireSalesRole, async (req: Req
 
     await customer.save();
 
+    // ✅ NOTIFICATION: Customer updated
+    if (changes.length > 0) {
+      await notifyAdmins(
+        '✏️ Customer Updated',
+        `${req.user.email || req.user.name} updated customer "${customer.name}": ${changes.join(', ')}`,
+        `/dashboard/sales/customers/${customer._id}`,
+        {
+          action: 'update_customer',
+          updatedBy: req.user.email || req.user.name,
+          customerId: customer._id,
+          customerName: customer.name,
+          changes
+        }
+      );
+    }
+
     res.json({ customer });
   } catch (e: any) {
     console.error(e);
@@ -262,7 +329,7 @@ router.patch('/customers/:id', authMiddleware, requireSalesRole, async (req: Req
 });
 
 // =====================
-// Quotations with Profit Tracking
+// Quotations with Notifications
 // =====================
 
 router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
@@ -297,7 +364,6 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
     const taxExemptCategories = (settings?.taxExemptCategories || []).map((c: string) => String(c).trim());
 
     let subtotal = 0;
-
     let totalCost = 0;
     let totalProfit = 0;
     let totalItemTax = 0;
@@ -321,7 +387,6 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       totalProfit += itemProfit;
       
       let itemTax = 0;
-      // tax-exempt categories are forced as non-taxable
       const productCategory = product.category;
       const isCategoryExempt = productCategory && taxExemptCategories.includes(String(productCategory).trim());
       const isTaxable = it.taxable !== false && !isCategoryExempt;
@@ -331,9 +396,8 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       }
       
       processedItems.push({
-
         productId: product._id,
-         name: it.name && it.name.trim() ? it.name : product.name, 
+        name: it.name && it.name.trim() ? it.name : product.name, 
         slug: product.slug,
         qty,
         price,
@@ -363,8 +427,8 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       tax = taxableAmount * taxRate;
     }
     
-      const transportCost = transport?.cost || 0;
-      const transportDescription = transport?.description || '';
+    const transportCost = transport?.cost || 0;
+    const transportDescription = transport?.description || '';
 
     const transportInfo = (transportCost > 0 || transportDescription) ? {
       cost: transportCost,
@@ -411,6 +475,23 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
       details: `Quotation created: ${quote.quoteNumber} for ${quote.customerName}`,
       skipIfNoUser: false
     });
+
+    // ✅ NOTIFICATION: New quotation created
+    await notifyAdmins(
+      '📄 New Quotation Created',
+      `${req.user.email || req.user.name} created quotation ${quoteNumber} for ${customer.name} (KES ${total.toLocaleString()})`,
+      `/dashboard/sales/quotations/${quote._id}`,
+      {
+        action: 'create_quotation',
+        createdBy: req.user.email || req.user.name,
+        quotationId: quote._id,
+        quoteNumber,
+        customerId: customer._id,
+        customerName: customer.name,
+        total,
+        itemCount: processedItems.length
+      }
+    );
 
     const populatedQuote = await QuotationModel.findById(quote._id).lean();
     
@@ -518,14 +599,23 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
       taxPerItem, transport, estimatedDelivery 
     } = req.body;
 
+    const changes: string[] = [];
+
     if (status && ['draft', 'sent', 'accepted', 'rejected', 'expired'].includes(status)) {
+      if (status !== quotation.status) {
+        changes.push(`status: ${quotation.status} → ${status}`);
+      }
       if (status === 'sent' && quotation.status !== 'sent') quotation.sentAt = new Date();
-      if (status === 'accepted' && quotation.status !== 'accepted') quotation.acceptedAt = new Date();
+      if (status === 'accepted' && quotation.status !== 'accepted') {
+        quotation.acceptedAt = new Date();
+      }
       if (status === 'rejected' && quotation.status !== 'rejected') quotation.rejectedAt = new Date();
       quotation.status = status;
     }
     
+    if (notes !== undefined && notes !== quotation.notes) changes.push('notes updated');
     if (notes !== undefined) quotation.notes = notes;
+    if (terms !== undefined && terms !== quotation.terms) changes.push('terms updated');
     if (terms !== undefined) quotation.terms = terms;
     if (validUntil !== undefined) quotation.validUntil = new Date(validUntil);
     if (discount !== undefined) quotation.discount = discount;
@@ -541,6 +631,7 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
         };
         quotation.transportCost = transport.cost || 0;
         quotation.transportDescription = transport.description || '';
+        changes.push('transport info updated');
       } else {
         quotation.transportInfo = undefined;
         quotation.transportCost = 0;
@@ -549,28 +640,24 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
     }
 
     if (items && Array.isArray(items)) {
+      changes.push('items updated');
       const settings = await CompanySettings.findOne();
       const taxRate = settings?.taxRate ?? 0.16;
       const taxExemptCategories = (settings?.taxExemptCategories || []).map((c: string) => String(c).trim());
 
       const updatedItems = [];
-
-
       let subtotal = 0;
-
       let totalCost = 0;
       let totalProfit = 0;
       let totalItemTax = 0;
       
       for (const it of items) {
         const product = await ProductModel.findById(it.productId);
-
         if (!product) {
           return res.status(404).json({ error: `Product not found: ${it.productId}` });
         }
-      const price = it.customPrice || it.price || product.price;
-      const buyingPrice = product.buyingPrice || 0;
-
+        const price = it.customPrice || it.price || product.price;
+        const buyingPrice = product.buyingPrice || 0;
         const qty = Number(it.qty);
         const itemTotal = price * qty;
         const itemCost = buyingPrice * qty;
@@ -581,7 +668,6 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
         totalProfit += itemProfit;
         
         let itemTax = 0;
-        // tax-exempt categories are forced as non-taxable
         const productCategory = product.category;
         const isCategoryExempt = productCategory && taxExemptCategories.includes(String(productCategory).trim());
         const isTaxable = it.taxable !== false && !isCategoryExempt;
@@ -589,8 +675,6 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
           itemTax = itemTotal * taxRate;
           totalItemTax += itemTax;
         }
-
-
         
         updatedItems.push({
           productId: product._id,
@@ -606,7 +690,6 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
           customPrice: it.customPrice !== undefined,
           taxable: isTaxable,
           image: product.images && product.images.length > 0 
-
             ? (product.images[0].url || (product.images[0].fileId ? product.images[0].fileId.toString() : ''))
             : '',
           description: product.description || ''
@@ -625,14 +708,9 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
       if (quotation.taxPerItem) {
         quotation.tax = totalItemTax;
       } else {
-        // subtotal-after-discount, but excluding tax-exempt categories
         const taxableAmount = Math.max(0, subtotal - discountAmount);
         quotation.tax = taxableAmount * taxRate;
-        // NOTE: Since we don't separately subtract exempt-category amounts here,
-        // item-level taxPerItem should be used when category exemptions must be accurate.
-        // (Kept for backward compatibility with existing taxPerItem=false behavior.)
       }
-
       
       const transportCost = quotation.transportCost || 0;
       quotation.total = subtotal - discountAmount + quotation.tax + transportCost;
@@ -647,6 +725,22 @@ router.patch('/quotations/:id', authMiddleware, requireSalesRole, async (req: Re
       details: `Quotation updated: ${quotation.quoteNumber}`,
       skipIfNoUser: false
     });
+
+    // ✅ NOTIFICATION: Quotation updated (only if significant changes)
+    if (changes.length > 0) {
+      await notifyAdmins(
+        '✏️ Quotation Updated',
+        `${req.user.email || req.user.name} updated quotation ${quotation.quoteNumber}: ${changes.join(', ')}`,
+        `/dashboard/sales/quotations/${quotation._id}`,
+        {
+          action: 'update_quotation',
+          updatedBy: req.user.email || req.user.name,
+          quotationId: quotation._id,
+          quoteNumber: quotation.quoteNumber,
+          changes
+        }
+      );
+    }
 
     const updatedQuote = await QuotationModel.findById(quotation._id).lean();
     res.json({ success: true, quotation: updatedQuote });
@@ -721,6 +815,21 @@ router.post('/quotations/:id/send', authMiddleware, requireSalesRole, async (req
       skipIfNoUser: false
     });
 
+    // ✅ NOTIFICATION: Quotation sent
+    await notifyAdmins(
+      '✉️ Quotation Sent',
+      `Quotation ${quotation.quoteNumber} sent to ${quotation.customerEmail} for ${quotation.customerName}`,
+      `/dashboard/sales/quotations/${quotation._id}`,
+      {
+        action: 'send_quotation',
+        sentBy: req.user.email || req.user.name,
+        quotationId: quotation._id,
+        quoteNumber: quotation.quoteNumber,
+        customerEmail: quotation.customerEmail,
+        customerName: quotation.customerName
+      }
+    );
+
     res.json({ 
       success: true, 
       message: 'Quotation sent successfully via email',
@@ -757,6 +866,21 @@ router.post('/quotations/:id/accept', authMiddleware, requireSalesRole, async (r
     if (new Date() > new Date(quotation.validUntil)) {
       quotation.status = 'expired';
       await quotation.save();
+      
+      // ✅ NOTIFICATION: Quotation expired
+      await notifyAdmins(
+        '⏰ Quotation Expired',
+        `Quotation ${quotation.quoteNumber} for ${quotation.customerName} has expired.`,
+        `/dashboard/sales/quotations/${quotation._id}`,
+        {
+          action: 'quotation_expired',
+          quotationId: quotation._id,
+          quoteNumber: quotation.quoteNumber,
+          customerName: quotation.customerName,
+          validUntil: quotation.validUntil
+        }
+      );
+      
       return res.status(400).json({ error: 'Quotation has expired' });
     }
 
@@ -824,6 +948,23 @@ router.post('/quotations/:id/accept', authMiddleware, requireSalesRole, async (r
       skipIfNoUser: false
     });
 
+    // ✅ NOTIFICATION: Quotation accepted and invoice created
+    await notifyAdmins(
+      '✅ Quotation Accepted & Invoice Created',
+      `${req.user.email || req.user.name} accepted quotation ${quotation.quoteNumber} from ${quotation.customerName}. Invoice ${invoiceNumber} created for KES ${quotation.total.toLocaleString()}`,
+      `/dashboard/sales/invoices/${invoice._id}`,
+      {
+        action: 'accept_quotation',
+        acceptedBy: req.user.email || req.user.name,
+        quotationId: quotation._id,
+        quoteNumber: quotation.quoteNumber,
+        invoiceId: invoice._id,
+        invoiceNumber,
+        customerName: quotation.customerName,
+        total: quotation.total
+      }
+    );
+
     res.json({
       success: true,
       message: 'Quotation accepted and invoice created',
@@ -867,15 +1008,32 @@ router.delete('/quotations/:id', authMiddleware, requireSalesRole, async (req: R
       return res.status(403).json({ error: 'Not allowed' });
     }
 
+    const quoteNumber = quotation.quoteNumber;
+    const customerName = quotation.customerName;
+
     await QuotationModel.deleteOne({ _id: quotation._id });
 
     await createAuditLog(req as any, {
       action: 'delete',
       resource: 'quotation',
       resourceId: quotation._id.toString(),
-      details: `Quotation deleted: ${quotation.quoteNumber}`,
+      details: `Quotation deleted: ${quoteNumber}`,
       skipIfNoUser: false
     });
+
+    // ✅ NOTIFICATION: Quotation deleted
+    await notifyAdmins(
+      '🗑️ Quotation Deleted',
+      `${req.user.email || req.user.name} deleted quotation ${quoteNumber} for ${customerName}`,
+      '/dashboard/sales/quotations',
+      {
+        action: 'delete_quotation',
+        deletedBy: req.user.email || req.user.name,
+        quotationId: id,
+        quoteNumber,
+        customerName
+      }
+    );
 
     res.json({ success: true, message: 'Quotation deleted successfully' });
   } catch (error: any) {
@@ -902,22 +1060,18 @@ router.post('/quotations/:id/create-invoice', authMiddleware, requireSalesRole, 
       return res.status(403).json({ error: 'Not allowed' });
     }
 
-    // Only allow creating invoice from accepted quotations that may have been edited
     if (quotation.status !== 'accepted') {
       return res.status(400).json({ error: 'Can only create invoice from accepted quotations' });
     }
 
-    // Check if quotation has items
     if (!quotation.items || quotation.items.length === 0) {
       return res.status(400).json({ error: 'Quotation has no items' });
     }
 
-    // Generate new invoice number
     const invoiceNumber = await generateInvoiceNumber();
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 30);
 
-    // Create new invoice with current quotation data
     const invoice = await InvoiceModel.create({
       quotationId: quotation._id,
       quotationNumber: quotation.quoteNumber,
@@ -966,7 +1120,6 @@ router.post('/quotations/:id/create-invoice', authMiddleware, requireSalesRole, 
       sentAt: new Date()
     });
 
-    // Update quotation to reference this new invoice
     quotation.invoiceId = invoice._id;
     quotation.invoiceNumber = invoice.invoiceNumber;
     quotation.lastInvoiceCreatedAt = new Date();
@@ -979,6 +1132,23 @@ router.post('/quotations/:id/create-invoice', authMiddleware, requireSalesRole, 
       details: `New invoice ${invoiceNumber} created from edited accepted quotation ${quotation.quoteNumber}`,
       skipIfNoUser: false
     });
+
+    // ✅ NOTIFICATION: New invoice created from edited quotation
+    await notifyAdmins(
+      '🧾 New Invoice Created from Quotation',
+      `${req.user.email || req.user.name} created invoice ${invoiceNumber} for ${quotation.customerName} from edited accepted quotation ${quotation.quoteNumber} (KES ${quotation.total.toLocaleString()})`,
+      `/dashboard/sales/invoices/${invoice._id}`,
+      {
+        action: 'create_invoice_from_quotation',
+        createdBy: req.user.email || req.user.name,
+        quotationId: quotation._id,
+        quoteNumber: quotation.quoteNumber,
+        invoiceId: invoice._id,
+        invoiceNumber,
+        customerName: quotation.customerName,
+        total: quotation.total
+      }
+    );
 
     res.json({
       success: true,
@@ -1006,9 +1176,8 @@ router.post('/quotations/:id/create-invoice', authMiddleware, requireSalesRole, 
   }
 });
 
-
 // =====================
-// Invoices
+// Invoices with Notifications
 // =====================
 
 router.get('/invoices', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
@@ -1149,6 +1318,22 @@ router.post('/invoices/:id/send', authMiddleware, requireSalesRole, async (req: 
       skipIfNoUser: false
     });
 
+    // ✅ NOTIFICATION: Invoice sent
+    await notifyAdmins(
+      '✉️ Invoice Sent',
+      `Invoice ${invoice.invoiceNumber} sent to ${invoice.customerEmail} for ${invoice.customerName} (KES ${invoice.total.toLocaleString()})`,
+      `/dashboard/sales/invoices/${invoice._id}`,
+      {
+        action: 'send_invoice',
+        sentBy: req.user.email || req.user.name,
+        invoiceId: invoice._id,
+        invoiceNumber: invoice.invoiceNumber,
+        customerEmail: invoice.customerEmail,
+        customerName: invoice.customerName,
+        total: invoice.total
+      }
+    );
+
     res.json({ 
       success: true, 
       message: 'Invoice sent successfully via email'
@@ -1190,7 +1375,6 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
 
     const transactionId = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`;
 
-    // Add payment to invoice payments array
     invoice.payments.push({
       amount: paymentAmount,
       method,
@@ -1203,7 +1387,7 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
     invoice.amountPaid += paymentAmount;
     invoice.balanceDue = invoice.total - invoice.amountPaid;
 
-    // Update payment status
+    const oldPaymentStatus = invoice.paymentStatus;
     if (invoice.amountPaid === 0) {
       invoice.paymentStatus = 'unpaid';
     } else if (invoice.amountPaid < invoice.total) {
@@ -1218,7 +1402,6 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
 
     await invoice.save();
 
-    // Try to create transaction (don't fail if it fails)
     try {
       await TransactionModel.create({
         orderId: invoice.orderId || null,
@@ -1240,7 +1423,7 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
         notes: notes || null,
         recordedBy: req.user!.userId,
         recordedByName: req.user!.name || req.user!.email,
-        source: 'order', // Use 'order' instead of 'invoice'
+        source: 'order',
         isPartialPayment: paymentAmount < invoice.balanceDue,
         paidAt: new Date()
       });
@@ -1249,19 +1432,35 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
     }
 
     let createdOrder = null;
-    // Auto-create order if fully paid
     if (invoice.paymentStatus === 'paid' && !invoice.orderId) {
       try {
         createdOrder = await createOrderFromInvoice(invoice, req.user);
+        
+        // ✅ NOTIFICATION: Order created from paid invoice
+        if (createdOrder) {
+          await notifyAdmins(
+            '📦 Order Created from Paid Invoice',
+            `Order ${createdOrder.orderNumber} was automatically created from paid invoice ${invoice.invoiceNumber} for ${invoice.customerName}`,
+            `/dashboard/orders/${createdOrder._id}`,
+            {
+              action: 'order_created_from_invoice',
+              invoiceId: invoice._id,
+              invoiceNumber: invoice.invoiceNumber,
+              orderId: createdOrder._id,
+              orderNumber: createdOrder.orderNumber,
+              customerName: invoice.customerName,
+              total: invoice.total
+            }
+          );
+        }
       } catch (orderError: any) {
         console.error('Auto-create order failed:', orderError.message);
       }
     }
 
-    // ✅ FIXED: Use 'update' instead of 'payment' for audit log action
     try {
       await createAuditLog(req as any, {
-        action: 'update',  // This is valid in the enum
+        action: 'update',
         resource: 'invoice',
         resourceId: invoice._id.toString(),
         details: `Payment of KES ${paymentAmount.toLocaleString()} recorded for invoice ${invoice.invoiceNumber}. New payment status: ${invoice.paymentStatus}`,
@@ -1271,8 +1470,30 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
       });
     } catch (auditError: any) {
       console.error('Audit log creation failed:', auditError.message);
-      // Don't fail the payment if audit fails
     }
+
+    // ✅ NOTIFICATION: Payment recorded (with priority for large payments)
+    const isLargePayment = paymentAmount >= 50000;
+    const notificationTitle = isLargePayment ? '💰 Large Payment Received' : '💵 Payment Received';
+    
+    await notifyAdmins(
+      notificationTitle,
+      `${isLargePayment ? 'LARGE PAYMENT: ' : ''}${req.user.email || req.user.name} recorded payment of KES ${paymentAmount.toLocaleString()} for invoice ${invoice.invoiceNumber} from ${invoice.customerName}. Payment status: ${invoice.paymentStatus}`,
+      `/dashboard/sales/invoices/${invoice._id}`,
+      {
+        action: 'record_payment',
+        recordedBy: req.user.email || req.user.name,
+        invoiceId: invoice._id,
+        invoiceNumber: invoice.invoiceNumber,
+        customerName: invoice.customerName,
+        paymentAmount,
+        paymentMethod: method,
+        isLargePayment,
+        oldPaymentStatus,
+        newPaymentStatus: invoice.paymentStatus,
+        balanceRemaining: invoice.balanceDue
+      }
+    );
 
     res.json({
       success: true,
@@ -1392,6 +1613,25 @@ router.post('/invoices/:id/create-order', authMiddleware, requireSalesRole, asyn
     }
 
     const createdOrder = await createOrderFromInvoice(invoice, req.user);
+
+    // ✅ NOTIFICATION: Order manually created from invoice
+    if (createdOrder) {
+      await notifyAdmins(
+        '📦 Order Created from Invoice',
+        `${req.user.email || req.user.name} manually created order ${createdOrder.orderNumber} from invoice ${invoice.invoiceNumber} for ${invoice.customerName}`,
+        `/dashboard/orders/${createdOrder._id}`,
+        {
+          action: 'manual_order_creation',
+          createdBy: req.user.email || req.user.name,
+          invoiceId: invoice._id,
+          invoiceNumber: invoice.invoiceNumber,
+          orderId: createdOrder._id,
+          orderNumber: createdOrder.orderNumber,
+          customerName: invoice.customerName,
+          total: invoice.total
+        }
+      );
+    }
 
     res.json({
       success: true,

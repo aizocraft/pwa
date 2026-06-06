@@ -6,7 +6,6 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { 
-  Sun, 
   Home, 
   Building2, 
   Droplets, 
@@ -38,10 +37,10 @@ const CircularGallery = dynamic(
 );
 
 const galleryItems = [
-  { image: '/images/solar-image1.jpg', text: 'Residential Solar' },
-  { image: '/images/solar-image2.jpg', text: 'Commercial Solar' },
-  { image: '/images/solar-image3.jpg', text: 'Solar Water Heater' },
-  { image: '/images/solar-image4.jpg', text: 'Solar Water Pump' },
+  { image: '/backup/solar-backup-kenya.png', text: 'Residential Solar' },
+  { image: '/images/100kw_solar_plant.jpg', text: 'Commercial Solar' },
+  { image: '/solar-heaters/solar-water-heaters.png', text: 'Solar Water Heater' },
+  { image: '/water-pump/Honda-Water-Pump.png', text: 'Solar Water Pump' },
   { image: '/images/solar.jpg', text: 'Solar Installation' },
   { image: '/images/solar-4.jpg', text: 'Hybrid System' },
 ];
@@ -53,7 +52,7 @@ const solarServices = [
     description: 'Custom solar power systems for homes. Reduce or eliminate electricity bills with clean, reliable energy.',
     icon: Home,
     features: ['6kW Systems', '5kVA Inverters', 'Battery Storage', '24/7 Power'],
-    image: '/images/solar-image1.jpg',
+    image: '/backup/solar-backup-kenya.png',
     savings: '70-90%',
   },
   {
@@ -62,7 +61,7 @@ const solarServices = [
     description: 'Scalable solar installations for businesses, offices, and industries. Maximize ROI and energy independence.',
     icon: Building2,
     features: ['30kW+ Systems', 'Custom Design', 'Grid-Tied Options', 'Monitoring'],
-    image: '/images/solar-image2.jpg',
+    image: '/images/100kw_solar_plant.jpg',
     savings: '60-80%',
   },
   {
@@ -71,7 +70,7 @@ const solarServices = [
     description: 'Seven Stars solar water heaters. Save up to 85% on water heating costs with endless hot water.',
     icon: Droplets,
     features: ['70-90% Savings', '20-25 Year Lifespan', 'Low Maintenance', 'All-Weather'],
-    image: '/images/solar-image3.jpg',
+    image: '/solar-heaters/solar-water-heaters.png',
     savings: '85%',
   },
   {
@@ -80,7 +79,7 @@ const solarServices = [
     description: 'Efficient solar-powered pumping solutions for irrigation, livestock, and domestic water supply.',
     icon: Droplets,
     features: ['2.5kW+ Systems', 'No Fuel Costs', 'Easy Installation', 'Minimal Maintenance'],
-    image: '/images/solar-image4.jpg',
+    image: '/water-pump/Honda-Water-Pump.png',
     savings: '90%',
   },
   {
@@ -89,18 +88,10 @@ const solarServices = [
     description: 'Reliable backup power with solar batteries. Never experience power outages again.',
     icon: Battery,
     features: ['Automatic Switchover', 'Scalable Storage', 'Clean Energy', 'Peace of Mind'],
-    image: '/images/solar.jpg',
+    image: '/backup/solar-backup-kenya.png',
     savings: '100%',
   },
-  {
-    slug: 'solar-hybrid-systems',
-    title: 'Hybrid Solar Systems',
-    description: 'Combine solar, battery, and grid power for maximum efficiency and reliability.',
-    icon: Zap,
-    features: ['Grid-Tied + Battery', 'Smart Management', 'Energy Independence', 'Highest ROI'],
-    image: '/images/solar-4.jpg',
-    savings: '75-95%',
-  },
+ 
 ];
 
 const benefits = [
@@ -138,8 +129,7 @@ export default function SolarSolutionsClient() {
             
             <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
               Harness the power of the sun with our premium solar solutions. 
-              Reduce costs, achieve energy independence, and embrace sustainability.
-            </p>
+                   </p>
           </div>
         </div>
       </section>

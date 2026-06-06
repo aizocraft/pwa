@@ -1,9 +1,12 @@
+// src/routes/companySettings.routes.ts
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { CompanySettings, ICompanySettings } from '../models/CompanySettings';
 import { getGridFSBucket } from '../config/gridfs';
 import mongoose from 'mongoose';
 import authMiddleware from '../middleware/auth';
+import { createNotification } from '../services/notification.service';
+import UserModel from '../models/User';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -27,6 +30,31 @@ const upload = multer({
 // Helper functions
 const isAdmin = (req: Request): boolean => (req as any).user?.role === 'admin';
 const logAction = (action: string, details: any) => console.log(`[Company] ${action}:`, JSON.stringify(details, null, 2));
+
+// Helper to send notifications to all admins
+const notifyAdmins = async (title: string, message: string, actionUrl: string, metadata: any = {}) => {
+  try {
+    const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+    if (adminUsers.length > 0) {
+      await Promise.all(adminUsers.map(admin =>
+        createNotification({
+          userId: admin._id.toString(),
+          type: 'system',
+          title,
+          message,
+          actionUrl,
+          metadata: {
+            ...metadata,
+            timestamp: new Date().toISOString()
+          }
+        })
+      ));
+      console.log(`✅ Notification sent to ${adminUsers.length} admin(s): ${title}`);
+    }
+  } catch (error) {
+    console.error('Failed to send admin notification:', error);
+  }
+};
 
 // GET /api/company
 router.get('/', async (req: Request, res: Response) => {
@@ -58,7 +86,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/company - Optimized update
+// PUT /api/company - Optimized update with notification
 router.put('/', authMiddleware, async (req: Request, res: Response) => {
   try {
     if (!isAdmin(req)) {
@@ -82,6 +110,9 @@ router.put('/', authMiddleware, async (req: Request, res: Response) => {
     delete updateData.logo;
     delete updateData.favicon;
 
+    // Get old settings for comparison
+    const oldSettings = await CompanySettings.findOne();
+    
     // Atomic update with validation
     const settings = await CompanySettings.findOneAndUpdate(
       {},
@@ -95,6 +126,31 @@ router.put('/', authMiddleware, async (req: Request, res: Response) => {
     ) as ICompanySettings;
 
     logAction('UPDATE_SUCCESS', { id: settings._id, fields: Object.keys(updateData) });
+    
+    // ✅ NOTIFICATION: Company settings updated
+    const changedFields = Object.keys(updateData).filter(key => 
+      oldSettings && JSON.stringify(oldSettings[key as keyof ICompanySettings]) !== JSON.stringify(updateData[key])
+    );
+    
+    if (changedFields.length > 0) {
+      await notifyAdmins(
+        '🏢 Company Settings Updated',
+        `${(req as any).user?.email || 'Admin'} updated company settings: ${changedFields.join(', ')}`,
+        '/dashboard/settings/company',
+        {
+          updatedBy: (req as any).user?.email || (req as any).user?.name,
+          changedFields,
+          oldValues: changedFields.reduce((acc, field) => {
+            acc[field] = oldSettings?.[field as keyof ICompanySettings];
+            return acc;
+          }, {} as Record<string, any>),
+          newValues: changedFields.reduce((acc, field) => {
+            acc[field] = settings[field as keyof ICompanySettings];
+            return acc;
+          }, {} as Record<string, any>)
+        }
+      );
+    }
     
     res.json({
       success: true,
@@ -134,7 +190,9 @@ router.post('/upload-logo', authMiddleware, upload.single('logo'), async (req: R
     let settings = await CompanySettings.findOne();
     
     // Delete old logo from GridFS if exists
+    let oldLogoInfo = null;
     if (settings && settings.logo && settings.logo.type === 'gridfs' && settings.logo.fileId) {
+      oldLogoInfo = { fileId: settings.logo.fileId, filename: settings.logo.filename };
       try { 
         await bucket.delete(settings.logo.fileId); 
         console.log('Old logo deleted from GridFS');
@@ -163,6 +221,21 @@ router.post('/upload-logo', authMiddleware, upload.single('logo'), async (req: R
       };
       await settings.save();
     }
+
+    // ✅ NOTIFICATION: Logo uploaded
+    await notifyAdmins(
+      '🖼️ Company Logo Updated',
+      `${(req as any).user?.email || 'Admin'} uploaded a new company logo`,
+      '/dashboard/settings/company',
+      {
+        action: 'upload_logo',
+        uploadedBy: (req as any).user?.email || (req as any).user?.name,
+        filename: req.file.originalname,
+        fileSize: req.file.size,
+        fileType: req.file.mimetype,
+        oldLogoDeleted: !!oldLogoInfo
+      }
+    );
 
     res.json({ success: true, message: 'Logo uploaded successfully', fileId: uploadStream.id, data: settings });
   } catch (error) {
@@ -197,7 +270,9 @@ router.post('/upload-favicon', authMiddleware, upload.single('favicon'), async (
     let settings = await CompanySettings.findOne();
     
     // Delete old favicon from GridFS if exists
+    let oldFaviconInfo = null;
     if (settings && settings.favicon && settings.favicon.type === 'gridfs' && settings.favicon.fileId) {
+      oldFaviconInfo = { fileId: settings.favicon.fileId, filename: settings.favicon.filename };
       try { 
         await bucket.delete(settings.favicon.fileId); 
         console.log('Old favicon deleted from GridFS');
@@ -227,6 +302,21 @@ router.post('/upload-favicon', authMiddleware, upload.single('favicon'), async (
       await settings.save();
     }
 
+    // ✅ NOTIFICATION: Favicon uploaded
+    await notifyAdmins(
+      '🔖 Company Favicon Updated',
+      `${(req as any).user?.email || 'Admin'} uploaded a new company favicon`,
+      '/dashboard/settings/company',
+      {
+        action: 'upload_favicon',
+        uploadedBy: (req as any).user?.email || (req as any).user?.name,
+        filename: req.file.originalname,
+        fileSize: req.file.size,
+        fileType: req.file.mimetype,
+        oldFaviconDeleted: !!oldFaviconInfo
+      }
+    );
+
     res.json({ success: true, message: 'Favicon uploaded successfully', fileId: uploadStream.id, data: settings });
   } catch (error) {
     console.error('Upload favicon error:', error);
@@ -251,9 +341,11 @@ router.post('/logo-url', authMiddleware, async (req: Request, res: Response) => 
 
     // Get current settings
     let settings = await CompanySettings.findOne();
+    let oldLogoType = null;
     
     // Delete old GridFS file if exists
     if (settings && settings.logo && settings.logo.type === 'gridfs' && settings.logo.fileId) {
+      oldLogoType = 'gridfs';
       try {
         const bucket = getGridFSBucket();
         await bucket.delete(settings.logo.fileId);
@@ -261,6 +353,8 @@ router.post('/logo-url', authMiddleware, async (req: Request, res: Response) => 
       } catch (err) {
         console.warn('Old logo delete failed:', err);
       }
+    } else if (settings?.logo?.type === 'url') {
+      oldLogoType = 'url';
     }
 
     // Prepare the logo object
@@ -290,7 +384,19 @@ router.post('/logo-url', authMiddleware, async (req: Request, res: Response) => 
     }
     
     console.log('Logo URL updated successfully');
-    console.log('New logo:', settings.logo);
+    
+    // ✅ NOTIFICATION: Logo URL updated
+    await notifyAdmins(
+      '🖼️ Company Logo URL Updated',
+      `${(req as any).user?.email || 'Admin'} changed the company logo URL`,
+      '/dashboard/settings/company',
+      {
+        action: 'update_logo_url',
+        updatedBy: (req as any).user?.email || (req as any).user?.name,
+        newLogoUrl: url,
+        oldLogoType: oldLogoType
+      }
+    );
     
     res.json({ 
       success: true, 
@@ -323,9 +429,11 @@ router.post('/favicon-url', authMiddleware, async (req: Request, res: Response) 
 
     // Get current settings
     let settings = await CompanySettings.findOne();
+    let oldFaviconType = null;
     
     // Delete old GridFS file if exists
     if (settings && settings.favicon && settings.favicon.type === 'gridfs' && settings.favicon.fileId) {
+      oldFaviconType = 'gridfs';
       try {
         const bucket = getGridFSBucket();
         await bucket.delete(settings.favicon.fileId);
@@ -333,6 +441,8 @@ router.post('/favicon-url', authMiddleware, async (req: Request, res: Response) 
       } catch (err) {
         console.warn('Old favicon delete failed:', err);
       }
+    } else if (settings?.favicon?.type === 'url') {
+      oldFaviconType = 'url';
     }
 
     // Prepare the favicon object
@@ -365,7 +475,19 @@ router.post('/favicon-url', authMiddleware, async (req: Request, res: Response) 
     }
     
     console.log('Favicon URL updated successfully');
-    console.log('New favicon:', settings.favicon);
+    
+    // ✅ NOTIFICATION: Favicon URL updated
+    await notifyAdmins(
+      '🔖 Company Favicon URL Updated',
+      `${(req as any).user?.email || 'Admin'} changed the company favicon URL`,
+      '/dashboard/settings/company',
+      {
+        action: 'update_favicon_url',
+        updatedBy: (req as any).user?.email || (req as any).user?.name,
+        newFaviconUrl: url,
+        oldFaviconType: oldFaviconType
+      }
+    );
     
     res.json({ 
       success: true, 
@@ -462,6 +584,17 @@ router.delete('/logo', authMiddleware, async (req: Request, res: Response) => {
       await settings.save();
     }
 
+    // ✅ NOTIFICATION: Logo reset to default
+    await notifyAdmins(
+      '🖼️ Company Logo Reset',
+      `${(req as any).user?.email || 'Admin'} reset the company logo to default`,
+      '/dashboard/settings/company',
+      {
+        action: 'reset_logo',
+        resetBy: (req as any).user?.email || (req as any).user?.name
+      }
+    );
+
     res.json({ success: true, message: 'Logo reset to default', data: settings });
   } catch (error) {
     console.error('Delete logo error:', error);
@@ -496,6 +629,17 @@ router.delete('/favicon', authMiddleware, async (req: Request, res: Response) =>
       settings.favicon = null;
       await settings.save();
     }
+
+    // ✅ NOTIFICATION: Favicon deleted
+    await notifyAdmins(
+      '🔖 Company Favicon Deleted',
+      `${(req as any).user?.email || 'Admin'} deleted the company favicon`,
+      '/dashboard/settings/company',
+      {
+        action: 'delete_favicon',
+        deletedBy: (req as any).user?.email || (req as any).user?.name
+      }
+    );
 
     res.json({ success: true, message: 'Favicon deleted', data: settings });
   } catch (error) {
@@ -542,6 +686,17 @@ router.post('/reset', authMiddleware, async (req: Request, res: Response) => {
       { new: true, upsert: true }
     ) as ICompanySettings;
 
+    // ✅ NOTIFICATION: All settings reset
+    await notifyAdmins(
+      '🏢 Company Settings Reset',
+      `${(req as any).user?.email || 'Admin'} reset all company settings to default`,
+      '/dashboard/settings/company',
+      {
+        action: 'reset_all_settings',
+        resetBy: (req as any).user?.email || (req as any).user?.name
+      }
+    );
+
     res.json({ success: true, message: 'Settings reset', data: resetSettings });
   } catch (error) {
     console.error('Reset error:', error);
@@ -561,12 +716,10 @@ router.get('/tax-rate', async (req: Request, res: Response) => {
   }
 });
 
-// In src/routes/companySettings.routes.ts or your admin routes
-
 // PUT /api/admin/settings/tax-exempt-categories
 router.put('/admin/settings/tax-exempt-categories', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user?.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
@@ -576,6 +729,9 @@ router.put('/admin/settings/tax-exempt-categories', authMiddleware, async (req: 
       return res.status(400).json({ error: 'taxExemptCategories must be an array' });
     }
 
+    const oldSettings = await CompanySettings.findOne();
+    const oldCategories = oldSettings?.taxExemptCategories || [];
+
     let settings = await CompanySettings.findOne();
     if (!settings) {
       settings = new CompanySettings();
@@ -583,6 +739,25 @@ router.put('/admin/settings/tax-exempt-categories', authMiddleware, async (req: 
     
     settings.taxExemptCategories = taxExemptCategories;
     await settings.save();
+    
+    // ✅ NOTIFICATION: Tax-exempt categories updated
+    const added = taxExemptCategories.filter((c: string) => !oldCategories.includes(c));
+    const removed = oldCategories.filter((c: string) => !taxExemptCategories.includes(c));
+    
+    if (added.length > 0 || removed.length > 0) {
+      await notifyAdmins(
+        '💰 Tax-Exempt Categories Updated',
+        `${req.user.email || 'Admin'} updated tax-exempt categories. ${added.length > 0 ? `Added: ${added.join(', ')}` : ''} ${removed.length > 0 ? `Removed: ${removed.join(', ')}` : ''}`,
+        '/dashboard/settings/tax',
+        {
+          action: 'update_tax_exempt_categories',
+          updatedBy: req.user.email || req.user.name,
+          addedCategories: added,
+          removedCategories: removed,
+          totalCategories: taxExemptCategories.length
+        }
+      );
+    }
     
     res.json({
       success: true,
@@ -601,6 +776,18 @@ router.get('/export', authMiddleware, async (req: Request, res: Response) => {
 
     const settings = await CompanySettings.findOne().lean();
     if (!settings) return res.status(404).json({ error: 'Settings not found' });
+
+    // ✅ NOTIFICATION: Settings exported (optional - can be commented if too noisy)
+    await notifyAdmins(
+      '📤 Company Settings Exported',
+      `${(req as any).user?.email || 'Admin'} exported company settings`,
+      '/dashboard/settings/company',
+      {
+        action: 'export_settings',
+        exportedBy: (req as any).user?.email || (req as any).user?.name,
+        exportTime: new Date().toISOString()
+      }
+    );
 
     // Destructure with proper type assertion
     const { _id, __v, createdAt, updatedAt, ...exportData } = settings as any;
@@ -630,6 +817,19 @@ router.post('/import', authMiddleware, async (req: Request, res: Response) => {
       { $set: cleanData }, 
       { new: true, upsert: true }
     ) as ICompanySettings;
+
+    // ✅ NOTIFICATION: Settings imported
+    await notifyAdmins(
+      '📥 Company Settings Imported',
+      `${(req as any).user?.email || 'Admin'} imported company settings`,
+      '/dashboard/settings/company',
+      {
+        action: 'import_settings',
+        importedBy: (req as any).user?.email || (req as any).user?.name,
+        importTime: new Date().toISOString(),
+        companyName: importData.companyName
+      }
+    );
 
     res.json({ success: true, message: 'Settings imported', data: settings });
   } catch (error) {

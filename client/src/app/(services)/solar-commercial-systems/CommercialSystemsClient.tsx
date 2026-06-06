@@ -24,11 +24,12 @@ import CircularGallery from '@/components/CircularGallery';
 import { useTheme } from '@/context/ThemeContext';
 
 const commercialImages = [
-  { image: '/images/solar-image2.jpg', location: 'Industrial Area, Nairobi', system: '50kW Solar System' },
-  { image: '/images/solar-image1.jpg', location: 'Westlands, Nairobi', system: '30kW Solar System' },
-  { image: '/images/solar-image3.jpg', location: 'Thika Road', system: '100kW Solar System' },
-  { image: '/images/solar-4.jpg', location: 'Mombasa Road', system: '75kW Solar System' },
-  { image: '/images/solar.jpg', location: 'Karen, Nairobi', system: '45kW Solar System' },
+  { image: '/images/10kw_solar_plant.jpg', location: '', system: '10kW Solar System' },
+  { image: '/images/30kw_solar_plant.jpg', location: '', system: '30kW Solar System' },
+  { image: '/images/50kw_solar_plant.jpg', location: '', system: '50kW Solar System' },
+  { image: '/images/100kw_solar_plant.jpg', location: '', system: '100kW Solar System' },
+  { image: '/images/200kw_solar_plant.jpg', location: '', system: '200kW Solar System' },
+  { image: '/images/500kw_solar_plant.jpg', location: '', system: '500kW Solar System' },
 ];
 
 const formattedGalleryItems = commercialImages.map(item => ({
@@ -107,7 +108,7 @@ export default function CommercialSystemsClient() {
             
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-xl">
-                <Image src="/images/solar-image2.jpg" alt="Commercial solar installation" fill className="object-cover" />
+                <Image src="/images/commercial-ground-mount-system.webp" alt="Commercial solar installation" fill className="object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
               </div>
             </div>

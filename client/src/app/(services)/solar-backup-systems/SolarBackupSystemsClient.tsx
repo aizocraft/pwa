@@ -12,25 +12,22 @@ import {
   Shield,
   Clock,
   TrendingDown,
-  Phone,
-  Calendar,
-  Sparkles,
-  ThumbsUp,
-  DollarSign,
-  Users,
-  Settings,
   Home,
   Building2,
   Activity
 } from 'lucide-react';
 import CircularGallery from '@/components/CircularGallery';
 import { useTheme } from '@/context/ThemeContext';
+import { useQuery } from '@tanstack/react-query';
+import { getProducts } from '@/lib/api';
+import ProductCard from '@/components/ProductCard';
+import type { Product } from '@/types/product';
 
 const backupImages = [
-  { image: '/images/solar.jpg', location: 'Runda, Nairobi', system: '5kVA Solar Backup System' },
-  { image: '/images/solar-image2.jpg', location: 'Westlands, Nairobi', system: '8kVA Solar Backup' },
-  { image: '/images/solar-image3.jpg', location: 'Kiambu Road', system: '3kVA Home Backup' },
-  { image: '/images/solar-4.jpg', location: 'Karen, Nairobi', system: '10kVA Commercial Backup' },
+  { image: '/backup/solar-backup-kenya1.png', location: 'Runda, Nairobi', system: '' },
+  { image: '/images/Combined-1.jpg', location: 'Westlands, Nairobi', system: '' },
+  { image: '/images/combined-2.jpg', location: 'Kiambu Road', system: '' },
+  { image: '/images/solar-4.jpg', location: 'Karen, Nairobi', system: '' },
 ];
 
 const formattedGalleryItems = backupImages.map(item => ({
@@ -83,6 +80,15 @@ export default function SolarBackupSystemsClient() {
     setMounted(true);
   }, []);
 
+  // Fetch Inverter products
+  const { data: productsData, isLoading: productsLoading } = useQuery({
+    queryKey: ['inverter-products'],
+    queryFn: () => getProducts({ category: 'inverters', limit: 8 }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const inverterProducts = (productsData?.products || []) as Product[];
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
       
@@ -133,15 +139,68 @@ export default function SolarBackupSystemsClient() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-xl">
                 <Image
-                  src="/images/solar.jpg"
-                  alt="Solar backup system installation"
+                  src="/backup/solar-backup-kenya.png"
+                  alt="Solar backup system installation in Kenya"
                   fill
                   className="object-cover"
+                  onError={(e) => {
+                    // Fallback to existing image if new one doesn't exist
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/images/solar.jpg';
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Products Section - Inverters */}
+      <section className="py-20 lg:py-24 bg-white dark:bg-gray-950">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+              Our{' '}
+              <span className="text-blue-600 dark:text-blue-400">Premium Inverters</span>
+            </h2>
+            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+              High-quality solar inverters for reliable backup power
+            </p>
+            <div className="w-20 h-0.5 bg-blue-600 dark:text-blue-400 mx-auto mt-4 rounded-full" />
+          </div>
+
+          {productsLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="aspect-[4/3] bg-gray-200 dark:bg-gray-700 rounded-xl mb-3" />
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : inverterProducts.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {inverterProducts.slice(0, 8).map((product) => (
+                  <ProductCard key={product._id} product={product} />
+                ))}
+              </div>
+              <div className="text-center mt-10">
+                <Link 
+                  href="/products?category=inverters" 
+                  className="inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors"
+                >
+                  View All Inverters <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">No inverter products available at the moment.</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -180,7 +239,7 @@ export default function SolarBackupSystemsClient() {
         </div>
       </section>
 
-      {/* Perfect For Section */}
+      {/* Perfect For Section - With Image instead of gradient box */}
       <section className="py-20 lg:py-24 bg-white dark:bg-gray-950">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -210,12 +269,20 @@ export default function SolarBackupSystemsClient() {
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl p-8 text-white text-center">
-              <Zap className="h-16 w-16 mx-auto mb-4 text-yellow-300" />
-              <div className="text-3xl font-bold mb-2">Instant Backup</div>
-              <p className="text-lg mb-4">Automatic switchover in milliseconds</p>
-              <div className="text-6xl font-bold mb-2">24/7</div>
-              <p className="text-blue-100">Continuous power protection</p>
+            {/* Image instead of gradient box */}
+            <div className="relative h-[400px] rounded-2xl overflow-hidden shadow-xl">
+              <Image
+                src="/backup/solarmax-inverter.png"
+                alt="Solarmax inverter - premium solar backup solution"
+                fill
+                className="object-cover hover:scale-105 transition-transform duration-500"
+                onError={(e) => {
+                  // Fallback image if specific one doesn't exist
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/images/solar-image2.jpg';
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
             </div>
           </div>
         </div>
@@ -298,8 +365,6 @@ export default function SolarBackupSystemsClient() {
           </div>
         </div>
       </section>
-
-    
     </div>
   );
 }

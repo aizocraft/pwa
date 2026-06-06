@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { 
   Building2, 
@@ -62,10 +63,6 @@ export default function WaterTowersClient() {
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 rounded-full px-3 py-1.5 mb-5">
-              <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Elevated Water Storage Solutions</span>
-            </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-4">
               Professional{' '}
@@ -76,7 +73,7 @@ export default function WaterTowersClient() {
             
             <p className="text-base text-gray-600 dark:text-gray-400 mb-6 max-w-2xl mx-auto">
               Custom-designed elevated water tanks for reliable storage and consistent pressure. 
-              Steel and PVC options available for any capacity need.
+             
             </p>
           </div>
         </div>
@@ -152,7 +149,7 @@ export default function WaterTowersClient() {
         </div>
       </section>
 
-      {/* Benefits Section - Increased font and width on desktop */}
+      {/* Benefits Section - With Image instead of stats */}
       <section className="py-16 lg:py-20 bg-white dark:bg-gray-950">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center lg:w-[85%] lg:mx-auto">
@@ -181,31 +178,20 @@ export default function WaterTowersClient() {
               </Link>
             </div>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-5">
-                <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800">
-                  <Zap className="h-10 w-10 text-yellow-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">50%</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Energy Savings</div>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800">
-                  <Shield className="h-10 w-10 text-green-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">20+</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Years Durability</div>
-                </div>
-              </div>
-              <div className="space-y-5 mt-8">
-                <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800">
-                  <Droplets className="h-10 w-10 text-blue-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">100kL+</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Max Capacity</div>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800">
-                  <Clock className="h-10 w-10 text-purple-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">24/7</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Water Access</div>
-                </div>
-              </div>
+            {/* Image replacing the stats grid */}
+            <div className="relative h-[400px] md:h-[500px] rounded-2xl overflow-hidden shadow-xl">
+              <Image
+                src="/images/tower-construction1.jpg"
+                alt="Water tower construction and installation by Plasma Water Africa"
+                fill
+                className="object-cover hover:scale-105 transition-transform duration-500"
+                onError={(e) => {
+                  // Fallback to a default image if the specified one doesn't exist
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/images/water_tower1.jpeg';
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
             </div>
           </div>
         </div>

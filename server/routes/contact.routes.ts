@@ -1,6 +1,9 @@
+// src/routes/contact.routes.ts
 import { Router, Request, Response } from 'express';
 import { Contact } from '../models/Contact';
 import authMiddleware from '../middleware/auth';
+import { createNotification, NOTIFICATION_TEMPLATES } from '../services/notification.service';
+import User from '../models/User';
 
 const router = Router();
 
@@ -13,7 +16,7 @@ const getClientIp = (req: Request): string => {
 
 // ==================== PUBLIC ROUTES ====================
 
-// Submit contact form (public) - accepts email OR phone
+// Submit contact form (public) - WITH ADMIN NOTIFICATION
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { name, email, phone, subject, message } = req.body;
@@ -52,6 +55,41 @@ router.post('/', async (req: Request, res: Response) => {
     });
 
     await contact.save();
+
+    // ✅ NOTIFICATION: Send to all admins when new contact message received (not spam)
+    if (!isSpam) {
+      try {
+        const adminUsers = await User.find({ role: 'admin', isActive: true });
+        
+        if (adminUsers.length > 0) {
+          const notificationPromises = adminUsers.map(admin => 
+            createNotification({
+              userId: admin._id.toString(),
+              type: 'system',
+              title: '📬 New Contact Message',
+              message: `${name} submitted a contact message: "${subject.substring(0, 50)}${subject.length > 50 ? '...' : ''}"`,
+              actionUrl: `/dashboard/contact/${contact._id}`,
+              metadata: {
+                contactId: contact._id.toString(),
+                name,
+                email: email || null,
+                phone: phone || null,
+                subject,
+                message: message.substring(0, 200),
+                submittedAt: new Date().toISOString(),
+                ipAddress: getClientIp(req)
+              }
+            })
+          );
+          
+          await Promise.all(notificationPromises);
+          console.log(`✅ Contact notification sent to ${adminUsers.length} admin(s)`);
+        }
+      } catch (notificationErr) {
+        console.error('Failed to send contact notification to admins:', notificationErr);
+        // Don't block the response if notification fails
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -117,7 +155,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-// Get single contact message (admin only)
+// Get single contact message (admin only) - with notification when marked as replied
 router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
@@ -148,7 +186,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-// Update message status (admin only)
+// Update message status (admin only) - with notification
 router.patch('/:id/status', authMiddleware, async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
@@ -176,6 +214,38 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response) 
 
     if (!message) {
       return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // ✅ NOTIFICATION: When admin replies, notify other admins (optional)
+    if (status === 'replied') {
+      try {
+        const otherAdmins = await User.find({ 
+          role: 'admin', 
+          isActive: true,
+          _id: { $ne: user.userId } // Exclude the replying admin
+        });
+        
+        if (otherAdmins.length > 0) {
+          const notificationPromises = otherAdmins.map(admin =>
+            createNotification({
+              userId: admin._id.toString(),
+              type: 'system',
+              title: '✅ Contact Message Replied',
+              message: `${user.email || user.name} replied to ${message.name}'s message: "${message.subject}"`,
+              actionUrl: `/dashboard/contact/${message._id}`,
+              metadata: {
+                contactId: message._id.toString(),
+                repliedBy: user.email || user.name,
+                repliedAt: new Date().toISOString(),
+                subject: message.subject
+              }
+            })
+          );
+          await Promise.all(notificationPromises);
+        }
+      } catch (notificationErr) {
+        console.error('Failed to send reply notification to admins:', notificationErr);
+      }
     }
 
     res.json({

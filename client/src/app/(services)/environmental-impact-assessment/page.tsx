@@ -9,14 +9,7 @@ import {
   CheckCircle, 
   Award, 
   Clock,
-  Leaf,
-  Users,
-  Phone,
-  Calendar,
-  Sparkles,
   FileCheck,
-  Building2,
-  TrendingUp
 } from 'lucide-react';
 
 export const metadata: Metadata = {
@@ -35,7 +28,7 @@ export default function EIAPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
       
-      {/* Hero Section - No Gradient */}
+      {/* Hero Section */}
       <section className="pt-20 lg:pt-24 pb-16 lg:pb-20">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -82,7 +75,7 @@ export default function EIAPage() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-lg">
                 <Image
-                  src="/images/borehole-drilling2.jpg"
+                  src="/images/eia.png"
                   alt="Environmental impact assessment"
                   fill
                   className="object-cover"

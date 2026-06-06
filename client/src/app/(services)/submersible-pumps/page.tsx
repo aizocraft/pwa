@@ -87,10 +87,11 @@ export default function SubmersiblePumpsPage() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-lg">
                 <Image
-                  src="/images/borehole-drilling3.jpg"
+                  src="/images/sub-pump1.png"
                   alt="Submersible pump installation"
                   fill
                   className="object-cover"
+
                 />
                 <div className="absolute inset-0 bg-black/20" />
               </div>
@@ -99,7 +100,7 @@ export default function SubmersiblePumpsPage() {
         </div>
       </section>
 
-      {/* Complete Pumping Systems Section */}
+      {/* Complete Pumping Systems Section - With Image instead of stats */}
       <section className="py-20 lg:py-24 bg-gray-50 dark:bg-gray-900/30">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -135,31 +136,16 @@ export default function SubmersiblePumpsPage() {
               </ul>
             </div>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-5">
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800 shadow-md">
-                  <Gauge className="h-10 w-10 text-blue-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">200m+</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Max Pumping Depth</div>
-                </div>
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800 shadow-md">
-                  <Zap className="h-10 w-10 text-yellow-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">100m³/h+</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Flow Rate Capacity</div>
-                </div>
-              </div>
-              <div className="space-y-5 mt-8">
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800 shadow-md">
-                  <Settings className="h-10 w-10 text-purple-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">Smart</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Control Panels</div>
-                </div>
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800 shadow-md">
-                  <Award className="h-10 w-10 text-green-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">10+</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Top Brands</div>
-                </div>
-              </div>
+            {/* Image replacing the stats grid */}
+            <div className="relative h-[400px] md:h-[450px] rounded-2xl overflow-hidden shadow-xl">
+              <Image
+                src="/images/sub-pump.png"
+                alt="Submersible pump system by Plasma Water Africa"
+                fill
+                className="object-cover hover:scale-105 transition-transform duration-500"
+
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
             </div>
           </div>
         </div>

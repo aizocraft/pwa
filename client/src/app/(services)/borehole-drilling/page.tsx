@@ -5,19 +5,10 @@ import Link from 'next/link';
 import { 
   Drill, 
   CheckCircle, 
-  ArrowRight, 
-  Gauge, 
+  ArrowRight,  
   Shield, 
-  Clock,
-  FileCheck,
-  HardHat,
   Droplets,
-  Phone,
-  Calendar,
-  Sparkles,
   Award,
-  TrendingUp,
-  Activity,
   Target
 } from 'lucide-react';
 
@@ -130,7 +121,7 @@ export default function BoreholeDrillingPage() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-lg">
                 <Image
-                  src="/images/borehole_drilling.jpeg"
+                  src="/borehole.jpg"
                   alt="Borehole drilling in progress"
                   fill
                   className="object-cover"

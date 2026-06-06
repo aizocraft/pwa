@@ -12,10 +12,6 @@ import {
   Target,
   Compass,
   Droplets,
-  Shield,
-  Phone,
-  Calendar,
-  Sparkles
 } from 'lucide-react';
 
 export const metadata: Metadata = {
@@ -85,7 +81,7 @@ export default function HydroGeologicalSurveyPage() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-lg">
                 <Image
-                  src="/images/borehole-drilling1.jpg"
+                  src="/images/survey.png"
                   alt="Hydro-geological survey in progress"
                   fill
                   className="object-cover"

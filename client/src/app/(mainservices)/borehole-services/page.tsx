@@ -2,17 +2,13 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
-  Droplets, 
-  Activity, 
   FileText, 
   Drill, 
   GitBranch, 
   Wrench, 
   Waves,
   ArrowRight,
-  CheckCircle,
   Map,
-  Gauge,
   Shield as ShieldIcon,
   Compass,
   FileCheck,
@@ -39,7 +35,7 @@ const boreholeServices = [
     description: 'Scientific groundwater exploration using advanced geophysical methods to identify optimal drilling locations.',
     icon: Map,
     features: ['V.E.S & H.E.P Methods', 'Site Reconnaissance', 'Depth Estimation', 'WRMA Permit Assistance'],
-    image: '/images/borehole-drilling1.jpg',
+    image: '/images/survey.png',
     color: 'from-blue-500 to-cyan-500',
   },
   {
@@ -48,7 +44,7 @@ const boreholeServices = [
     description: 'NEMA-compliant EIA reports and permitting for borehole drilling and construction projects.',
     icon: FileText,
     features: ['NEMA Licensing', 'Field Questionnaires', 'Impact Analysis', 'Mitigation Plans'],
-    image: '/images/borehole-drilling2.jpg',
+    image: '/images/eia.png',
     color: 'from-green-500 to-emerald-500',
   },
   {
@@ -57,7 +53,7 @@ const boreholeServices = [
     description: 'Professional drilling with DTH machines capable of reaching depths up to 500 meters.',
     icon: Drill,
     features: ['Up to 500m Depth', 'DTH Technology', 'Casing Installation', 'Test Pumping'],
-    image: '/images/borehole_drilling.jpeg',
+    image: '/borehole.jpg',
     color: 'from-orange-500 to-red-500',
   },
   {
@@ -66,7 +62,7 @@ const boreholeServices = [
     description: 'High-quality pump installation for boreholes and water distribution systems.',
     icon: GitBranch,
     features: ['Sized to Your Needs', 'Control Panels', 'Sensor Cables', 'Plumbing Works'],
-    image: '/images/borehole-drilling3.jpg',
+    image: '/images/sub-pump.png',
     color: 'from-purple-500 to-pink-500',
   },
   {
@@ -75,16 +71,16 @@ const boreholeServices = [
     description: 'Restore and renew underperforming boreholes to their original capacity.',
     icon: Wrench,
     features: ['Pump Removal', 'Blowing/Reboring', 'Screen Cleaning', 'Yield Restoration'],
-    image: '/images/borehole.jpg',
+    image: '/images/Borehole-rehabilitation.jpg',
     color: 'from-yellow-500 to-orange-500',
   },
   {
-    slug: 'geo-membrane-ponds',
-    title: 'Geo-Membrane Ponds',
-    description: 'Professional liner installation for water storage ponds and reservoirs.',
+    slug: 'water-towers',
+    title: 'Water Storage Solutions',
+    description: 'Durable water towers and storage tanks designed for optimal water preservation and distribution.',
     icon: Waves,
-    features: ['Durable Liners', 'Leak Prevention', 'Custom Sizing', 'UV Resistant'],
-    image: '/images/water_tower3.jpeg',
+    features: [ 'Custom Designs', 'Corrosion Resistant', 'Easy Maintenance', 'Professional Installation'],
+    image: '/images/watertower.jpg',
     color: 'from-cyan-500 to-blue-500',
   },
 ];
@@ -142,7 +138,7 @@ export default function BoreholeServicesPage() {
             
             <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
               Complete groundwater solutions from survey to installation. 
-              Reliable, sustainable, and professional borehole services across Kenya.
+             
             </p>
           </div>
         </div>

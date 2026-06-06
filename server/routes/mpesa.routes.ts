@@ -6,7 +6,11 @@ import TransactionModel from '../models/Transaction';
 import OrderModel from '../models/Order';
 import authMiddleware from '../middleware/auth';
 import optionalAuthMiddleware from '../middleware/optionalAuth';
+import { createNotification, NOTIFICATION_TEMPLATES } from '../services/notification.service';
+import UserModel from '../models/User';
 import { sendPaymentConfirmation, sendPaymentFailedNotification } from '../services/email.service';
+
+
 
 const router = Router();
 
@@ -301,17 +305,70 @@ router.post('/callback', async (req: Request, res: Response) => {
       transaction.mpesaReceipt = CallbackMetadata.Item.find((i: any) => i.Name === 'MpesaReceiptNumber')?.Value;
       transaction.paidAt = new Date();
       await transaction.save();
-      
+
       // Update order
       const order = await OrderModel.findById(transaction.orderId);
       if (order) {
+        // ensure amountPaid doesn't double add on duplicate callbacks
+        const previousOrderAmountPaid = order.amountPaid || 0;
         order.paymentStatus = 'paid';
-        order.amountPaid = (order.amountPaid || 0) + transaction.amount;
+        order.amountPaid = previousOrderAmountPaid + (transaction.amount || 0);
         await order.save();
+
+        // ✅ Notifications: both customer + admins
+        try {
+          const { title: payTitle, message: payMessage, actionUrl } = NOTIFICATION_TEMPLATES.paymentReceived(
+            order.orderNumber,
+            transaction.amount || order.total || 0
+          );
+
+          // customer notification
+          if (order.userId) {
+            await createNotification({
+              userId: order.userId.toString(),
+              type: 'payment',
+              title: payTitle,
+              message: payMessage,
+              actionUrl,
+              metadata: {
+                orderId: order._id.toString(),
+                orderNumber: order.orderNumber,
+                amount: transaction.amount,
+                mpesaReceipt: transaction.mpesaReceipt,
+                paidAt: transaction.paidAt?.toISOString()
+              }
+            });
+          }
+
+          // admin notifications (broadcast to all active admins)
+          const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+          if (adminUsers?.length) {
+            const notifications = adminUsers.map((admin: any) =>
+              createNotification({
+                userId: admin._id.toString(),
+                type: 'payment',
+                title: payTitle,
+                message: payMessage,
+                actionUrl: `/dashboard/orders/${order._id}`,
+                metadata: {
+                  orderId: order._id.toString(),
+                  orderNumber: order.orderNumber,
+                  amount: transaction.amount,
+                  mpesaReceipt: transaction.mpesaReceipt,
+                  paidAt: transaction.paidAt?.toISOString()
+                }
+              })
+            );
+            await Promise.all(notifications);
+          }
+
+        } catch (notificationErr) {
+          console.error('Failed to create payment notifications (mpesa callback):', notificationErr);
+        }
       }
-      
+
       console.log(`✅ Payment completed: ${CheckoutRequestID}, Receipt: ${transaction.mpesaReceipt}`);
-      
+
     } else if (ResultCode === 1037) {
       // Timeout - keep pending
       console.log(`⏳ Payment timeout: ${CheckoutRequestID} - ${ResultDesc}`);
@@ -323,8 +380,61 @@ router.post('/callback', async (req: Request, res: Response) => {
       transaction.status = 'failed';
       transaction.notes = `Failed: ${ResultDesc}`;
       await transaction.save();
+
+      // ✅ Notifications for failure: both customer + admins
+      try {
+        const order = await OrderModel.findById(transaction.orderId);
+        if (order) {
+          const { title: failTitle, message: failMessage, actionUrl } = NOTIFICATION_TEMPLATES.paymentFailed(
+            order.orderNumber,
+            ResultDesc || 'Payment failed'
+          );
+
+          if (order.userId) {
+            await createNotification({
+              userId: order.userId.toString(),
+              type: 'payment',
+              title: failTitle,
+              message: failMessage,
+              actionUrl,
+              metadata: {
+                orderId: order._id.toString(),
+                orderNumber: order.orderNumber,
+                amount: transaction.amount,
+                failedAt: new Date().toISOString(),
+                mpesaResultDesc: ResultDesc
+              }
+            });
+          }
+
+          const adminUsers = await (await import('../models/User')).default.find({ role: 'admin', isActive: true });
+          if (adminUsers?.length) {
+            const notifications = adminUsers.map((admin: any) =>
+              createNotification({
+                userId: admin._id.toString(),
+                type: 'payment',
+                title: failTitle,
+                message: failMessage,
+                actionUrl: `/dashboard/orders/${order._id}/payment`,
+                metadata: {
+                  orderId: order._id.toString(),
+                  orderNumber: order.orderNumber,
+                  amount: transaction.amount,
+                  failedAt: new Date().toISOString(),
+                  mpesaResultDesc: ResultDesc
+                }
+              })
+            );
+            await Promise.all(notifications);
+          }
+        }
+      } catch (notificationErr) {
+        console.error('Failed to create payment failure notifications (mpesa callback):', notificationErr);
+      }
+
       console.log(`❌ Payment failed: ${CheckoutRequestID} - ${ResultDesc}`);
     }
+
     
     const duration = Date.now() - startTime;
     console.log(`✅ Callback processed in ${duration}ms`);

@@ -6,33 +6,26 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { 
   Droplets, 
-  Sun, 
-  Thermometer, 
-  Zap, 
   CheckCircle, 
   ArrowRight,
-  Home,
-  Building2,
-  Award,
-  Clock,
+  Thermometer,
   Shield,
-  TrendingDown,
-  Phone,
-  Calendar,
-  Sparkles,
+  Clock,
   ThumbsUp,
-  DollarSign,
-  Users,
-  Settings
+  TrendingDown,
 } from 'lucide-react';
 import CircularGallery from '@/components/CircularGallery';
 import { useTheme } from '@/context/ThemeContext';
+import { getProducts } from '@/lib/api';
+import ProductCard from '@/components/ProductCard';
+import type { Product } from '@/types/product';
+
 
 const waterHeaterImages = [
-  { image: '/images/solar-image3.jpg', location: 'Runda, Nairobi', system: '300L Solar Water Heater' },
-  { image: '/images/solar-image1.jpg', location: 'Kiambu Road', system: '200L Solar Water Heater' },
-  { image: '/images/solar-4.jpg', location: 'Westlands, Nairobi', system: '500L Commercial System' },
-  { image: '/images/solar-image2.jpg', location: 'Karen, Nairobi', system: '400L Solar Water Heater' },
+  { image: '/solar-heaters/300L-Stainless-Flat-Panel-Seven-Stars-Solar-Water-Heater-1-1.jpg', location: 'Runda, Nairobi', system: '300L Solar Water Heater' },
+  { image: '/solar-heaters/150L-Seven-Star-Pressurized-Solar-Water-Heater-White-300x300.jpg', location: 'Kiambu Road', system: '150L Solar Water Heater' },
+  { image: '/solar-heaters/150L-Stainless-Seven-Stars-Non-Pressurized-Solar-WaterHeat.jpg', location: 'Westlands, Nairobi', system: '150L Solar Water Heater' },
+  { image: '/solar-heaters/Seven-SS-Stars-300-Liters-indirect-flat-plate-solar-water-heater.webp', location: 'Karen, Nairobi', system: '300L Solar Water Heater' },
 ];
 
 const formattedGalleryItems = waterHeaterImages.map(item => ({
@@ -41,14 +34,14 @@ const formattedGalleryItems = waterHeaterImages.map(item => ({
 }));
 
 const benefits = [
-  { value: '70-85%', label: 'Energy Savings', icon: TrendingDown, description: 'Reduce water heating bills dramatically' },
-  { value: '20-25', label: 'Years Lifespan', icon: Award, description: 'Long-term peace of mind' },
-  { value: '2-5', label: 'Years Payback', icon: Clock, description: 'Quick return on investment' },
-  { value: '100%', label: 'Free Energy', icon: Sun, description: 'Powered by the sun' },
+  { value: '85+%', label: 'Energy Savings' },
+  { value: '25+', label: 'Years Lifespan' },
+  { value: '100+', label: 'Installations Completed' },
+  { value: '365', label: 'Days of Hot Water'},
 ];
 
 const features = [
-  { icon: Shield, title: 'Premium Quality', description: ' Kenya\'s most trusted solar water heater' },
+  { icon: Shield, title: 'Premium Quality', description: 'Kenya\'s most trusted solar water heater' },
   { icon: Thermometer, title: 'All-Weather Performance', description: 'Works efficiently even on cloudy days' },
   { icon: Clock, title: 'Instant Hot Water', description: 'Endless hot water whenever you need it' },
   { icon: ThumbsUp, title: 'Easy Installation', description: 'Professional installation in 1-2 days' },
@@ -57,10 +50,10 @@ const features = [
 ];
 
 const whySolarBenefits = [
-  'Reduces electricity bill by 30-40% (water heating portion)',
-  'Provides free hot water for 20-25 years',
+  'Reduces electricity bill',
+  'Provides free hot water for 25+ years',
   'Works efficiently in all weather conditions',
-  'Environmentally friendly - reduces carbon footprint',
+  'Environmentally friendly',
   'Increases property resale value',
   'Qualifies for green energy incentives',
 ];
@@ -69,10 +62,71 @@ export default function SolarWaterHeatersClient() {
   const { theme } = useTheme();
   const galleryTextColor = theme === 'dark' ? '#ffffff' : '#1f2937';
   const [mounted, setMounted] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+    fetchSolarWaterHeaterProducts();
   }, []);
+
+  const fetchSolarWaterHeaterProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await getProducts({
+        category: 'Solar Water Heaters',
+        limit: 6,
+        sort: 'createdAt',
+        order: 'desc'
+      });
+      
+      // ProductListResponse has a 'products' property directly
+      const productsData = response.products || [];
+      setProducts(productsData);
+    } catch (error) {
+      console.error('Error fetching solar water heater products:', error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show loading skeleton
+  const LoadingSkeleton = () => (
+    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse">
+          <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-t-xl" />
+          <div className="p-4 space-y-3">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Show empty state when no products found
+  const EmptyState = () => (
+    <div className="text-center py-12">
+      <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
+        <Droplets className="h-8 w-8 text-gray-400" />
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        No Products Available
+      </h3>
+      <p className="text-gray-600 dark:text-gray-400 mb-6">
+        Solar water heater products are coming soon. Check back later!
+      </p>
+      <Link 
+        href="/contact" 
+        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-all"
+      >
+        Contact Us for Availability <ArrowRight className="h-4 w-4" />
+      </Link>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
@@ -87,7 +141,7 @@ export default function SolarWaterHeatersClient() {
             <div>
               <div className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 rounded-full px-4 py-2 mb-6">
                 <Droplets className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm font-medium text-blue-700 dark:text-blue-300"> Solar Water Heaters</span>
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Solar Water Heaters</span>
               </div>
               
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-6">
@@ -110,7 +164,6 @@ export default function SolarWaterHeatersClient() {
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-gray-200 dark:border-gray-800">
                 {benefits.map((benefit, i) => {
-                  const Icon = benefit.icon;
                   return (
                     <div key={i} className="text-center">
                       <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{benefit.value}</div>
@@ -124,75 +177,12 @@ export default function SolarWaterHeatersClient() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-xl">
                 <Image
-                  src="/images/solar-image3.jpg"
+                  src="/solar-heaters/solar-water-heater-preview.png"
                   alt="Solar water heater installation"
                   fill
                   className="object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Why Solar Water Heating Section */}
-      <section className="py-20 lg:py-24 bg-gray-50 dark:bg-gray-900/30">
-        <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-                Why{' '}
-                <span className="text-blue-600 dark:text-blue-400">Solar Water Heating?</span>
-              </h2>
-              <p className="text-lg text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
-                Water heating accounts for 30-40% of your electricity bill. Solar water heaters 
-                eliminate this cost completely, providing free hot water for 20+ years.
-              </p>
-              <ul className="space-y-4">
-                <li className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Instant hot water anytime, day or night</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Works efficiently even on cloudy days</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Minimal maintenance required</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Increases property value by up to 10%</span>
-                </li>
-              </ul>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-5">
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800 shadow-md">
-                  <Zap className="h-10 w-10 text-yellow-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">₿15k+</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Annual Savings</div>
-                </div>
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800 shadow-md">
-                  <Shield className="h-10 w-10 text-green-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">3-5</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Years Payback</div>
-                </div>
-              </div>
-              <div className="space-y-5 mt-8">
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800 shadow-md">
-                  <Award className="h-10 w-10 text-blue-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">10+</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Years Warranty</div>
-                </div>
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl text-center border border-gray-200 dark:border-gray-800 shadow-md">
-                  <Home className="h-10 w-10 text-purple-500 mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">500+</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Happy Customers</div>
-                </div>
               </div>
             </div>
           </div>
@@ -257,6 +247,40 @@ export default function SolarWaterHeatersClient() {
         </div>
       </section>
 
+      {/* Solar Water Heaters Products Section - FIXED */}
+      <section className="py-20 lg:py-24 bg-gray-50 dark:bg-gray-900/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+              Our{' '}
+              <span className="text-blue-600 dark:text-blue-400">Products</span>
+            </h2>
+            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+              Explore our range of high-quality solar water heaters designed for Kenyan homes
+            </p>
+            <div className="w-20 h-0.5 bg-blue-600 dark:bg-blue-400 mx-auto mt-4 rounded-full" />
+          </div>
+          
+          {loading ? (
+            <LoadingSkeleton />
+          ) : products.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+              {products.map((product) => (
+                <ProductCard 
+                  key={product._id} 
+                  product={product}
+                  // Remove isList if it's not a valid prop, or set to false if it's optional
+                  // If ProductCard requires isList, uncomment the line below
+                  // isList={false}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState />
+          )}
+        </div>            
+      </section>
+          
       {/* Gallery Section */}
       <section className="py-20 lg:py-24 bg-white dark:bg-gray-950">
         <div className="container mx-auto px-4">
@@ -290,13 +314,12 @@ export default function SolarWaterHeatersClient() {
         </div>
       </section>
 
-      {/*  Brand Section */}
+      {/* Brand Section */}
       <section className="py-20 lg:py-24 bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-3xl mx-auto">
-            
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-              Ready to install a  Solar Water Heater?
+              Ready to install a Solar Water Heater?
             </h2>
             <p className="text-xl text-blue-100 mb-8 leading-relaxed">
               Kenya's most trusted solar water heater brand. Engineered for Kenyan conditions with 
@@ -311,8 +334,6 @@ export default function SolarWaterHeatersClient() {
           </div>
         </div>
       </section>
-
-   
     </div>
   );
 }

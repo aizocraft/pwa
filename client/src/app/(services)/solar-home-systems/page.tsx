@@ -35,12 +35,12 @@ export const metadata: Metadata = {
 };
 
 const homeSolarImages = [
-  { image: '/images/solar-image1.jpg', text: 'Kiratina, Ruiru', subtext: '5kVA Solar System' },
-  { image: '/images/solar-image2.jpg', text: 'Runda, Nairobi', subtext: '6kVA Solar System' },
-  { image: '/images/solar-image3.jpg', text: 'Kiambu Road', subtext: '3kVA Solar System' },
-  { image: '/images/solar-image4.jpg', text: 'Muthaiga, Nairobi', subtext: '10kVA Solar System' },
-  { image: '/images/solar.jpg', text: 'Karen, Nairobi', subtext: '8kVA Solar System' },
-  { image: '/images/solar-4.jpg', text: 'Westlands, Nairobi', subtext: '5kVA Solar System' },
+  { image: '/images/solar-image1.jpg', text: '', subtext: '' },
+  { image: '/images/solar-image2.jpg', text: '', subtext: '' },
+  { image: '/images/solar-image3.jpg', text: '', subtext: '' },
+  { image: '/images/solar-image4.jpg', text: '', subtext: '' },
+  { image: '/images/solar.jpg', text: '', subtext: '' },
+  { image: '/images/solar-4.jpg', text: '', subtext: '' },
 ];
 
 // Format gallery items with line break using \n
@@ -281,7 +281,7 @@ export default function SolarHomeSystemsPage() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="relative h-[400px] rounded-xl overflow-hidden shadow-xl order-2 lg:order-1">
               <Image
-                src="/images/solar-installation.jpg"
+                src="/images/solar-installation-kenya.png"
                 alt="Solar panel installation"
                 fill
                 className="object-cover"
