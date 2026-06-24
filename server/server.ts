@@ -75,7 +75,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Apply audit middleware (retained)
-app.use(auditContextMiddleware); // This adds requestId and startTime
+app.use(auditContextMiddleware); 
 app.use(autoAuditMiddleware({ 
   excludePaths: [
     '/health', 

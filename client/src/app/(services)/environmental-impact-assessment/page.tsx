@@ -75,7 +75,7 @@ export default function EIAPage() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-lg">
                 <Image
-                  src="/images/eia.png"
+                  src="/environmental_impact_assessment.webp"
                   alt="Environmental impact assessment"
                   fill
                   className="object-cover"

@@ -68,7 +68,7 @@ export default function ShippingAreas({ areas, onUpdateAreas }: ShippingAreasPro
       setNewArea({ name: '', regions: [], baseCost: 0, freeThreshold: 0 })
       setRegionsInput('')
       setFreeShippingEnabled(false)
-      toast.success('Shipping area created!')
+     
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create shipping area')
     } finally {
@@ -110,7 +110,7 @@ export default function ShippingAreas({ areas, onUpdateAreas }: ShippingAreasPro
     try {
       await deleteShippingArea(id)
       await reloadAreas()
-      toast.success('Shipping area deleted!')
+     
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to delete')
     } finally {

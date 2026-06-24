@@ -37,7 +37,7 @@ export default function MpesaPayment({
     const savedPhone = localStorage.getItem('mpesa_phone_number')
     if (savedPhone && !mpesaPhone) {
       setMpesaPhone(savedPhone)
-      toast.success('📱 Saved phone number loaded', { icon: '📱', duration: 2000 })
+     
     }
   }, []) // Run only once on mount
 

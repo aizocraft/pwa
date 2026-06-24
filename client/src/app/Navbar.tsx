@@ -36,7 +36,9 @@ import {
   Award,
   Shield,
   ArrowRight,
-  Briefcase, LogIn
+  Briefcase, LogIn,
+  Bell,
+  CircleDot
 } from 'lucide-react'
 import { BoreholeIcon } from '@/components/icons/BoreholeIcon'
 import { useAuth } from '@/lib/auth'
@@ -189,7 +191,7 @@ export default function Navbar() {
     )
   }
 
-  const logoUrl = '/logo3.png'
+  const logoUrl = '/plasmawater_africa_logo.png'
   const companyName = 'Plasma Water Africa'
 
   return (
@@ -469,7 +471,21 @@ export default function Navbar() {
                               </div>
                               My Orders
                             </Link>
-                            
+
+                            <Link
+                              href="/notifications"
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 group"
+                              onClick={() => setShowProfileMenu(false)}
+                            >
+                              <div className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
+                                <Bell className="w-4 h-4" />
+                              </div>
+                              Notifications
+                              <div className="ml-auto flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/50 text-[#0043b3] dark:text-[#009dff]">
+                                <CircleDot className="w-4 h-4" />
+                              </div>
+                            </Link>
+
                             <div className="border-t border-gray-100 dark:border-gray-700 mt-1 pt-1">
                               <button
                                 onClick={handleLogout}

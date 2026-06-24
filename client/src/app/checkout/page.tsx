@@ -1,4 +1,4 @@
-// src/app/checkout/page.tsx - COMPLETE WITH PHONE STORAGE
+// src/app/checkout/page.tsx - COMPLETE WITH FIXED SHIPPING STORAGE
 
 'use client'
 
@@ -38,6 +38,7 @@ export default function CheckoutPage() {
   const cartStore = useCartStore()
   const [orderSuccess, setOrderSuccess] = useState(false)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   useEffect(() => {
     const ensureCartReady = async () => {
@@ -64,6 +65,7 @@ export default function CheckoutPage() {
   const [mpesaStep, setMpesaStep] = useState<"idle" | "processing" | "pending" | "completed" | "failed">("idle")
   const [mpesaError, setMpesaError] = useState("")
   const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null)
+  const [isDataLoaded, setIsDataLoaded] = useState(false)
 
   // 💾 Load saved M-PESA phone on mount
   useEffect(() => {
@@ -71,10 +73,6 @@ export default function CheckoutPage() {
     if (savedPhone && savedPhone.length === 12) {
       setMpesaPhone(savedPhone)
       console.log('📱 Loaded saved phone:', savedPhone)
-      // Optional: Show a toast notification
-      setTimeout(() => {
-        toast.success('📱 Saved phone number loaded', { duration: 2000 })
-      }, 500)
     }
   }, [])
 
@@ -115,43 +113,72 @@ export default function CheckoutPage() {
     phone: ""
   })
 
-  // 💾 Load saved shipping address on mount
+  // 💾 LOAD ALL SAVED DATA on mount - FIXED
   useEffect(() => {
+    console.log('📦 Loading all saved data...');
+    
+    // Load shipping address
     const savedAddress = localStorage.getItem(STORAGE_KEYS.SHIPPING_ADDRESS)
     if (savedAddress) {
       try {
         const parsed = JSON.parse(savedAddress)
-        setShippingAddress(prev => ({ ...prev, ...parsed }))
-        console.log('📍 Loaded saved shipping address')
+        console.log('📍 Loaded shipping address:', parsed)
+        setShippingAddress(prev => ({ 
+          ...prev, 
+          ...parsed,
+          // Ensure phone is properly formatted if present
+          phone: parsed.phone || ''
+        }))
       } catch (e) {
         console.error('Failed to load saved address:', e)
       }
     }
     
+    // Load guest info
     const savedGuestEmail = localStorage.getItem(STORAGE_KEYS.GUEST_EMAIL)
     const savedGuestPhone = localStorage.getItem(STORAGE_KEYS.GUEST_PHONE)
-    if (savedGuestEmail) setGuestEmail(savedGuestEmail)
-    if (savedGuestPhone) setGuestPhone(savedGuestPhone)
-  }, [])
+    if (savedGuestEmail) {
+      setGuestEmail(savedGuestEmail)
+      console.log('📧 Loaded guest email:', savedGuestEmail)
+    }
+    if (savedGuestPhone) {
+      setGuestPhone(savedGuestPhone)
+      console.log('📱 Loaded guest phone:', savedGuestPhone)
+    }
+    
+    setIsDataLoaded(true)
+  }, []) // Empty dependency - run once on mount
 
-  // 💾 Save shipping address to localStorage when it changes
-const handleSetShippingAddress = useCallback((
-  address: typeof shippingAddress | ((prev: typeof shippingAddress) => typeof shippingAddress)
-) => {
-  const newAddress = typeof address === 'function' 
-    ? address(shippingAddress) 
-    : address;
-  
-  setShippingAddress(newAddress);
-  
-  // Save to localStorage only if valid
-  if (newAddress.fullName && newAddress.phone) {
-    localStorage.setItem(STORAGE_KEYS.SHIPPING_ADDRESS, JSON.stringify(newAddress));
-    console.log('📍 Shipping address saved:', newAddress.fullName);
-  }
-}, [shippingAddress]);
+  // 💾 SAVE shipping address to localStorage with DEBOUNCE - FIXED
+  const handleSetShippingAddress = useCallback((
+    address: typeof shippingAddress | ((prev: typeof shippingAddress) => typeof shippingAddress)
+  ) => {
+    const newAddress = typeof address === 'function' 
+      ? address(shippingAddress) 
+      : address;
+    
+    setShippingAddress(newAddress);
+    
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Debounce save to avoid excessive writes
+    saveTimeoutRef.current = setTimeout(() => {
+      // Save to localStorage if we have at least SOME data
+      if (newAddress.fullName || newAddress.address1 || newAddress.phone) {
+        localStorage.setItem(STORAGE_KEYS.SHIPPING_ADDRESS, JSON.stringify(newAddress));
+        console.log('💾 Shipping address saved:', {
+          name: newAddress.fullName || 'partial',
+          phone: newAddress.phone || 'partial',
+          city: newAddress.city || 'partial'
+        });
+      }
+    }, 300);
+  }, [shippingAddress]);
 
-  // 💾 Save guest info to localStorage
+  // 💾 Save guest info to localStorage with debounce
   const handleSetGuestEmail = useCallback((email: string) => {
     setGuestEmail(email)
     if (email && email.includes('@')) {
@@ -183,20 +210,24 @@ const handleSetShippingAddress = useCallback((
       shippingAddress.city &&
       shippingAddress.state &&
       shippingAddress.zip &&
-      shippingAddress.phone
+      shippingAddress.phone &&
+      shippingAddress.phone.length >= 10
     )
   }
 
   const isGuestInfoValid = (): boolean => {
     if (!isGuest) return true
-    return !!(guestEmail && guestPhone && guestEmail.includes("@"))
+    return !!(guestEmail && guestPhone && guestEmail.includes("@") && guestPhone.length >= 10)
   }
 
-  // Clean up polling on unmount
+  // Clean up polling and save timeouts on unmount
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current)
+      }
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
       }
     }
   }, [])

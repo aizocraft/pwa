@@ -32,6 +32,8 @@ import Link from 'next/link';
 import { getProduct, updateProduct, uploadProductImages, deleteProductImage, getImageUrl } from '@/lib/api';
 import type { Product, ProductImage } from '@/types/product';
 import { cn } from '@/lib/utils';
+import RichTextEditor from '@/components/RichTextEditor';
+
 
 interface EditProductFormData {
   name: string;
@@ -622,13 +624,11 @@ export default function EditProductPage() {
               </div>
             </div>
             <div className="p-5 sm:p-6">
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                rows={6}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 transition-all"
-                placeholder="Write a detailed description of your product..."
-              />
+<RichTextEditor
+  value={formData.description}
+  onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
+  placeholder="Write a detailed description with rich formatting..."
+/>
               <p className="text-xs text-gray-500 mt-2">
                 {formData.description.length} characters
               </p>

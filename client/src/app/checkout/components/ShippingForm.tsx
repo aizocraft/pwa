@@ -1,10 +1,9 @@
+// src/app/checkout/components/ShippingForm.tsx
 'use client'
 
-import { MapPin, User, Home, Building2, Phone, ArrowRight, Truck, Gift, Clock } from 'lucide-react'
-import Link from 'next/link'
+import { MapPin, User, Home, Building2, Phone, ArrowRight } from 'lucide-react'
 import { useCartStore } from '../../../store/cart'
-import { formatCurrency } from '../../../lib/utils'
-import { useEffect } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 
 // Define the shipping address type
@@ -32,6 +31,13 @@ interface ShippingFormProps {
   onContinue: () => void
 }
 
+// Storage keys
+const STORAGE_KEYS = {
+  SHIPPING_ADDRESS: 'saved_shipping_address',
+  GUEST_EMAIL: 'saved_guest_email',
+  GUEST_PHONE: 'saved_guest_phone'
+}
+
 export default function ShippingForm({
   isGuest,
   guestEmail,
@@ -45,19 +51,23 @@ export default function ShippingForm({
   onContinue
 }: ShippingFormProps) {
   const cart = useCartStore();
+  const [isLoaded, setIsLoaded] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load from localStorage on mount - ONLY ONCE
+  // LOAD from localStorage on mount - ONLY ONCE
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !isLoaded) {
+      console.log('📦 Loading saved shipping data...');
+      
       // Load saved shipping address
-      const savedAddress = localStorage.getItem('saved_shipping_address');
+      const savedAddress = localStorage.getItem(STORAGE_KEYS.SHIPPING_ADDRESS);
       if (savedAddress) {
         try {
           const parsedAddress: ShippingAddress = JSON.parse(savedAddress);
-          // Only update if there's actual data
-          if (parsedAddress.fullName || parsedAddress.address1) {
-            setShippingAddress(parsedAddress);
-          }
+          console.log('📍 Loaded shipping address:', parsedAddress);
+          
+          // Update all fields at once
+          setShippingAddress(parsedAddress);
         } catch (e) {
           console.error('Error loading saved address:', e);
         }
@@ -65,35 +75,80 @@ export default function ShippingForm({
 
       // Load saved guest info for guest checkout
       if (isGuest) {
-        const savedEmail = localStorage.getItem('saved_guest_email');
-        const savedPhone = localStorage.getItem('saved_guest_phone');
+        const savedEmail = localStorage.getItem(STORAGE_KEYS.GUEST_EMAIL);
+        const savedPhone = localStorage.getItem(STORAGE_KEYS.GUEST_PHONE);
         if (savedEmail) setGuestEmail(savedEmail);
         if (savedPhone) setGuestPhone(savedPhone);
       }
+      
+      setIsLoaded(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty array - only run once on mount
+  }, [isLoaded]);
 
-  // Save to localStorage whenever values change
-  const saveToLocalStorage = () => {
-    if (typeof window !== 'undefined') {
-      // Save shipping address
-      localStorage.setItem('saved_shipping_address', JSON.stringify(shippingAddress));
-      
-      // Save guest info if guest checkout
-      if (isGuest) {
-        localStorage.setItem('saved_guest_email', guestEmail);
-        localStorage.setItem('saved_guest_phone', guestPhone);
-      }
-    }
-  };
-
-  // Auto-save on any input change
+  // SAVE to localStorage whenever values change (with debounce)
   useEffect(() => {
-    saveToLocalStorage();
-  }, [shippingAddress, guestEmail, guestPhone, isGuest]);
+    if (!isLoaded) return;
+    
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Debounce save to avoid excessive writes
+    saveTimeoutRef.current = setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        // Save shipping address - check if we have at least some data
+        if (shippingAddress.fullName || shippingAddress.address1 || shippingAddress.phone) {
+          localStorage.setItem(STORAGE_KEYS.SHIPPING_ADDRESS, JSON.stringify(shippingAddress));
+          console.log('💾 Saved shipping address:', shippingAddress);
+        }
+        
+        // Save guest info if guest checkout
+        if (isGuest) {
+          if (guestEmail && guestEmail.includes('@')) {
+            localStorage.setItem(STORAGE_KEYS.GUEST_EMAIL, guestEmail);
+          }
+          if (guestPhone && guestPhone.length >= 10) {
+            localStorage.setItem(STORAGE_KEYS.GUEST_PHONE, guestPhone);
+          }
+        }
+      }
+    }, 300); // 300ms debounce
 
-  // Shipping area handled globally by checkout/cart - no local override needed
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [shippingAddress, guestEmail, guestPhone, isGuest, isLoaded]);
+
+  // Handle phone number with proper formatting
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    // Format as Kenyan phone number
+    if (value.startsWith('0') && value.length <= 10) {
+      value = '254' + value.slice(1);
+    } else if (value.startsWith('+254')) {
+      value = value.substring(1);
+    } else if (!value.startsWith('254') && value.length > 0 && value.length <= 9) {
+      // If user types a number without 254 prefix (e.g., 712345678)
+      value = '254' + value;
+    }
+    
+    // Fix for 2540xxxxxx (extra zero)
+    if (value.startsWith('2540')) {
+      value = '254' + value.slice(3);
+    }
+    
+    // Limit to 12 digits
+    if (value.length > 12) {
+      value = value.slice(0, 12);
+    }
+    
+    setShippingAddress({ ...shippingAddress, phone: value });
+  };
 
   const handleFullNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setShippingAddress({ ...shippingAddress, fullName: e.target.value });
@@ -121,10 +176,6 @@ export default function ShippingForm({
 
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setShippingAddress({ ...shippingAddress, country: e.target.value });
-  };
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setShippingAddress({ ...shippingAddress, phone: e.target.value });
   };
 
   return (
@@ -281,38 +332,51 @@ export default function ShippingForm({
             </div>
           </div>
 
-          {/* Phone field  */}
+          {/* Phone field with proper formatting */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Phone Number *  
+              Phone Number *
             </label>
-            <div className="relative">  
+            <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
-                type="tel"                value={shippingAddress.phone}
+                type="tel"
+                value={shippingAddress.phone}
                 onChange={handlePhoneChange}
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-shadow"
                 placeholder="254700000000"
               />
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Format: 254XXXXXXXXX (12 digits total)
+            </p>
           </div>
 
-          {/* Read-only: Shipping & Promo from Cart (No Edit) */}
-    
-
+          {/* Continue Button */}
           <motion.button
             onClick={onContinue}
             disabled={!isShippingValid() || (isGuest && !isGuestInfoValid()) || !cart.selectedShippingAreaId}
-            className="group relative w-full mt-6 overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 p-1 shadow-xl ring-1 ring-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/30 hover:ring-blue-400/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-clip-padding shadow-lg"
-            whileHover={{ scale: 1.02, boxShadow: '0 20px 40px -10px rgba(59,130,246,0.4)' }}
+            className="group relative w-full mt-6 overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 p-1 shadow-xl ring-1 ring-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/30 hover:ring-blue-400/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
           >
-            <span>Continue to Payment</span>
-            <motion.div animate={{ x: [0, 4, 0] }} transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}>
-              <ArrowRight className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            </motion.div>
+            <span className="flex items-center justify-center gap-2 text-white font-semibold py-3 px-6">
+              Continue to Payment
+              <motion.div 
+                animate={{ x: [0, 4, 0] }} 
+                transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <ArrowRight className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              </motion.div>
+            </span>
           </motion.button>
+          
+          {/* Show saved data indicator */}
+          {isLoaded && (shippingAddress.fullName || shippingAddress.phone) && (
+            <p className="text-xs text-green-600 dark:text-green-400 text-center mt-2">
+              ✓ Shipping details saved locally
+            </p>
+          )}
         </div>
       </div>
     </div>

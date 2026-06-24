@@ -81,7 +81,7 @@ export default function HydroGeologicalSurveyPage() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-lg">
                 <Image
-                  src="/images/survey.png"
+                  src="/hydro-geological_survey.webp"
                   alt="Hydro-geological survey in progress"
                   fill
                   className="object-cover"

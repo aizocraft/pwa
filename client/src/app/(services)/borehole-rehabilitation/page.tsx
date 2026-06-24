@@ -82,7 +82,7 @@ export default function BoreholeRehabilitationPage() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-lg">
                 <Image
-                  src="/images/Borehole-rehabilitation.jpg"
+                  src="/rehabilitation_bh.webp"
                   alt="Borehole rehabilitation"
                   fill
                   className="object-cover"
