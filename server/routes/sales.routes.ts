@@ -1344,10 +1344,14 @@ router.post('/invoices/:id/send', authMiddleware, requireSalesRole, async (req: 
   }
 });
 
+// src/routes/sales.ts - CORRECTED PAYMENT ROUTE
+
 router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { id } = req.params;
     const { amount, method, reference, notes } = req.body;
+
+    console.log(`📝 Recording payment for invoice ${id}:`, { amount, method, reference });
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid invoice ID' });
@@ -1373,8 +1377,9 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
       });
     }
 
-    const transactionId = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`;
+    const transactionId = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
 
+    // Add payment to invoice
     invoice.payments.push({
       amount: paymentAmount,
       method,
@@ -1384,8 +1389,8 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
       transactionId: transactionId
     });
 
-    invoice.amountPaid += paymentAmount;
-    invoice.balanceDue = invoice.total - invoice.amountPaid;
+    invoice.amountPaid = (invoice.amountPaid || 0) + paymentAmount;
+    invoice.balanceDue = Math.max(0, invoice.total - invoice.amountPaid);
 
     const oldPaymentStatus = invoice.paymentStatus;
     if (invoice.amountPaid === 0) {
@@ -1402,8 +1407,27 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
 
     await invoice.save();
 
+    console.log(`✅ Invoice ${invoice.invoiceNumber} updated: amountPaid=${invoice.amountPaid}, balanceDue=${invoice.balanceDue}, status=${invoice.paymentStatus}`);
+
+    // ✅ FIXED: Create transaction with source: 'invoice'
+    let createdTransaction = null;
     try {
-      await TransactionModel.create({
+      // Map payment method to transaction payment method
+      const methodMap: Record<string, string> = {
+        'mpesa': 'mpesa',
+        'm-pesa': 'mpesa',
+        'M-PESA': 'mpesa',
+        'cash': 'cash',
+        'bank_transfer': 'bank_transfer',
+        'bank transfer': 'bank_transfer',
+        'card': 'card',
+        'credit card': 'card',
+        'cheque': 'cheque'
+      };
+      
+      const txPaymentMethod = methodMap[method?.toLowerCase()] || 'cash';
+
+      createdTransaction = await TransactionModel.create({
         orderId: invoice.orderId || null,
         invoiceId: invoice._id,
         invoiceNumber: invoice.invoiceNumber,
@@ -1414,21 +1438,21 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
         guestPhone: invoice.customerPhone,
         amount: paymentAmount,
         currency: 'KES',
-        paymentMethod: method === 'bank_transfer' ? 'bank_transfer' : 
-                       method === 'mpesa' ? 'mpesa' : 
-                       method === 'card' ? 'card' : 'cash',
+        paymentMethod: txPaymentMethod,
         status: 'completed',
         transactionId: transactionId,
         reference: reference || null,
-        notes: notes || null,
+        notes: notes || `Payment recorded for invoice ${invoice.invoiceNumber}`,
         recordedBy: req.user!.userId,
         recordedByName: req.user!.name || req.user!.email,
-        source: 'order',
-        isPartialPayment: paymentAmount < invoice.balanceDue,
+        source: 'invoice', // ✅ CRITICAL FIX: Changed from 'order' to 'invoice'
+        isPartialPayment: paymentAmount < invoice.balanceDue || paymentAmount < invoice.total,
         paidAt: new Date()
       });
+
+      console.log(`✅ Transaction created: ${transactionId} for invoice ${invoice.invoiceNumber}`);
     } catch (txError: any) {
-      console.error('Transaction creation skipped:', txError.message);
+      console.error('❌ Transaction creation failed:', txError.message);
     }
 
     let createdOrder = null;
@@ -1436,7 +1460,6 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
       try {
         createdOrder = await createOrderFromInvoice(invoice, req.user);
         
-        // ✅ NOTIFICATION: Order created from paid invoice
         if (createdOrder) {
           await notifyAdmins(
             '📦 Order Created from Paid Invoice',
@@ -1472,7 +1495,6 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
       console.error('Audit log creation failed:', auditError.message);
     }
 
-    // ✅ NOTIFICATION: Payment recorded (with priority for large payments)
     const isLargePayment = paymentAmount >= 50000;
     const notificationTitle = isLargePayment ? '💰 Large Payment Received' : '💵 Payment Received';
     
@@ -1505,6 +1527,13 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
         amountPaid: invoice.amountPaid,
         balanceDue: invoice.balanceDue
       },
+      transaction: createdTransaction ? {
+        id: createdTransaction._id,
+        transactionId: createdTransaction.transactionId,
+        amount: createdTransaction.amount,
+        method: createdTransaction.paymentMethod,
+        source: createdTransaction.source
+      } : null,
       order: createdOrder ? {
         _id: createdOrder._id,
         orderNumber: createdOrder.orderNumber,
@@ -1513,8 +1542,11 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
       } : null
     });
   } catch (error: any) {
-    console.error('Record payment error:', error);
-    res.status(500).json({ error: error.message || 'Failed to record payment' });
+    console.error('❌ Record payment error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to record payment',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

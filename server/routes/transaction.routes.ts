@@ -1,21 +1,94 @@
-// routes/transaction.routes.ts (was admin.routes.ts)
+// routes/transaction.routes.ts
 import { Router, Request, Response } from 'express';
+import mongoose from 'mongoose';
 import TransactionModel from '../models/Transaction';
 import OrderModel from '../models/Order';
 import authMiddleware from '../middleware/auth';
-import { PaymentService } from '../services/payment.service';
+import { createAuditLog } from '../middleware/auditMiddleware';
 
 const router = Router();
 
-const adminMiddleware = (req: Request & { user?: any }, res: Response, next: any) => {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
+// Helper to check if user is admin or sales
+const isAdminOrSales = (user: any) => {
+  return user && (user.role === 'admin' || user.role === 'sales');
+};
+
+// Middleware for admin or sales
+const requireAdminOrSales = (req: Request & { user?: any }, res: Response, next: any) => {
+  if (!req.user || !isAdminOrSales(req.user)) {
+    return res.status(403).json({ error: 'Admin or Sales access required' });
   }
   next();
 };
 
-// GET /api/transactions - List all transactions (paginated)
-router.get('/', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+// Helper function to calculate payment summary
+async function getOrderPaymentSummary(orderId: string) {
+  const transactions = await TransactionModel.find({
+    orderId: new mongoose.Types.ObjectId(orderId),
+    status: 'completed'
+  }).sort({ createdAt: -1 }).lean();
+  
+  const totalPaid = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  const order = await OrderModel.findById(orderId).select('total amountPaid balanceDue');
+  
+  let orderTotal = 0;
+  if (order && typeof order.total === 'number' && !isNaN(order.total)) {
+    orderTotal = order.total;
+  }
+  
+  const calculatedBalance = Math.max(0, orderTotal - totalPaid);
+  
+  return {
+    transactions,
+    totalPaid,
+    balanceDue: calculatedBalance,
+    orderTotal,
+    paymentCount: transactions.length,
+    lastPayment: transactions[0] || null
+  };
+}
+
+// Helper to calculate payment status
+function calculatePaymentStatus(totalPaid: number, orderTotal: number) {
+  if (totalPaid <= 0) return 'unpaid';
+  if (totalPaid < orderTotal) return 'partially_paid';
+  if (totalPaid === orderTotal) return 'paid';
+  return 'overpaid';
+}
+
+// Helper to update order payment summary
+async function updateOrderPaymentSummary(orderId: string) {
+  const summary = await getOrderPaymentSummary(orderId);
+  const order = await OrderModel.findById(orderId);
+  if (!order) return null;
+  
+  if (!order.total || order.total <= 0) {
+    console.error(`Order ${orderId} has invalid total: ${order.total}`);
+    return null;
+  }
+  
+  order.amountPaid = summary.totalPaid;
+  order.balanceDue = Math.max(0, summary.balanceDue);
+  order.paymentStatus = calculatePaymentStatus(summary.totalPaid, order.total);
+  
+  if (summary.transactions.length > 0) {
+    const latest = summary.transactions[0];
+    order.paymentDetails = {
+      transactionId: latest.transactionId,
+      mpesaReceipt: latest.mpesaReceipt,
+      cardLast4: latest.cardLast4,
+      cardBrand: latest.cardBrand,
+      paidAt: latest.paidAt,
+      phoneNumber: undefined
+    };
+  }
+  
+  await order.save();
+  return order;
+}
+
+// GET /api/transactions - List all transactions (UPDATED: allows admin and sales)
+router.get('/', authMiddleware, requireAdminOrSales, async (req: Request & { user?: any }, res: Response) => {
   try {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
@@ -42,6 +115,13 @@ router.get('/', authMiddleware, adminMiddleware, async (req: Request, res: Respo
       ];
     }
 
+    // If sales role, only show transactions they created or invoices they own
+    if (req.user?.role === 'sales') {
+      // Sales can see all transactions (or filter by createdBy if needed)
+      // For now, show all transactions that have invoiceNumber or are from invoice source
+      // This ensures they can see invoice payments
+    }
+
     const [transactions, total] = await Promise.all([
       TransactionModel.find(query)
         .populate('orderId', 'orderNumber total status')
@@ -64,7 +144,7 @@ router.get('/', authMiddleware, adminMiddleware, async (req: Request, res: Respo
 });
 
 // GET /api/transactions/stats - Transaction statistics
-router.get('/stats', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.get('/stats', authMiddleware, requireAdminOrSales, async (req: Request & { user?: any }, res: Response) => {
   try {
     const stats = await TransactionModel.aggregate([
       {
@@ -95,7 +175,7 @@ router.get('/stats', authMiddleware, adminMiddleware, async (req: Request, res: 
 });
 
 // GET /api/transactions/:id - Get single transaction
-router.get('/:id', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.get('/:id', authMiddleware, requireAdminOrSales, async (req: Request & { user?: any }, res: Response) => {
   try {
     const transaction = await TransactionModel.findById(req.params.id)
       .populate('orderId', 'orderNumber total status')
@@ -113,7 +193,7 @@ router.get('/:id', authMiddleware, adminMiddleware, async (req: Request, res: Re
 });
 
 // PATCH /api/transactions/:id/status - Update transaction status
-router.patch('/:id/status', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.patch('/:id/status', authMiddleware, requireAdminOrSales, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { status, reason } = req.body;
     const validStatuses = ['pending', 'completed', 'failed', 'refunded'];
@@ -141,8 +221,8 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req: Request
     await transaction.save();
     
     // Update order payment summary if completed or refunded
-    if (status === 'completed' || status === 'refunded') {
-      await PaymentService.updateOrderPaymentSummary(transaction.orderId.toString());
+    if (transaction.orderId && (status === 'completed' || status === 'refunded')) {
+      await updateOrderPaymentSummary(transaction.orderId.toString());
     }
     
     res.json({ success: true, message: `Status updated from ${oldStatus} to ${status}`, transaction });
@@ -153,7 +233,7 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req: Request
 });
 
 // GET /api/transactions/export/csv - Export transactions as CSV
-router.get('/export/csv', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+router.get('/export/csv', authMiddleware, requireAdminOrSales, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { startDate, endDate, status, paymentMethod } = req.query;
     
@@ -172,13 +252,14 @@ router.get('/export/csv', authMiddleware, adminMiddleware, async (req: Request, 
       .lean();
     
     const csvRows = [
-      ['Transaction ID', 'Order Number', 'Customer Name', 'Amount', 'Currency', 'Status', 'Payment Method', 'Source', 'Reference', 'Created At', 'Notes']
+      ['Transaction ID', 'Order Number', 'Invoice Number', 'Customer Name', 'Amount', 'Currency', 'Status', 'Payment Method', 'Source', 'Reference', 'Created At', 'Notes']
     ];
     
     for (const tx of transactions) {
       csvRows.push([
         tx.transactionId,
         (tx.orderId as any)?.orderNumber || 'N/A',
+        tx.invoiceNumber || 'N/A',
         tx.customerName,
         tx.amount.toString(),
         tx.currency,
@@ -198,6 +279,81 @@ router.get('/export/csv', authMiddleware, adminMiddleware, async (req: Request, 
   } catch (error: any) {
     console.error('Export CSV error:', error);
     res.status(500).json({ error: 'Failed to export transactions' });
+  }
+});
+
+// GET /api/transactions/debug/latest - Debug endpoint to check latest transactions
+router.get('/debug/latest', authMiddleware, requireAdminOrSales, async (req: Request, res: Response) => {
+  try {
+    const transactions = await TransactionModel.find({})
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+    
+    res.json({
+      success: true,
+      count: transactions.length,
+      transactions: transactions.map(t => ({
+        id: t._id,
+        transactionId: t.transactionId,
+        invoiceNumber: t.invoiceNumber,
+        amount: t.amount,
+        source: t.source,
+        paymentMethod: t.paymentMethod,
+        status: t.status,
+        customerName: t.customerName,
+        createdAt: t.createdAt
+      }))
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/payments/orders/:orderId - Get payment summary for an order
+router.get('/orders/:orderId', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+    
+    const order = await OrderModel.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    const isAdmin = req.user?.role === 'admin';
+    const isSales = req.user?.role === 'sales';
+    const isOwner = order.userId?.toString() === req.user?.userId;
+    
+    if (!isAdmin && !isSales && !isOwner) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const summary = await getOrderPaymentSummary(orderId);
+    
+    const validTotal = order.total && !isNaN(order.total) ? order.total : 0;
+    const validAmountPaid = summary.totalPaid || 0;
+    const validBalanceDue = Math.max(0, validTotal - validAmountPaid);
+    
+    res.json({
+      success: true,
+      orderId: order._id,
+      orderNumber: order.orderNumber || 'N/A',
+      invoiceNumber: order.invoiceNumber,
+      total: validTotal,
+      paymentStatus: order.paymentStatus || 'unpaid',
+      amountPaid: validAmountPaid,
+      balanceDue: validBalanceDue,
+      paymentCount: summary.paymentCount,
+      lastPayment: summary.lastPayment,
+      transactions: summary.transactions
+    });
+  } catch (error: any) {
+    console.error('Get payment summary error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

@@ -15,19 +15,83 @@ import {
   LogOut,
   Menu,
   X,
+  Bell,
+  Search,
+  ChevronDown,
+  Sun,
+  Moon,
+  Settings,
+  HelpCircle,
+  TrendingUp,
+  Sparkles,
+  Crown,
+  Zap,
+  Calendar,
+  Clock,
+  UserCircle,
+  Home
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'react-hot-toast';
 
-// Navigation items - Same for both admin and sales
+// Navigation items with icons and descriptions
 const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/sales' },
-  { id: 'quotations', label: 'Quotations', icon: FileSpreadsheet, href: '/sales/quotations' },
-  { id: 'invoices', label: 'Invoices', icon: ReceiptText, href: '/sales/invoices' },
-  { id: 'orders', label: 'Orders', icon: ShoppingBag, href: '/sales/orders' },
-  { id: 'customers', label: 'Customers', icon: Users2, href: '/sales/customers' },
-  { id: 'transactions', label: 'Transactions', icon: Receipt, href: '/sales/transactions' },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3, href: '/sales/analytics' },
+  { 
+    id: 'dashboard', 
+    label: 'Dashboard', 
+    icon: LayoutDashboard, 
+    href: '/sales',
+    description: 'Overview & metrics'
+  },
+  { 
+    id: 'quotations', 
+    label: 'Quotations', 
+    icon: FileSpreadsheet, 
+    href: '/sales/quotations',
+    description: 'Create & manage'
+  },
+  { 
+    id: 'invoices', 
+    label: 'Invoices', 
+    icon: ReceiptText, 
+    href: '/sales/invoices',
+    description: 'Track payments'
+  },
+  { 
+    id: 'orders', 
+    label: 'Orders', 
+    icon: ShoppingBag, 
+    href: '/sales/orders',
+    description: 'Fulfillment'
+  },
+  { 
+    id: 'customers', 
+    label: 'Customers', 
+    icon: Users2, 
+    href: '/sales/customers',
+    description: 'Client management'
+  },
+  { 
+    id: 'transactions', 
+    label: 'Transactions', 
+    icon: Receipt, 
+    href: '/sales/transactions',
+    description: 'Payment history'
+  },
+  { 
+    id: 'analytics', 
+    label: 'Analytics', 
+    icon: BarChart3, 
+    href: '/sales/analytics',
+    description: 'Performance insights'
+  },
+];
+
+// Quick action items
+const quickActions = [
+  { label: 'New Quotation', icon: FileSpreadsheet, href: '/sales/quotations/new', color: 'cyan' },
+  { label: 'New Customer', icon: Users2, href: '/sales/customers/new', color: 'purple' },
+  { label: 'View Reports', icon: TrendingUp, href: '/sales/analytics', color: 'green' },
 ];
 
 export default function SalesLayout({
@@ -40,6 +104,14 @@ export default function SalesLayout({
   const { user, isLoggedIn, isAdminOrSales: hasSalesAccess, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [notifications, setNotifications] = useState([
+    { id: 1, title: 'New quotation created', time: '5 min ago', read: false },
+    { id: 2, title: 'Payment received KES 5,000', time: '1 hour ago', read: false },
+    { id: 3, title: 'Invoice INV-001 is overdue', time: '2 hours ago', read: true },
+  ]);
 
   // Check if user has access
   useEffect(() => {
@@ -62,11 +134,33 @@ export default function SalesLayout({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Handle dark mode
+  useEffect(() => {
+    const isDarkMode = localStorage.getItem('theme') === 'dark';
+    setIsDark(isDarkMode);
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newDark = !isDark;
+    setIsDark(newDark);
+    localStorage.setItem('theme', newDark ? 'dark' : 'light');
+    if (newDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
   const handleLogout = () => {
     logout();
     router.push('/');
     toast.success('Logged out successfully');
   };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   if (!user || !hasSalesAccess) {
     return (
@@ -78,81 +172,222 @@ export default function SalesLayout({
 
   const isAdmin = user?.role === 'admin';
   const displayName = user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'User';
+  const userInitial = user?.name?.charAt(0) || user?.email?.charAt(0) || 'U';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
-      {/* Top Navigation Bar - Same for both roles */}
-      <header className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm">
         <div className="px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
             {/* Logo / Brand */}
             <Link href="/sales" className="flex items-center gap-3 group">
-              <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-all">
-                <LayoutDashboard className="w-4 h-4 text-white" />
+              <div className="relative">
+                <div className="w-9 h-9 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
+                  <LayoutDashboard className="w-5 h-5 text-white" />
+                </div>
+                {isAdmin && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-gray-900 animate-pulse" />
+                )}
               </div>
-              <span className="font-bold text-gray-900 dark:text-white hidden sm:inline">
-                Sales Portal
-              </span>
+              <div>
+                <span className="font-bold text-gray-900 dark:text-white hidden sm:inline">
+                  Sales Portal
+                </span>
+                {isAdmin && (
+                  <span className="hidden sm:inline ml-2 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
+                    Admin
+                  </span>
+                )}
+              </div>
             </Link>
 
             {/* Desktop Navigation Tabs */}
-            <nav className="hidden md:flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <nav className="hidden lg:flex items-center gap-0.5 bg-gray-100/50 dark:bg-gray-800/50 rounded-xl p-1 backdrop-blur-sm">
               {navItems.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.id}
                     href={item.href}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 relative ${
                       isActive
-                        ? 'bg-white dark:bg-gray-900 text-cyan-600 dark:text-cyan-400 shadow-sm'
+                        ? 'bg-white dark:bg-gray-900 text-cyan-600 dark:text-cyan-400 shadow-md'
                         : 'text-gray-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-900/50'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span className="text-sm font-medium">{item.label}</span>
+                    {isActive && (
+                      <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-cyan-500 rounded-full" />
+                    )}
                   </Link>
                 );
               })}
             </nav>
 
-            {/* User Info & Actions - Desktop */}
-            <div className="hidden md:flex items-center gap-3">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                  {user.name?.charAt(0) || user.email?.charAt(0) || 'U'}
-                </div>
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {displayName}
-                </span>
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 capitalize">
-                  {user.role}
-                </span>
+            {/* Right Side Actions */}
+            <div className="flex items-center gap-2">
+              {/* Search - Desktop */}
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 focus-within:border-cyan-500 transition-all">
+                <Search className="w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="bg-transparent border-none outline-none text-sm w-32 lg:w-48 text-gray-700 dark:text-gray-300 placeholder:text-gray-400"
+                />
+                <kbd className="hidden lg:block text-xs text-gray-400 bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded">⌘K</kbd>
               </div>
+
+              {/* Quick Actions - Desktop */}
+              <div className="hidden lg:flex items-center gap-1">
+                {quickActions.map((action) => (
+                  <Link
+                    key={action.label}
+                    href={action.href}
+                    className={`p-2 rounded-lg hover:bg-${action.color}-50 dark:hover:bg-${action.color}-900/20 transition-colors group`}
+                    title={action.label}
+                  >
+                    <action.icon className={`w-4 h-4 text-${action.color}-500`} />
+                  </Link>
+                ))}
+              </div>
+
+              {/* Notifications */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+                >
+                  <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notifications Dropdown */}
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden z-50">
+                    <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
+                      <button className="text-xs text-cyan-600 hover:text-cyan-700">Mark all read</button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`p-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer ${
+                            !notification.read ? 'bg-cyan-50 dark:bg-cyan-900/10' : ''
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className={`w-2 h-2 rounded-full mt-1.5 ${!notification.read ? 'bg-cyan-500' : 'bg-gray-300'}`} />
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-900 dark:text-white">{notification.title}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">{notification.time}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-2 border-t border-gray-200 dark:border-gray-800">
+                      <button className="w-full text-center text-sm text-cyan-600 hover:text-cyan-700 py-1">
+                        View all notifications
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Theme Toggle */}
               <button
-                onClick={handleLogout}
+                onClick={toggleTheme}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                title="Logout"
               >
-                <LogOut className="w-4 h-4 text-gray-500" />
+                {isDark ? <Sun className="w-4 h-4 text-gray-400" /> : <Moon className="w-4 h-4 text-gray-600" />}
+              </button>
+
+              {/* User Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                    {userInitial}
+                  </div>
+                  <div className="hidden md:block text-left">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{displayName}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user.role}</p>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-400 hidden md:block" />
+                </button>
+
+                {/* User Menu Dropdown */}
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden z-50">
+                    <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name || 'User'}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
+                      <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 capitalize">
+                        {user.role}
+                      </span>
+                    </div>
+                    <div className="p-2">
+                      <Link
+                        href="/profile"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        <UserCircle className="w-4 h-4" />
+                        Profile Settings
+                      </Link>
+                      <Link
+                        href="/help"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        <HelpCircle className="w-4 h-4" />
+                        Help & Support
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm text-red-600 dark:text-red-400"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
             </div>
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
 
-          {/* Mobile Menu Dropdown - Same for both roles */}
+          {/* Mobile Menu Dropdown */}
           {mobileMenuOpen && (
-            <div className="md:hidden mt-3 pt-3 border-t border-gray-200 dark:border-gray-800">
+            <div className="lg:hidden mt-3 pt-3 border-t border-gray-200 dark:border-gray-800">
+              {/* Mobile Search */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl mb-3">
+                <Search className="w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="bg-transparent border-none outline-none text-sm flex-1 text-gray-700 dark:text-gray-300 placeholder:text-gray-400"
+                />
+              </div>
+
               {/* Mobile Navigation */}
-              <nav className="flex flex-col gap-1 mb-3">
+              <nav className="grid grid-cols-2 gap-1 mb-3">
                 {navItems.map((item) => {
                   const isActive = pathname === item.href;
                   const Icon = item.icon;
@@ -161,24 +396,45 @@ export default function SalesLayout({
                       key={item.id}
                       href={item.href}
                       onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
                         isActive
                           ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400'
                           : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
-                      <span className="text-sm font-medium">{item.label}</span>
+                      <div>
+                        <span className="text-sm font-medium block">{item.label}</span>
+                        <span className="text-xs text-gray-500">{item.description}</span>
+                      </div>
                     </Link>
                   );
                 })}
               </nav>
 
-              {/* Mobile User Info */}
+              {/* Mobile Quick Actions */}
               <div className="border-t border-gray-200 dark:border-gray-800 pt-3">
+                <p className="text-xs text-gray-500 px-3 mb-2">Quick Actions</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {quickActions.map((action) => (
+                    <Link
+                      key={action.label}
+                      href={action.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex flex-col items-center gap-1 p-3 rounded-lg bg-${action.color}-50 dark:bg-${action.color}-900/20 hover:bg-${action.color}-100 dark:hover:bg-${action.color}-800/30 transition-colors`}
+                    >
+                      <action.icon className={`w-4 h-4 text-${action.color}-500`} />
+                      <span className="text-xs text-gray-700 dark:text-gray-300">{action.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mobile User Info */}
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-3 mt-3">
                 <div className="flex items-center gap-3 px-3 py-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                    {user.name?.charAt(0) || user.email?.charAt(0) || 'U'}
+                  <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                    {userInitial}
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
@@ -203,9 +459,30 @@ export default function SalesLayout({
       </header>
 
       {/* Main Content */}
-      <main className="p-4 sm:p-6">
+      <main className="p-4 sm:p-6 max-w-7xl mx-auto">
         {children}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-200/50 dark:border-gray-800/50 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-4">
+              <span>© 2024 Sales Portal</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="text-xs">v2.0.0</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link href="/privacy" className="hover:text-gray-700 dark:hover:text-gray-300">Privacy</Link>
+              <Link href="/terms" className="hover:text-gray-700 dark:hover:text-gray-300">Terms</Link>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-xs">System Online</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

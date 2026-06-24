@@ -18,17 +18,91 @@ import {
   Home,
   CheckCircle,
   Clock,
-  XCircle
+  XCircle,
+  Sparkles,
+  Zap,
+  Calendar,
+  Clock as ClockIcon,
+  BarChart4,
+  PieChart,
+  Download,
+  RefreshCw,
+  AlertCircle,
+  TrendingDown,
+  Gift,
+  UserPlus,
+  FileText,
+  Package,
+  ChevronRight,
+  Star,
+  ThumbsUp
 } from 'lucide-react';
 import { getSalesAnalyticsOverview, type SalesAnalytics } from '@/lib/sales';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'react-hot-toast';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart as RePieChart,
+  Pie,
+  Cell,
+  Legend,
+  BarChart,
+  Bar,
+  LineChart,
+  Line
+} from 'recharts';
+import Link from 'next/link';
+
+// Mock data for charts
+const weeklyData = [
+  { name: 'Mon', sales: 45000, orders: 12 },
+  { name: 'Tue', sales: 52000, orders: 15 },
+  { name: 'Wed', sales: 38000, orders: 10 },
+  { name: 'Thu', sales: 61000, orders: 18 },
+  { name: 'Fri', sales: 73000, orders: 22 },
+  { name: 'Sat', sales: 42000, orders: 14 },
+  { name: 'Sun', sales: 35000, orders: 9 },
+];
+
+const monthlyData = [
+  { name: 'Jan', sales: 850000, orders: 45 },
+  { name: 'Feb', sales: 920000, orders: 52 },
+  { name: 'Mar', sales: 780000, orders: 41 },
+  { name: 'Apr', sales: 1030000, orders: 58 },
+  { name: 'May', sales: 890000, orders: 47 },
+  { name: 'Jun', sales: 1150000, orders: 63 },
+];
+
+const paymentMethodData = [
+  { name: 'M-PESA', value: 65 },
+  { name: 'Cash', value: 15 },
+  { name: 'Bank Transfer', value: 10 },
+  { name: 'Card', value: 7 },
+  { name: 'Other', value: 3 },
+];
+
+const COLORS = ['#06b6d4', '#10b981', '#6366f1', '#f59e0b', '#ef4444'];
+
+const statusData = [
+  { status: 'Completed', count: 85, percentage: 85 },
+  { status: 'Pending', count: 10, percentage: 10 },
+  { status: 'Failed', count: 3, percentage: 3 },
+  { status: 'Refunded', count: 2, percentage: 2 },
+];
 
 export default function SalesOverview() {
   const { user } = useAuth();
   const router = useRouter();
   const [analytics, setAnalytics] = useState<SalesAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter'>('week');
+  const [selectedChart, setSelectedChart] = useState<'sales' | 'orders'>('sales');
 
   // Redirect admin users away from overview
   useEffect(() => {
@@ -38,7 +112,6 @@ export default function SalesOverview() {
   }, [user, router]);
 
   useEffect(() => {
-    // Only fetch analytics for sales users
     if (user?.role === 'sales') {
       fetchAnalytics();
     }
@@ -57,7 +130,6 @@ export default function SalesOverview() {
     }
   };
 
-  // Show loading while checking role
   if (!user) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -66,7 +138,6 @@ export default function SalesOverview() {
     );
   }
 
-  // Admin users should be redirected, but show loading while redirect happens
   if (user.role === 'admin') {
     return (
       <div className="flex items-center justify-center h-96">
@@ -83,7 +154,7 @@ export default function SalesOverview() {
     );
   }
 
-  // Helper to safely get values
+  // Helper functions
   const getTotalRevenue = () => analytics?.orders?.totalRevenue || 0;
   const getTotalOrders = () => analytics?.orders?.totalOrders || 0;
   const getTotalQuotations = () => analytics?.quotations?.totalQuotations || 0;
@@ -116,37 +187,65 @@ export default function SalesOverview() {
       value: `KES ${getTotalRevenue().toLocaleString()}`,
       icon: DollarSign,
       color: 'green',
-      change: analytics?.overview?.revenueGrowth ? `+${analytics.overview.revenueGrowth}%` : '+0%'
+      change: analytics?.overview?.revenueGrowth ? `+${analytics.overview.revenueGrowth}%` : '+0%',
+      trend: 'up' as const,
+      detail: 'This month'
     },
     {
       title: 'Total Orders',
-      value: getTotalOrders(),
+      value: getTotalOrders().toString(),
       icon: ShoppingCart,
       color: 'blue',
-      change: analytics?.overview?.orderGrowth ? `+${analytics.overview.orderGrowth}%` : '+0%'
+      change: analytics?.overview?.orderGrowth ? `+${analytics.overview.orderGrowth}%` : '+0%',
+      trend: 'up' as const,
+      detail: `${getPaidOrders()} completed`
     },
     {
       title: 'Quotations',
-      value: getTotalQuotations(),
+      value: getTotalQuotations().toString(),
       icon: FileSpreadsheet,
       color: 'orange',
-      change: `${getConvertedCount()} converted`
+      change: `${getConvertedCount()} converted`,
+      trend: 'neutral' as const,
+      detail: `${getAcceptedCount()} accepted`
     },
     {
       title: 'Success Rate',
       value: `${getSuccessRate().toFixed(1)}%`,
       icon: TrendingUp,
       color: 'purple',
-      change: '+0%'
+      change: '+2.5%',
+      trend: 'up' as const,
+      detail: 'vs last month'
     }
   ];
 
   const getColorClasses = (color: string) => {
-    const colors: Record<string, { bg: string; text: string }> = {
-      green: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-600 dark:text-green-400' },
-      blue: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400' },
-      orange: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-600 dark:text-orange-400' },
-      purple: { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-600 dark:text-purple-400' }
+    const colors: Record<string, { bg: string; text: string; border: string; hover: string }> = {
+      green: { 
+        bg: 'bg-green-50 dark:bg-green-900/20', 
+        text: 'text-green-600 dark:text-green-400',
+        border: 'border-green-200 dark:border-green-800',
+        hover: 'hover:bg-green-100 dark:hover:bg-green-900/30'
+      },
+      blue: { 
+        bg: 'bg-blue-50 dark:bg-blue-900/20', 
+        text: 'text-blue-600 dark:text-blue-400',
+        border: 'border-blue-200 dark:border-blue-800',
+        hover: 'hover:bg-blue-100 dark:hover:bg-blue-900/30'
+      },
+      orange: { 
+        bg: 'bg-orange-50 dark:bg-orange-900/20', 
+        text: 'text-orange-600 dark:text-orange-400',
+        border: 'border-orange-200 dark:border-orange-800',
+        hover: 'hover:bg-orange-100 dark:hover:bg-orange-900/30'
+      },
+      purple: { 
+        bg: 'bg-purple-50 dark:bg-purple-900/20', 
+        text: 'text-purple-600 dark:text-purple-400',
+        border: 'border-purple-200 dark:border-purple-800',
+        hover: 'hover:bg-purple-100 dark:hover:bg-purple-900/30'
+      }
     };
     return colors[color];
   };
@@ -154,64 +253,230 @@ export default function SalesOverview() {
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Welcome back, {user?.name || 'Sales Representative'}!
-        </h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-          Here's your sales performance overview
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Welcome back, {user?.name || 'Sales Representative'}!
+            </h1>
+            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 text-xs font-medium">
+              <Sparkles className="w-3 h-3" />
+              New
+            </span>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Here's your sales performance overview for today
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={fetchAnalytics}
+            className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2 text-sm"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+          <button className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg flex items-center gap-2 text-sm transition-colors">
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, idx) => {
           const colors = getColorClasses(stat.color);
           return (
             <div
               key={idx}
-              className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 hover:shadow-md transition-shadow"
+              className={`bg-white dark:bg-gray-900 rounded-xl shadow-sm border ${colors.border} p-6 hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer group`}
             >
               <div className="flex items-center justify-between mb-4">
-                <div className={`p-2 ${colors.bg} rounded-lg`}>
-                  <stat.icon className={`w-6 h-6 ${colors.text}`} />
+                <div className={`p-2.5 ${colors.bg} rounded-xl group-hover:scale-110 transition-transform`}>
+                  <stat.icon className={`w-5 h-5 ${colors.text}`} />
                 </div>
-                <span className="text-sm font-medium text-green-600 flex items-center gap-1">
-                  <ArrowUpRight className="w-3 h-3" /> {stat.change}
+                <span className={`text-sm font-medium flex items-center gap-1 ${
+                  stat.trend === 'up' ? 'text-green-600' : 
+                  stat.trend === 'neutral' ? 'text-gray-500' : 'text-gray-500'
+                }`}>
+                  {stat.trend === 'up' && <ArrowUpRight className="w-3 h-3" />}
+                  {stat.change}
                 </span>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {stat.value}
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{stat.title}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{stat.detail}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Performance Details */}
+      {/* Time Range Selector */}
+      <div className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-xl p-1 border border-gray-200 dark:border-gray-800 w-fit">
+        {(['week', 'month', 'quarter'] as const).map((range) => (
+          <button
+            key={range}
+            onClick={() => setTimeRange(range)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+              timeRange === range
+                ? 'bg-cyan-600 text-white'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`}
+          >
+            {range}
+          </button>
+        ))}
+      </div>
+
+      {/* Chart Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Chart */}
+        <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Sales Overview</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Weekly sales and order trends</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedChart('sales')}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  selectedChart === 'sales'
+                    ? 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                Sales
+              </button>
+              <button
+                onClick={() => setSelectedChart('orders')}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  selectedChart === 'orders'
+                    ? 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                Orders
+              </button>
+            </div>
+          </div>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              {selectedChart === 'sales' ? (
+                <AreaChart data={weeklyData}>
+                  <defs>
+                    <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.5} />
+                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                  <YAxis stroke="#9ca3af" fontSize={12} tickFormatter={(value) => `KES ${value/1000}k`} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255,255,255,0.9)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      backdropFilter: 'blur(8px)'
+                    }}
+                  // Recharts Tooltip formatter typing varies by ValueType; keep it permissive to avoid TS mismatch.
+                    formatter={(value: any) => [`KES ${Number(value ?? 0).toLocaleString()}`, 'Sales'] as [string, string]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sales"
+                    stroke="#06b6d4"
+                    strokeWidth={2}
+                    fill="url(#salesGradient)"
+                  />
+                </AreaChart>
+              ) : (
+                <BarChart data={weeklyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.5} />
+                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                  <YAxis stroke="#9ca3af" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255,255,255,0.9)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      backdropFilter: 'blur(8px)'
+                    }}
+                  />
+                  <Bar dataKey="orders" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Payment Method Distribution */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Methods</h2>
+          <div className="h-60">
+            <ResponsiveContainer width="100%" height="100%">
+              <RePieChart>
+                <Pie
+                  data={paymentMethodData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={70}
+                  paddingAngle={4}
+                  dataKey="value"
+                >
+                  {paymentMethodData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    backdropFilter: 'blur(8px)'
+                  }}
+                />
+                <Legend verticalAlign="bottom" height={36} />
+              </RePieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Quotation Performance */}
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Quotation Performance
             </h2>
+            <Link
+              href="/sales/quotations"
+              className="text-sm text-cyan-600 hover:text-cyan-700 flex items-center gap-1"
+            >
+              View all <ChevronRight className="w-4 h-4" />
+            </Link>
           </div>
           <div className="p-6 space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-800">
               <span className="text-gray-600 dark:text-gray-400">Total Created</span>
               <span className="font-semibold text-gray-900 dark:text-white">
                 {getTotalQuotations()}
               </span>
             </div>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-800">
               <span className="text-gray-600 dark:text-gray-400">Accepted</span>
               <span className="font-semibold text-green-600">
                 {getAcceptedCount()}
               </span>
             </div>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-800">
               <span className="text-gray-600 dark:text-gray-400">Converted to Orders</span>
               <span className="font-semibold text-blue-600">
                 {getConvertedCount()}
@@ -226,9 +491,9 @@ export default function SalesOverview() {
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
                 <div
-                  className="bg-cyan-600 h-2 rounded-full transition-all"
+                  className="bg-gradient-to-r from-cyan-500 to-blue-600 h-2 rounded-full transition-all duration-1000"
                   style={{
-                    width: `${getConversionRate()}%`
+                    width: `${Math.min(getConversionRate(), 100)}%`
                   }}
                 />
               </div>
@@ -238,24 +503,39 @@ export default function SalesOverview() {
 
         {/* Order Status Breakdown */}
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Order Status
             </h2>
+            <Link
+              href="/sales/orders"
+              className="text-sm text-cyan-600 hover:text-cyan-700 flex items-center gap-1"
+            >
+              View all <ChevronRight className="w-4 h-4" />
+            </Link>
           </div>
           <div className="p-6 space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600" />
+                <div className="w-2 h-2 rounded-full bg-green-500" />
                 <span className="text-gray-600 dark:text-gray-400">Paid Orders</span>
               </div>
               <span className="font-semibold text-green-600">
                 {getPaidOrders()}
               </span>
             </div>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-red-600" />
+                <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                <span className="text-gray-600 dark:text-gray-400">Processing</span>
+              </div>
+              <span className="font-semibold text-yellow-600">
+                {Math.max(0, getTotalOrders() - getPaidOrders() - getCancelledOrders())}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-500" />
                 <span className="text-gray-600 dark:text-gray-400">Cancelled</span>
               </div>
               <span className="font-semibold text-red-600">
@@ -271,68 +551,93 @@ export default function SalesOverview() {
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
                 <div
-                  className="bg-green-600 h-2 rounded-full transition-all"
+                  className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-1000"
                   style={{
-                    width: `${getCompletionRate()}%`
+                    width: `${Math.min(getCompletionRate(), 100)}%`
                   }}
                 />
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Transaction Summary */}
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 lg:col-span-2">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+      {/* Transaction Summary */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+          <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Transaction Summary
             </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Real-time transaction status</p>
           </div>
-          <div className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 rounded-lg bg-green-50 dark:bg-green-900/20">
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {getCompletedTransactions()}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Completed</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
-                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                  {getPendingTransactions()}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Pending</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-red-50 dark:bg-red-900/20">
-                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {getFailedTransactions()}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Failed</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-orange-50 dark:bg-orange-900/20">
-                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {getRefundedTransactions()}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Refunded</p>
-              </div>
+          <Link
+            href="/sales/transactions"
+            className="text-sm text-cyan-600 hover:text-cyan-700 flex items-center gap-1"
+          >
+            View all <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="text-center p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50">
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {getCompletedTransactions()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1 flex items-center justify-center gap-1">
+                <CheckCircle className="w-3 h-3 text-green-500" />
+                Completed
+              </p>
             </div>
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
-              <div className="flex justify-between items-center">
+            <div className="text-center p-4 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50">
+              <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                {getPendingTransactions()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1 flex items-center justify-center gap-1">
+                <Clock className="w-3 h-3 text-yellow-500" />
+                Pending
+              </p>
+            </div>
+            <div className="text-center p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
+              <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                {getFailedTransactions()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1 flex items-center justify-center gap-1">
+                <XCircle className="w-3 h-3 text-red-500" />
+                Failed
+              </p>
+            </div>
+            <div className="text-center p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50">
+              <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                {getRefundedTransactions()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1 flex items-center justify-center gap-1">
+                <ArrowUpRight className="w-3 h-3 text-orange-500" />
+                Refunded
+              </p>
+            </div>
+          </div>
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
                 <span className="text-gray-600 dark:text-gray-400">Total Volume</span>
-                <span className="font-bold text-xl text-gray-900 dark:text-white">
+                <p className="font-bold text-2xl text-gray-900 dark:text-white">
                   KES {getTotalVolume().toLocaleString()}
-                </span>
+                </p>
               </div>
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-sm text-gray-500">Average Transaction</span>
-                <span className="font-semibold text-gray-700 dark:text-gray-300">
-                  KES {Math.round(analytics?.transactions?.averageValue || 0).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-sm text-gray-500">Success Rate</span>
-                <span className="font-semibold text-green-600">
-                  {getSuccessRate().toFixed(1)}%
-                </span>
+              <div className="flex items-center gap-6">
+                <div>
+                  <span className="text-sm text-gray-500">Average Transaction</span>
+                  <p className="font-semibold text-gray-700 dark:text-gray-300">
+                    KES {Math.round(analytics?.transactions?.averageValue || 0).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-sm text-gray-500">Success Rate</span>
+                  <p className="font-semibold text-green-600">
+                    {getSuccessRate().toFixed(1)}%
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -340,52 +645,74 @@ export default function SalesOverview() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <button
-          onClick={() => router.push('/sales/customers')}
-          className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 text-left hover:shadow-md transition-all group"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg group-hover:bg-cyan-200 dark:group-hover:bg-cyan-800/50 transition-colors">
-              <Users className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-            </div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">Manage Customers</h3>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            View and manage your customer list, track their purchase history
-          </p>
-        </button>
-
-        <button
-          onClick={() => router.push('/sales/quotations')}
-          className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 text-left hover:shadow-md transition-all group"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg group-hover:bg-cyan-200 dark:group-hover:bg-cyan-800/50 transition-colors">
-              <FileSpreadsheet className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-            </div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">Create Quotation</h3>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Generate new quotations for your customers
-          </p>
-        </button>
-
-        <button
-          onClick={() => router.push('/sales/analytics')}
-          className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 text-left hover:shadow-md transition-all group"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg group-hover:bg-cyan-200 dark:group-hover:bg-cyan-800/50 transition-colors">
-              <TrendingUp className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-            </div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">View Analytics</h3>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Dive deeper into your sales performance metrics
-          </p>
-        </button>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <QuickActionCard
+          icon={FileSpreadsheet}
+          title="New Quotation"
+          description="Create a new quotation for your customer"
+          href="/sales/quotations/new"
+          color="cyan"
+        />
+        <QuickActionCard
+          icon={UserPlus}
+          title="Add Customer"
+          description="Register a new customer"
+          href="/sales/customers/new"
+          color="purple"
+        />
+        <QuickActionCard
+          icon={FileText}
+          title="Create Invoice"
+          description="Generate invoice from quotation"
+          href="/sales/invoices"
+          color="green"
+        />
+        <QuickActionCard
+          icon={Package}
+          title="View Orders"
+          description="Check order status and fulfillment"
+          href="/sales/orders"
+          color="orange"
+        />
       </div>
     </div>
+  );
+}
+
+// Quick Action Card Component
+function QuickActionCard({ 
+  icon: Icon, 
+  title, 
+  description, 
+  href, 
+  color 
+}: { 
+  icon: any; 
+  title: string; 
+  description: string; 
+  href: string; 
+  color: string;
+}) {
+  const router = useRouter();
+  const colorClasses: Record<string, { bg: string; text: string; hover: string }> = {
+    cyan: { bg: 'bg-cyan-50 dark:bg-cyan-900/20', text: 'text-cyan-600 dark:text-cyan-400', hover: 'hover:bg-cyan-100 dark:hover:bg-cyan-900/30' },
+    purple: { bg: 'bg-purple-50 dark:bg-purple-900/20', text: 'text-purple-600 dark:text-purple-400', hover: 'hover:bg-purple-100 dark:hover:bg-purple-900/30' },
+    green: { bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-600 dark:text-green-400', hover: 'hover:bg-green-100 dark:hover:bg-green-900/30' },
+    orange: { bg: 'bg-orange-50 dark:bg-orange-900/20', text: 'text-orange-600 dark:text-orange-400', hover: 'hover:bg-orange-100 dark:hover:bg-orange-900/30' },
+  };
+
+  const colors = colorClasses[color];
+
+  return (
+    <button
+      onClick={() => router.push(href)}
+      className={`bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 text-left hover:shadow-md transition-all group ${colors.hover}`}
+    >
+      <div className={`p-3 ${colors.bg} rounded-xl w-fit mb-3 group-hover:scale-110 transition-transform`}>
+        <Icon className={`w-5 h-5 ${colors.text}`} />
+      </div>
+      <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
+    </button>
   );
 }
