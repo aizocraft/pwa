@@ -23,6 +23,7 @@ export interface ContactEmailData {
 
 export interface OrderEmailData {
   orderId: string;
+  orderNumber: string;
   customerName: string;
   customerEmail: string;
   subtotal: number;
@@ -37,6 +38,7 @@ export interface OrderEmailData {
 
 export interface AdminOrderNotificationData {
   orderId: string;
+  orderNumber: string;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -245,7 +247,7 @@ export const sendOrderConfirmation = async (data: OrderEmailData) => {
 
   return await sendEmail({
     to: data.customerEmail,
-    subject: `Order Confirmation #${data.orderId}`,
+    subject: `Order Confirmation #${data.orderNumber}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -278,7 +280,7 @@ export const sendOrderConfirmation = async (data: OrderEmailData) => {
             
             <div class="order-details">
               <h3>Order Details</h3>
-              <p><strong>Order ID:</strong> ${data.orderId}</p>
+              <p><strong>Order Number:</strong> ${data.orderNumber}</p>
               <p><strong>Status:</strong> <span style="color: #10b981;">${data.status.toUpperCase()}</span></p>
               <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
               
@@ -353,7 +355,7 @@ export const sendAdminOrderNotification = async (data: AdminOrderNotificationDat
   
   return await sendEmail({
     to: adminEmail,
-    subject: `NEW ORDER #${data.orderId} - Action Required`,
+    subject: `NEW ORDER #${data.orderNumber} - Action Required`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -380,7 +382,7 @@ export const sendAdminOrderNotification = async (data: AdminOrderNotificationDat
         <div class="container">
           <div class="header">
             <span class="alert-badge">NEW ORDER ALERT</span>
-            <h1 style="margin: 10px 0 0 0;">Order #${data.orderId}</h1>
+            <h1 style="margin: 10px 0 0 0;">Order #${data.orderNumber}</h1>
           </div>
           <div class="content">
             <p>A new order has been placed and requires your attention.</p>
@@ -388,8 +390,8 @@ export const sendAdminOrderNotification = async (data: AdminOrderNotificationDat
             <div class="order-info">
               <h3>Order Information</h3>
               <div class="info-row">
-                <div class="info-label">Order ID:</div>
-                <div class="info-value">${data.orderId}</div>
+                <div class="info-label">Order Number:</div>
+                <div class="info-value">${data.orderNumber}</div>
               </div>
               <div class="info-row">
                 <div class="info-label">Order Date:</div>

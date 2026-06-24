@@ -280,6 +280,7 @@ const orderData: any = {
     // Send order confirmation to customer
     sendOrderConfirmation({
       orderId: order._id.toString(),
+      orderNumber: order.orderNumber,
       customerName: customerName,
       customerEmail: customerEmail,
       subtotal: calculatedSubtotal,
@@ -296,6 +297,7 @@ const orderData: any = {
     if (process.env.ADMIN_EMAIL) {
       sendAdminOrderNotification({
         orderId: order._id.toString(),
+        orderNumber: order.orderNumber,
         customerName: customerName,
         customerEmail: customerEmail,
         customerPhone: customerPhone,
