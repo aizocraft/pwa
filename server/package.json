@@ -1,13 +1,18 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "main": "dist/server.js",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  
   "scripts": {
     "dev": "ts-node server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "seed": "ts-node scripts/seed.ts"
+    "vercel-build": "tsc"
   },
+  
   "dependencies": {
     "@getbrevo/brevo": "^1.0.1",
     "axios": "^1.15.0",
