@@ -103,7 +103,8 @@ const paymentSchema = new Schema({
   reference: { type: String },
   date: { type: Date, default: Date.now },
   recordedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  transactionId: { type: String }
+  transactionId: { type: String },
+  phoneNumber: { type: String }
 });
 
 const invoiceSchema = new Schema<IInvoice>(

@@ -2,6 +2,7 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export interface ITransaction extends Document {
   orderId: mongoose.Types.ObjectId;
+  invoiceId?: mongoose.Types.ObjectId;
   invoiceNumber?: string;
   quotationNumber?: string;
   
@@ -26,7 +27,7 @@ export interface ITransaction extends Document {
   notes?: string;
   recordedBy?: mongoose.Types.ObjectId;
   recordedByName?: string;
-  source: 'checkout' | 'quotation' | 'admin' | 'manual' | 'invoice';
+  source: 'checkout' | 'quotation' | 'admin' | 'manual' | 'invoice' | 'order';
   isPartialPayment: boolean;
   paidAt?: Date;
   
@@ -43,6 +44,13 @@ const transactionSchema = new Schema<ITransaction, TransactionModel>({
     required: false, 
     index: true 
   },
+  invoiceId: { 
+  type: mongoose.SchemaTypes.ObjectId, 
+  ref: 'Invoice', 
+  required: false, 
+  index: true 
+},
+
   invoiceNumber: { type: String, index: true },
   quotationNumber: { type: String, index: true },
   
@@ -95,6 +103,7 @@ transactionSchema.index({ paymentMethod: 1 });
 transactionSchema.index({ createdAt: -1 });
 transactionSchema.index({ orderId: 1, status: 1 });
 transactionSchema.index({ invoiceNumber: 1 });
+transactionSchema.index({ invoiceId: 1 });
 transactionSchema.index({ source: 1 });
 
 const TransactionModel = mongoose.model<ITransaction, TransactionModel>('Transaction', transactionSchema);

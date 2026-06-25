@@ -53,7 +53,7 @@ const notifyAdmins = async (title: string, message: string, actionUrl: string, m
 };
 
 // Helper function to create order from invoice with profit tracking
-async function createOrderFromInvoice(invoice: any, user: any) {
+async function createOrderFromInvoice(invoice: any, user: any, paymentMethod?: string) {
   try {
     if (invoice.orderId) {
       const existingOrder = await OrderModel.findById(invoice.orderId);
@@ -120,6 +120,28 @@ async function createOrderFromInvoice(invoice: any, user: any) {
 
     const transportCost = invoice.transportCost || invoice.transportInfo?.cost || 0;
 
+    // ✅ Determine the correct payment method
+    let orderPaymentMethod = paymentMethod || 'cod';
+
+    // If no payment method was passed, try to get it from the invoice payments
+    if (!paymentMethod && invoice.payments && invoice.payments.length > 0) {
+      const lastPayment = invoice.payments[invoice.payments.length - 1];
+      if (lastPayment.method) {
+        const methodMap: Record<string, string> = {
+          'mpesa': 'mpesa',
+          'm-pesa': 'mpesa',
+          'M-PESA': 'mpesa',
+          'cash': 'cash',
+          'bank_transfer': 'bank_transfer',
+          'bank transfer': 'bank_transfer',
+          'card': 'card',
+          'credit card': 'card',
+          'cheque': 'cheque'
+        };
+        orderPaymentMethod = methodMap[lastPayment.method.toLowerCase()] || 'cod';
+      }
+    }
+
     const order = await OrderModel.create({
       invoiceId: invoice._id,
       invoiceNumber: invoice.invoiceNumber,
@@ -135,7 +157,7 @@ async function createOrderFromInvoice(invoice: any, user: any) {
       tax: invoice.tax,
       discount: invoice.discount,
       total: invoice.total,
-      paymentMethod: 'cod',
+      paymentMethod: orderPaymentMethod, // ✅ Now uses the correct payment method
       paymentStatus: invoice.paymentStatus,
       amountPaid: invoice.amountPaid,
       balanceDue: invoice.balanceDue,
@@ -1354,8 +1376,7 @@ router.post('/invoices/:id/send', authMiddleware, requireSalesRole, async (req: 
   }
 });
 
-// src/routes/sales.ts - CORRECTED PAYMENT ROUTE
-
+// Record payment
 router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { id } = req.params;
@@ -1419,10 +1440,9 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
 
     console.log(`✅ Invoice ${invoice.invoiceNumber} updated: amountPaid=${invoice.amountPaid}, balanceDue=${invoice.balanceDue}, status=${invoice.paymentStatus}`);
 
-    // ✅ FIXED: Create transaction with source: 'invoice'
+    // ✅ Create transaction with source: 'invoice' and include invoiceId
     let createdTransaction = null;
     try {
-      // Map payment method to transaction payment method
       const methodMap: Record<string, string> = {
         'mpesa': 'mpesa',
         'm-pesa': 'mpesa',
@@ -1439,7 +1459,7 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
 
       createdTransaction = await TransactionModel.create({
         orderId: invoice.orderId || null,
-        invoiceId: invoice._id,
+        invoiceId: invoice._id, // ✅ Now this field exists in the schema
         invoiceNumber: invoice.invoiceNumber,
         quotationNumber: invoice.quotationNumber,
         userId: invoice.customerId,
@@ -1455,7 +1475,7 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
         notes: notes || `Payment recorded for invoice ${invoice.invoiceNumber}`,
         recordedBy: req.user!.userId,
         recordedByName: req.user!.name || req.user!.email,
-        source: 'invoice', // ✅ CRITICAL FIX: Changed from 'order' to 'invoice'
+        source: 'invoice', // ✅ Now 'invoice' is valid in the enum
         isPartialPayment: paymentAmount < invoice.balanceDue || paymentAmount < invoice.total,
         paidAt: new Date()
       });
@@ -1465,12 +1485,21 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
       console.error('❌ Transaction creation failed:', txError.message);
     }
 
+    // ✅ Create order if invoice is fully paid - PASS THE PAYMENT METHOD
     let createdOrder = null;
     if (invoice.paymentStatus === 'paid' && !invoice.orderId) {
       try {
-        createdOrder = await createOrderFromInvoice(invoice, req.user);
+        // ✅ Pass the payment method to createOrderFromInvoice
+        createdOrder = await createOrderFromInvoice(invoice, req.user, method);
         
         if (createdOrder) {
+          // ✅ Update the transaction with the orderId
+          if (createdTransaction) {
+            await TransactionModel.findByIdAndUpdate(createdTransaction._id, {
+              orderId: createdOrder._id
+            });
+          }
+          
           await notifyAdmins(
             '📦 Order Created from Paid Invoice',
             `Order ${createdOrder.orderNumber} was automatically created from paid invoice ${invoice.invoiceNumber} for ${invoice.customerName}`,
@@ -1482,7 +1511,8 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
               orderId: createdOrder._id,
               orderNumber: createdOrder.orderNumber,
               customerName: invoice.customerName,
-              total: invoice.total
+              total: invoice.total,
+              paymentMethod: method // ✅ Include the payment method
             }
           );
         }
@@ -1542,13 +1572,15 @@ router.post('/invoices/:id/payments', authMiddleware, requireSalesRole, async (r
         transactionId: createdTransaction.transactionId,
         amount: createdTransaction.amount,
         method: createdTransaction.paymentMethod,
-        source: createdTransaction.source
+        source: createdTransaction.source,
+        orderId: createdTransaction.orderId
       } : null,
       order: createdOrder ? {
         _id: createdOrder._id,
         orderNumber: createdOrder.orderNumber,
         status: createdOrder.status,
-        total: createdOrder.total
+        total: createdOrder.total,
+        paymentMethod: createdOrder.paymentMethod // ✅ Returns the correct payment method
       } : null
     });
   } catch (error: any) {
@@ -1623,6 +1655,7 @@ router.get('/products', authMiddleware, requireSalesRole, async (req: Request & 
   }
 });
 
+// Create order from invoice
 router.post('/invoices/:id/create-order', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
     const { id } = req.params;
@@ -1654,9 +1687,9 @@ router.post('/invoices/:id/create-order', authMiddleware, requireSalesRole, asyn
       }
     }
 
-    const createdOrder = await createOrderFromInvoice(invoice, req.user);
+    // ✅ Pass the payment method to createOrderFromInvoice
+    const createdOrder = await createOrderFromInvoice(invoice, req.user, paymentMethod);
 
-    // ✅ NOTIFICATION: Order manually created from invoice
     if (createdOrder) {
       await notifyAdmins(
         '📦 Order Created from Invoice',
@@ -1670,7 +1703,8 @@ router.post('/invoices/:id/create-order', authMiddleware, requireSalesRole, asyn
           orderId: createdOrder._id,
           orderNumber: createdOrder.orderNumber,
           customerName: invoice.customerName,
-          total: invoice.total
+          total: invoice.total,
+          paymentMethod // ✅ Include payment method
         }
       );
     }
@@ -1684,7 +1718,8 @@ router.post('/invoices/:id/create-order', authMiddleware, requireSalesRole, asyn
         total: createdOrder.total,
         totalProfit: createdOrder.totalProfit,
         paymentStatus: createdOrder.paymentStatus,
-        status: createdOrder.status
+        status: createdOrder.status,
+        paymentMethod: createdOrder.paymentMethod // ✅ Return the correct payment method
       } : null
     });
   } catch (error: any) {
