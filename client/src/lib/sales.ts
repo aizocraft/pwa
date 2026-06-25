@@ -543,6 +543,8 @@ export async function listSalesQuotations(params?: {
   status?: string;
   page?: number;
   limit?: number;
+  startDate?: string;
+  endDate?: string;
 }): Promise<{ quotations: Quotation[]; pagination: any }> {
   const res = await api.get('/sales/quotations', { params });
   return res.data;
@@ -621,6 +623,8 @@ export async function listInvoices(params?: {
   search?: string;
   status?: string;
   paymentStatus?: string;
+  startDate?: string;
+  endDate?: string;
   page?: number;
   limit?: number;
 }): Promise<{ invoices: Invoice[]; pagination: any }> {

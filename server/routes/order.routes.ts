@@ -612,12 +612,26 @@ router.get('/admin/orders', authMiddleware, async (req: Request & { user?: any }
     const status = req.query.status as string;
     const paymentMethod = req.query.paymentMethod as string;
     const search = req.query.search as string;
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
     const sortField = (req.query.sort as string) || 'createdAt';
     const sortOrder = (req.query.order as string) === 'asc' ? 1 : -1;
 
     const query: any = {};
     if (status) query.status = status;
     if (paymentMethod) query.paymentMethod = paymentMethod;
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) query.createdAt.$lte = new Date(endDate);
+    }
+    if (search) {
+      query.$or = [
+        { 'guestInfo.email': { $regex: search, $options: 'i' } },
+        { 'guestInfo.phone': { $regex: search, $options: 'i' } },
+        { 'shippingAddress.fullName': { $regex: search, $options: 'i' } }
+      ];
+    }
     
     if (search) {
       query.$or = [

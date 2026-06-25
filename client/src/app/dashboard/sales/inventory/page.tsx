@@ -38,7 +38,9 @@ const formatNumber = (num: number) => {
   return new Intl.NumberFormat('en-KE').format(num);
 };
 
-type TabType = 'low-stock' | 'valuation' | 'bulk-actions' | 'settings';
+import DashboardProductsPage from '@/app/dashboard/products/page'
+
+type TabType = 'low-stock' | 'valuation' | 'bulk-actions' | 'products' | 'settings';
 
 export default function InventoryPage() {
   const [summary, setSummary] = useState<any>(null);
@@ -286,6 +288,17 @@ export default function InventoryPage() {
           >
             <BarChart3 className="w-4 h-4 inline mr-2" />
             Inventory Valuation
+          </button>
+          <button
+            onClick={() => setActiveTab('products')}
+            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
+              activeTab === 'products' 
+                ? 'text-cyan-600 border-b-2 border-cyan-600' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Package className="w-4 h-4 inline mr-2" />
+            Products
           </button>
           <button
             onClick={() => setActiveTab('bulk-actions')}
@@ -576,6 +589,13 @@ export default function InventoryPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Products Tab */}
+      {activeTab === 'products' && (
+        <div className="">
+          <DashboardProductsPage viewMode="sales" />
         </div>
       )}
 

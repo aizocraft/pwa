@@ -567,6 +567,8 @@ export async function getAdminOrders(params?: {
   search?: string;
   sort?: string;
   order?: 'asc' | 'desc';
+  startDate?: string;
+  endDate?: string;
 }): Promise<OrderListResponse> {
   const query = new URLSearchParams();
   Object.entries(params || {}).forEach(([key, value]) => {

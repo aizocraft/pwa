@@ -505,13 +505,18 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
 // GET /api/sales/quotations - List quotations
 router.get('/quotations', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
-    const { search, status, page = '1', limit = '20', sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const { search, status, page = '1', limit = '20', sortBy = 'createdAt', sortOrder = 'desc', startDate, endDate } = req.query;
     const p = Number(page);
     const l = Number(limit);
     const skip = (p - 1) * l;
 
     const query: any = {};
     if (status) query.status = status;
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate as string);
+      if (endDate) query.createdAt.$lte = new Date(endDate as string);
+    }
     
     if (req.user!.role === 'sales') {
       query.createdBy = req.user!.userId;
@@ -1182,7 +1187,7 @@ router.post('/quotations/:id/create-invoice', authMiddleware, requireSalesRole, 
 
 router.get('/invoices', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
   try {
-    const { search, status, paymentStatus, page = '1', limit = '20', sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const { search, status, paymentStatus, page = '1', limit = '20', sortBy = 'createdAt', sortOrder = 'desc', startDate, endDate } = req.query;
     const p = Number(page);
     const l = Number(limit);
     const skip = (p - 1) * l;
@@ -1190,6 +1195,11 @@ router.get('/invoices', authMiddleware, requireSalesRole, async (req: Request & 
     const query: any = {};
     if (status) query.status = status;
     if (paymentStatus) query.paymentStatus = paymentStatus;
+    if (startDate || endDate) {
+      query.issueDate = {};
+      if (startDate) query.issueDate.$gte = new Date(startDate as string);
+      if (endDate) query.issueDate.$lte = new Date(endDate as string);
+    }
     
     if (req.user!.role === 'sales') {
       query.createdBy = req.user!.userId;

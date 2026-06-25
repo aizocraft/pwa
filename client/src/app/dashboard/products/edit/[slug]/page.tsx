@@ -1,5 +1,4 @@
 // src/app/dashboard/products/edit/[slug]/page.tsx
-
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
@@ -36,7 +35,7 @@ import type { Product, ProductImage } from '@/types/product';
 import { cn } from '@/lib/utils';
 import RichTextEditor from '@/components/RichTextEditor';
 
-
+// ==================== TYPES ====================
 interface EditProductFormData {
   name: string;
   slug: string;
@@ -58,6 +57,7 @@ interface EditProductFormData {
   supplierName?: string;
 }
 
+// ==================== MAIN COMPONENT ====================
 export default function EditProductPage() {
   const router = useRouter();
   const params = useParams();
@@ -84,12 +84,8 @@ export default function EditProductPage() {
     rating: 0,
   });
 
-  // Local draft for rich text description to avoid auto-saving while formatting
+  // Rich text description - updates on blur only to prevent auto-save issues
   const [descriptionDraft, setDescriptionDraft] = useState<string>(formData.description || '');
-
-  useEffect(() => {
-    setDescriptionDraft(formData.description || '');
-  }, [formData.description]);
 
   // Image handling
   const [newUploadImages, setNewUploadImages] = useState<File[]>([]);
@@ -109,14 +105,14 @@ export default function EditProductPage() {
   const profitMargin = formData.price > 0 ? (profitAmount / formData.price) * 100 : 0;
   const markup = formData.buyingPrice > 0 ? (profitAmount / formData.buyingPrice) * 100 : 0;
 
-  // Fetch product
+  // ==================== FETCH PRODUCT ====================
   const { data: product, isLoading } = useQuery({
     queryKey: ['product', productSlug],
     queryFn: () => getProduct(productSlug),
     enabled: !!productSlug
   });
 
-  // Load product data into form
+  // ==================== LOAD PRODUCT DATA ====================
   useEffect(() => {
     if (product) {
       setFormData({
@@ -137,10 +133,12 @@ export default function EditProductPage() {
         featured: product.featured || false,
         rating: product.rating || 0,
       });
+      setDescriptionDraft(product.description || '');
       setIsSlugEdited(product.slug !== generateSlug(product.name || ''));
     }
   }, [product]);
 
+  // ==================== HELPERS ====================
   const generateSlug = (name: string) => {
     return name
       .toLowerCase()
@@ -156,7 +154,12 @@ export default function EditProductPage() {
     }));
   };
 
-  // Image dropzone for new uploads
+  // Update formData.description when user leaves the rich text editor
+  const handleDescriptionBlur = (content: string) => {
+    setFormData(prev => ({ ...prev, description: content }));
+  };
+
+  // ==================== IMAGE DROPZONE ====================
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setNewUploadImages(prev => [...prev, ...acceptedFiles]);
     const newPreviews = acceptedFiles.map(file => URL.createObjectURL(file));
@@ -194,7 +197,7 @@ export default function EditProductPage() {
     toast.success('Image marked for deletion');
   };
 
-  // Tag handlers
+  // ==================== TAGS ====================
   const addTag = () => {
     const trimmed = newTag.trim();
     if (trimmed && !formData.tags.includes(trimmed)) {
@@ -208,7 +211,7 @@ export default function EditProductPage() {
     setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
   };
 
-  // Spec handlers
+  // ==================== SPECIFICATIONS ====================
   const addSpec = () => {
     const keyTrim = specKey.trim();
     const valTrim = specValue.trim();
@@ -231,6 +234,7 @@ export default function EditProductPage() {
     });
   };
 
+  // ==================== SUBMIT ====================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -261,6 +265,7 @@ export default function EditProductPage() {
         });
       });
 
+      // Build product data
       const productData = {
         name: formData.name,
         slug: formData.slug,
@@ -271,8 +276,7 @@ export default function EditProductPage() {
         price: Number(formData.price),
         buyingPrice: Number(formData.buyingPrice),
         compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
-        descriptionDraft: descriptionDraft,
-        description: descriptionDraft,
+        description: formData.description, // Updated on blur
         specs: formData.specs,
         stock: Number(formData.stock),
         tags: formData.tags,
@@ -282,7 +286,6 @@ export default function EditProductPage() {
       };
 
       await updateProduct(productSlug, productData);
-  
       router.push('/dashboard/products');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update product');
@@ -291,6 +294,7 @@ export default function EditProductPage() {
     }
   };
 
+  // ==================== LOADING STATE ====================
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
@@ -302,6 +306,7 @@ export default function EditProductPage() {
     );
   }
 
+  // ==================== NOT FOUND STATE ====================
   if (!product) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 px-4">
@@ -325,13 +330,15 @@ export default function EditProductPage() {
     );
   }
 
+  // Filter out deleted images
   const existingImages = formData.images.filter((_, index) => !deletedImageIndices.includes(index));
 
+  // ==================== RENDER ====================
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
       <div className="max-w-6xl mx-auto py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
         
-        {/* Header */}
+        {/* ==================== HEADER ==================== */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
           <div className="flex items-center gap-3">
             <Link
@@ -369,10 +376,10 @@ export default function EditProductPage() {
           </button>
         </div>
 
-        {/* Main Form */}
+        {/* ==================== FORM ==================== */}
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* Basic Information */}
+          {/* ==================== BASIC INFORMATION ==================== */}
           <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
               <div className="flex items-center gap-3">
@@ -388,6 +395,7 @@ export default function EditProductPage() {
             
             <div className="p-5 sm:p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Product Name */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Product Name <span className="text-red-500">*</span>
@@ -401,6 +409,7 @@ export default function EditProductPage() {
                   />
                 </div>
                 
+                {/* Slug */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Slug (SEO)
@@ -416,6 +425,7 @@ export default function EditProductPage() {
                   />
                 </div>
 
+                {/* SKU */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     SKU
@@ -428,6 +438,7 @@ export default function EditProductPage() {
                   />
                 </div>
 
+                {/* Category */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Category <span className="text-red-500">*</span>
@@ -454,6 +465,7 @@ export default function EditProductPage() {
                   </div>
                 </div>
 
+                {/* Brand */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Brand <span className="text-red-500">*</span>
@@ -470,6 +482,7 @@ export default function EditProductPage() {
                   </div>
                 </div>
 
+                {/* Type */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Type <span className="text-red-500">*</span>
@@ -486,6 +499,7 @@ export default function EditProductPage() {
                   </div>
                 </div>
 
+                {/* Selling Price */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Selling Price (KES) <span className="text-red-500">*</span>
@@ -504,6 +518,7 @@ export default function EditProductPage() {
                   </div>
                 </div>
 
+                {/* Buying Price */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Buying Price (KES)
@@ -522,7 +537,7 @@ export default function EditProductPage() {
                 </div>
               </div>
 
-              {/* Profit Display */}
+              {/* Profit Analysis */}
               {(formData.price > 0 || formData.buyingPrice > 0) && (
                 <div className={`mt-4 p-4 rounded-xl ${profitAmount >= 0 ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800'}`}>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -558,7 +573,9 @@ export default function EditProductPage() {
                 </div>
               )}
 
+              {/* Additional Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                {/* Compare at Price */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Compare at Price (Optional)
@@ -577,6 +594,7 @@ export default function EditProductPage() {
                   </div>
                 </div>
 
+                {/* Stock */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Stock Quantity
@@ -590,6 +608,7 @@ export default function EditProductPage() {
                   />
                 </div>
 
+                {/* Rating */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Rating (0-5)
@@ -608,6 +627,7 @@ export default function EditProductPage() {
                   </div>
                 </div>
 
+                {/* Featured */}
                 <div className="flex items-center">
                   <label className="flex items-center gap-3 cursor-pointer group">
                     <input
@@ -625,7 +645,7 @@ export default function EditProductPage() {
             </div>
           </div>
 
-          {/* Description */}
+          {/* ==================== DESCRIPTION ==================== */}
           <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
               <div className="flex items-center gap-3">
@@ -639,19 +659,23 @@ export default function EditProductPage() {
               </div>
             </div>
             <div className="p-5 sm:p-6">
-<RichTextEditor
-  value={descriptionDraft}
-  onChange={(value) => setDescriptionDraft(value)}
-  placeholder="Write a detailed description with rich formatting..."
-/
->
+              {/* Rich Text Editor - Updates formData.description on blur */}
+              <RichTextEditor
+                initialValue={descriptionDraft}
+                placeholder="Write a detailed description with rich formatting..."
+                onBlur={handleDescriptionBlur}
+                onChange={(content) => {
+                  // Update draft for character count display
+                  setDescriptionDraft(content);
+                }}
+              />
               <p className="text-xs text-gray-500 mt-2">
                 {descriptionDraft.length} characters
               </p>
             </div>
           </div>
 
-          {/* Images Section */}
+          {/* ==================== IMAGES ==================== */}
           <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
               <div className="flex items-center justify-between flex-wrap gap-4">
@@ -818,6 +842,7 @@ export default function EditProductPage() {
                 )}
               </div>
 
+              {/* Image Change Summary */}
               {(deletedImageIndices.length > 0 || newPreviewImages.length > 0 || newUrlImages.length > 0) && (
                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
                   <p className="text-sm text-blue-700 dark:text-blue-400">
@@ -830,7 +855,7 @@ export default function EditProductPage() {
             </div>
           </div>
 
-          {/* Tags */}
+          {/* ==================== TAGS ==================== */}
           <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
               <div className="flex items-center gap-3">
@@ -885,7 +910,7 @@ export default function EditProductPage() {
             </div>
           </div>
 
-          {/* Specifications */}
+          {/* ==================== SPECIFICATIONS ==================== */}
           <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
               <div className="flex items-center gap-3">

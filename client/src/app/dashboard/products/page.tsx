@@ -22,7 +22,13 @@ import { getProducts, deleteProduct, updateProduct } from '@/lib/api'
 const fadeInUp = "transition-all duration-300 ease-out transform hover:translate-y-[-2px]"
 const buttonHover = "transition-all duration-200 transform hover:scale-105 active:scale-95"
 
-export default function DashboardProductsPage() {
+type DashboardProductsPageProps = {
+  viewMode?: 'admin' | 'sales'
+}
+
+export default function DashboardProductsPage({ viewMode = 'admin' }: DashboardProductsPageProps) {
+  const canDelete = viewMode !== 'sales'
+
   const router = useRouter()
   const queryClient = useQueryClient()
   
@@ -38,7 +44,10 @@ export default function DashboardProductsPage() {
   const [page, setPage] = useState(1)
   const [limit] = useState(12)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
+  const [productsViewMode, setProductsViewMode] = useState<'grid' | 'table'>('table')
+
+  // viewMode alias removed (we use productsViewMode for UI grid/table toggle)
+
   
   // Delete confirmation modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
@@ -235,7 +244,7 @@ export default function DashboardProductsPage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Delete Confirmation Modal */}
-      {deleteModalOpen && productToDelete && (
+      {canDelete && deleteModalOpen && productToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in">
             <div className="flex items-center gap-4 mb-4">
@@ -310,13 +319,15 @@ export default function DashboardProductsPage() {
             Manage your inventory • {pagination?.total || 0} product{(pagination?.total || 0) !== 1 ? 's' : ''} total
           </p>
         </div>
-        <Link 
-          href="/dashboard/products/add" 
-          className={`inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl ${buttonHover}`}
-        >
-          <Plus className="w-4 h-4" />
-          Add Product
-        </Link>
+        {canDelete && (
+          <Link 
+            href="/dashboard/products/add" 
+            className={`inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl ${buttonHover}`}
+          >
+            <Plus className="w-4 h-4" />
+            Add Product
+          </Link>
+        )}
       </div>
 
       {/* Search and Filters Bar */}
@@ -344,8 +355,8 @@ export default function DashboardProductsPage() {
         </div>
         
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setFiltersOpen(!filtersOpen)}
+            <button
+              onClick={() => setFiltersOpen(!filtersOpen)}
             className={`flex items-center gap-2 px-5 py-3 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-md transition-all duration-200 ${filtersOpen ? 'border-blue-500 shadow-md' : ''}`}
           >
             <Filter className="w-4 h-4" />
@@ -361,14 +372,14 @@ export default function DashboardProductsPage() {
           {/* View Toggle */}
           <div className="flex bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl p-1">
             <button
-              onClick={() => setViewMode('table')}
-              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === 'table' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              onClick={() => setProductsViewMode('table')}
+              className={`p-2 rounded-lg transition-all duration-200 ${productsViewMode === 'table' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
             >
               <List className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === 'grid' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              onClick={() => setProductsViewMode('grid')}
+              className={`p-2 rounded-lg transition-all duration-200 ${productsViewMode === 'grid' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
             >
               <Grid className="w-4 h-4" />
             </button>
@@ -498,7 +509,7 @@ export default function DashboardProductsPage() {
 
       {/* Products Display */}
       {isLoading || isFetching ? (
-        <div className={viewMode === 'grid' 
+        <div className={productsViewMode === 'grid' 
           ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
           : "space-y-4"
         }>
@@ -534,7 +545,7 @@ export default function DashboardProductsPage() {
             </Link>
           )}
         </div>
-      ) : viewMode === 'grid' ? (
+      ) : productsViewMode === 'grid' ? (
         // Grid View with Profit Display
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {products.map((product, index) => {
@@ -647,7 +658,14 @@ export default function DashboardProductsPage() {
                     </button>
                     <button
                       onClick={() => openDeleteModal(product)}
-                      className="p-2 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-xl hover:bg-red-100 transition-all"
+                      disabled={!canDelete}
+                      className={`p-2 rounded-xl transition-all ${
+                        canDelete
+                          ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400'
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-700/50 dark:text-gray-500'
+                      }`}
+                      aria-disabled={!canDelete}
+                      title={canDelete ? 'Delete' : 'Delete not available for sales users'}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -781,9 +799,13 @@ export default function DashboardProductsPage() {
                         </Link>
                         <button
                           onClick={() => openDeleteModal(product)}
-                          disabled={deleteMutation.isPending}
-                          className="inline-flex p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-all hover:scale-110 disabled:opacity-50"
-                          title="Delete"
+                          disabled={!canDelete || deleteMutation.isPending}
+                          className={`inline-flex p-1.5 rounded-lg transition-all hover:scale-110 disabled:opacity-50 ${
+                            canDelete
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-gray-400 hover:bg-transparent cursor-not-allowed'
+                          }`}
+                          title={canDelete ? 'Delete' : 'Delete not available for sales users'}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

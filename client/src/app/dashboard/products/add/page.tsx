@@ -33,6 +33,7 @@ import type { Product, ProductImage } from '@/types/product';
 import { cn, formatCurrency } from '@/lib/utils';
 import RichTextEditor from '@/components/RichTextEditor';
 
+// ==================== TYPES ====================
 interface AddProductFormData {
   name: string;
   slug: string;
@@ -54,6 +55,7 @@ interface AddProductFormData {
   supplierName?: string;
 }
 
+// ==================== MAIN COMPONENT ====================
 export default function AddProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -85,24 +87,23 @@ export default function AddProductPage() {
     featured: false,
     rating: 0,
   });
-  // Local draft for rich text description to avoid triggering global autosave
+
+  // Rich text description - updates on blur only to prevent auto-save issues
   const [descriptionDraft, setDescriptionDraft] = useState<string>(formData.description || '');
 
-  useEffect(() => {
-    setDescriptionDraft(formData.description || '');
-  }, [formData.description]);
-
+  // Helper states
   const [newTag, setNewTag] = useState('');
   const [specKey, setSpecKey] = useState('');
   const [specValue, setSpecValue] = useState('');
   const [newUrlImage, setNewUrlImage] = useState('');
   const [isSlugEdited, setIsSlugEdited] = useState(false);
 
-  // Calculate profit
+  // Calculate profit metrics
   const profitAmount = formData.price - formData.buyingPrice;
   const profitMargin = formData.price > 0 ? (profitAmount / formData.price) * 100 : 0;
   const markup = formData.buyingPrice > 0 ? (profitAmount / formData.buyingPrice) * 100 : 0;
 
+  // ==================== HELPERS ====================
   const generateSlug = (name: string) => {
     return name
       .toLowerCase()
@@ -116,6 +117,7 @@ export default function AddProductPage() {
     return `${prefix}-${random}`;
   };
 
+  // ==================== HANDLERS ====================
   const handleNameChange = (name: string) => {
     setFormData(prev => ({
       ...prev,
@@ -132,7 +134,12 @@ export default function AddProductPage() {
     }));
   };
 
-  // Load brands
+  // Update formData.description when user leaves the rich text editor
+  const handleDescriptionBlur = (content: string) => {
+    setFormData(prev => ({ ...prev, description: content }));
+  };
+
+  // ==================== BRANDS ====================
   useEffect(() => {
     getBrands()
       .then(setBrands)
@@ -140,7 +147,7 @@ export default function AddProductPage() {
       .finally(() => setBrandsLoading(false));
   }, []);
 
-  // Image dropzone
+  // ==================== IMAGE DROPZONE ====================
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setUploadImages(prev => [...prev, ...acceptedFiles]);
     const newPreviews = acceptedFiles.map(file => URL.createObjectURL(file));
@@ -173,7 +180,7 @@ export default function AddProductPage() {
     setUrlImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Tag handlers
+  // ==================== TAGS ====================
   const addTag = () => {
     const trimmed = newTag.trim();
     if (trimmed && !formData.tags.includes(trimmed)) {
@@ -187,7 +194,7 @@ export default function AddProductPage() {
     setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
   };
 
-  // Spec handlers
+  // ==================== SPECIFICATIONS ====================
   const addSpec = () => {
     const keyTrim = specKey.trim();
     const valTrim = specValue.trim();
@@ -210,76 +217,75 @@ export default function AddProductPage() {
     });
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
+  // ==================== SUBMIT ====================
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    let allImages: ProductImage[] = [];
+    try {
+      let allImages: ProductImage[] = [];
 
-    // Upload files first
-    if (uploadImages.length > 0) {
-      const uploaded = await uploadProductImages(null, uploadImages);
-      allImages.push(...uploaded);
-    }
+      // Upload file images
+      if (uploadImages.length > 0) {
+        const uploaded = await uploadProductImages(null, uploadImages);
+        allImages.push(...uploaded);
+      }
 
-    // Add URL images
-    urlImages.forEach(url => {
-      allImages.push({
-        type: 'url',
-        url: url
+      // Add URL images
+      urlImages.forEach(url => {
+        allImages.push({ type: 'url', url });
       });
-    });
 
-    if (allImages.length === 0) {
-      toast.error('Please add at least one product image');
-      setLoading(false);
-      return;
-    }
+      // Validate at least one image
+      if (allImages.length === 0) {
+        toast.error('Please add at least one product image');
+        setLoading(false);
+        return;
+      }
 
-    // Generate SKU if not provided
-    let finalSku = formData.sku;
-    if (!finalSku || finalSku.trim() === '') {
-      const prefix = formData.category.substring(0, 3).toUpperCase().padEnd(3, 'X');
-      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      finalSku = `${prefix}-${random}`;
-    }
+      // Auto-generate SKU if not provided
+      let finalSku = formData.sku;
+      if (!finalSku || finalSku.trim() === '') {
+        const prefix = formData.category.substring(0, 3).toUpperCase().padEnd(3, 'X');
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        finalSku = `${prefix}-${random}`;
+      }
 
+      // Build product data
       const productData = {
-      name: formData.name,
-      slug: formData.slug,
-      sku: finalSku, // Ensure this is always a string, never undefined
-      category: formData.category,
-      brand: formData.brand,
-      type: formData.type,
-      price: Number(formData.price),
-      buyingPrice: Number(formData.buyingPrice),
-      compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
-      description: descriptionDraft,
-      specs: formData.specs,
-      stock: Number(formData.stock),
-      tags: formData.tags,
-      images: allImages,
-      featured: formData.featured,
-      rating: Number(formData.rating),
-    };
+        name: formData.name,
+        slug: formData.slug,
+        sku: finalSku,
+        category: formData.category,
+        brand: formData.brand,
+        type: formData.type,
+        price: Number(formData.price),
+        buyingPrice: Number(formData.buyingPrice),
+        compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
+        description: formData.description, // Updated on blur
+        specs: formData.specs,
+        stock: Number(formData.stock),
+        tags: formData.tags,
+        images: allImages,
+        featured: formData.featured,
+        rating: Number(formData.rating),
+      };
 
-    await createProduct(productData);
-    
+      await createProduct(productData);
+      router.push('/dashboard/products');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to create product');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    router.push('/dashboard/products');
-  } catch (error: any) {
-    toast.error(error.response?.data?.error || 'Failed to create product');
-  } finally {
-    setLoading(false);
-  }
-};
-
+  // ==================== RENDER ====================
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
       <div className="max-w-6xl mx-auto py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
         
-        {/* Header */}
+        {/* ==================== HEADER ==================== */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
           <div className="flex items-center gap-3">
             <button
@@ -316,10 +322,10 @@ const handleSubmit = async (e: React.FormEvent) => {
           </button>
         </div>
 
-        {/* Main Form */}
+        {/* ==================== FORM ==================== */}
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* Basic Information */}
+          {/* ==================== BASIC INFORMATION ==================== */}
           <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
               <div className="flex items-center gap-3">
@@ -335,6 +341,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             
             <div className="p-5 sm:p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Product Name */}
                 <div className="md:col-span-1">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Product Name <span className="text-red-500">*</span>
@@ -349,6 +356,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   />
                 </div>
                 
+                {/* Slug */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Slug (SEO)
@@ -365,6 +373,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   />
                 </div>
 
+                {/* SKU */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     SKU
@@ -379,6 +388,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <p className="text-xs text-gray-500 mt-1">Leave empty to auto-generate</p>
                 </div>
 
+                {/* Category */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Category <span className="text-red-500">*</span>
@@ -400,12 +410,13 @@ const handleSubmit = async (e: React.FormEvent) => {
                       <option value="Generators">Generators</option>
                       <option value="Accessories">Accessories</option>
                       <option value="Labour">Labour</option>
-                      <option value="Other">Other </option>
+                      <option value="Other">Other</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
 
+                {/* Brand */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Brand <span className="text-red-500">*</span>
@@ -418,11 +429,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                       onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
                       className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., SolarTech"
-                     
+                      required
                     />
                   </div>
                 </div>
 
+                {/* Type */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Type <span className="text-red-500">*</span>
@@ -435,11 +447,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                       onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
                       className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., Monocrystalline"
-                      
+                      required
                     />
                   </div>
                 </div>
 
+                {/* Selling Price */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Selling Price (KES) <span className="text-red-500">*</span>
@@ -458,6 +471,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   </div>
                 </div>
 
+                {/* Buying Price */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Buying Price (KES)
@@ -476,7 +490,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </div>
               </div>
 
-              {/* Profit Display */}
+              {/* Profit Analysis */}
               {(formData.price > 0 || formData.buyingPrice > 0) && (
                 <div className={`mt-4 p-4 rounded-xl ${profitAmount >= 0 ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800'}`}>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -512,7 +526,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </div>
               )}
 
+              {/* Additional Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                {/* Compare at Price */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Compare at Price (Optional)
@@ -531,6 +547,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   </div>
                 </div>
 
+                {/* Stock */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Stock Quantity
@@ -544,6 +561,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   />
                 </div>
 
+                {/* Rating */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Rating (0-5)
@@ -562,6 +580,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   </div>
                 </div>
 
+                {/* Featured */}
                 <div className="flex items-center">
                   <label className="flex items-center gap-3 cursor-pointer group">
                     <input
@@ -579,7 +598,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
           </div>
 
-          {/* Description */}
+          {/* ==================== DESCRIPTION ==================== */}
           <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
               <div className="flex items-center gap-3">
@@ -593,18 +612,23 @@ const handleSubmit = async (e: React.FormEvent) => {
               </div>
             </div>
             <div className="p-5 sm:p-6">
-<RichTextEditor
-  value={descriptionDraft}
-  onChange={(value) => setDescriptionDraft(value)}
-  placeholder="Write a detailed description with rich formatting..."
-/>
+              {/* Rich Text Editor - Updates formData.description on blur */}
+              <RichTextEditor
+                initialValue={descriptionDraft}
+                placeholder="Write a detailed description with rich formatting..."
+                onBlur={handleDescriptionBlur}
+                onChange={(content) => {
+                  // Update draft for character count display
+                  setDescriptionDraft(content);
+                }}
+              />
               <p className="text-xs text-gray-500 mt-2">
-                {formData.description.length} characters
+                {descriptionDraft.length} characters
               </p>
             </div>
           </div>
 
-          {/* Images Section */}
+          {/* ==================== IMAGES ==================== */}
           <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
               <div className="flex items-center justify-between flex-wrap gap-4">
@@ -649,6 +673,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             <div className="p-5 sm:p-6">
               {imageInputType === 'upload' ? (
                 <>
+                  {/* Upload Dropzone */}
                   <div
                     {...getRootProps()}
                     className={cn(
@@ -666,6 +691,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                     <p className="text-xs text-gray-400 mt-2">PNG, JPG, WebP, GIF up to 5MB • Max 6 images</p>
                   </div>
 
+                  {/* Upload Previews */}
                   {previewImages.length > 0 && (
                     <div className="mt-6">
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
@@ -695,6 +721,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </>
               ) : (
                 <div className="space-y-4">
+                  {/* URL Input */}
                   <div className="flex gap-2">
                     <input
                       type="url"
@@ -713,6 +740,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                     </button>
                   </div>
 
+                  {/* URL Images */}
                   {urlImages.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                       {urlImages.map((url, index) => (
@@ -739,6 +767,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </div>
               )}
 
+              {/* Image Count */}
               {(previewImages.length > 0 || urlImages.length > 0) && (
                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
                   <p className="text-sm text-blue-700 dark:text-blue-400">
@@ -749,7 +778,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
           </div>
 
-          {/* Tags */}
+          {/* ==================== TAGS ==================== */}
           <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
               <div className="flex items-center gap-3">
@@ -804,7 +833,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
           </div>
 
-          {/* Specifications */}
+          {/* ==================== SPECIFICATIONS ==================== */}
           <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 p-5 sm:p-6">
               <div className="flex items-center gap-3">
