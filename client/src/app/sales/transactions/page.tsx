@@ -1,6 +1,8 @@
+// client/src/app/sales/transactions/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Receipt,
   Search,
@@ -25,7 +27,7 @@ import {
   Banknote,
   ChevronRight
 } from 'lucide-react';
-import api from '@/lib/api';
+import { getTransactions } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'react-hot-toast';
 
@@ -59,7 +61,8 @@ interface Transaction {
 }
 
 export default function SalesTransactionsPage() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, isLoggedIn, isAdminOrSales } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,18 +71,20 @@ export default function SalesTransactionsPage() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
-    fetchTransactions();
-  }, []);
+    if (!isLoggedIn || !isAdminOrSales) {
+      router.push('/auth/login');
+      toast.error('Please login with sales or admin access to view transactions');
+      return;
+    }
 
-  const fetchTransactions = async () => {
+    fetchTransactions();
+  }, [isLoggedIn, isAdminOrSales, router]);
+
+  const fetchTransactions = useCallback(async () => {
     try {
       setLoading(true);
-      // Use the existing transactions endpoint from your backend
-      const response = await api.get('/transactions', {
-        params: { limit: 100 }
-      });
-      
-      let transactionsData = response.data.transactions || [];
+      const response = await getTransactions({ limit: 100 });
+      let transactionsData = response.transactions || [];
       
       // Sort by createdAt descending
       transactionsData = transactionsData.sort((a: Transaction, b: Transaction) => 
@@ -93,7 +98,7 @@ export default function SalesTransactionsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {

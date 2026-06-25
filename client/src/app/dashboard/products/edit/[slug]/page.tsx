@@ -89,6 +89,7 @@ export default function EditProductPage() {
   const [imageInputType, setImageInputType] = useState<'upload' | 'url'>('upload');
   const [deletedImageIndices, setDeletedImageIndices] = useState<number[]>([]);
   const [newUrlImage, setNewUrlImage] = useState('');
+  const [isSlugEdited, setIsSlugEdited] = useState(false);
 
   const [newTag, setNewTag] = useState('');
   const [specKey, setSpecKey] = useState('');
@@ -127,6 +128,7 @@ export default function EditProductPage() {
         featured: product.featured || false,
         rating: product.rating || 0,
       });
+      setIsSlugEdited(product.slug !== generateSlug(product.name || ''));
     }
   }, [product]);
 
@@ -141,7 +143,7 @@ export default function EditProductPage() {
     setFormData(prev => ({
       ...prev,
       name,
-      slug: generateSlug(name)
+      slug: isSlugEdited ? prev.slug : generateSlug(name)
     }));
   };
 
@@ -396,7 +398,10 @@ export default function EditProductPage() {
                   <input
                     type="text"
                     value={formData.slug}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                    onChange={(e) => {
+                      setIsSlugEdited(true);
+                      setFormData(prev => ({ ...prev, slug: e.target.value }));
+                    }}
                     className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800 font-mono text-sm"
                   />
                 </div>

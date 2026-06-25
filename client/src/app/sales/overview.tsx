@@ -58,6 +58,7 @@ import {
   Line
 } from 'recharts';
 import Link from 'next/link';
+import SalesActionCard from '@/components/ui/SalesActionCard';
 
 // Mock data for charts
 const weeklyData = [
@@ -646,28 +647,28 @@ export default function SalesOverview() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <QuickActionCard
+        <SalesActionCard
           icon={FileSpreadsheet}
           title="New Quotation"
           description="Create a new quotation for your customer"
           href="/sales/quotations/new"
           color="cyan"
         />
-        <QuickActionCard
+        <SalesActionCard
           icon={UserPlus}
           title="Add Customer"
           description="Register a new customer"
           href="/sales/customers/new"
           color="purple"
         />
-        <QuickActionCard
+        <SalesActionCard
           icon={FileText}
           title="Create Invoice"
           description="Generate invoice from quotation"
           href="/sales/invoices"
           color="green"
         />
-        <QuickActionCard
+        <SalesActionCard
           icon={Package}
           title="View Orders"
           description="Check order status and fulfillment"

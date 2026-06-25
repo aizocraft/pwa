@@ -13,7 +13,7 @@ import {
   Undo, Redo, Heading1, Heading2, Heading3,
   AlignLeft, AlignCenter, AlignRight
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface RichTextEditorProps {
   value: string;
@@ -56,6 +56,7 @@ export default function RichTextEditor({
 }: RichTextEditorProps) {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
+  const lastValueRef = useRef(value);
 
   const editor = useEditor({
     extensions: [
@@ -82,7 +83,9 @@ export default function RichTextEditor({
     content: value,
     editable: !readOnly,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      const html = editor.getHTML();
+      lastValueRef.current = html;
+      onChange(html);
     },
     editorProps: {
       attributes: {
@@ -90,6 +93,17 @@ export default function RichTextEditor({
       }
     }
   });
+
+  useEffect(() => {
+    if (!editor) return;
+    if (readOnly) return;
+    if (value !== lastValueRef.current) {
+      if (value !== editor.getHTML()) {
+        editor.commands.setContent(value || '<p></p>');
+        lastValueRef.current = value;
+      }
+    }
+  }, [value, editor, readOnly]);
 
   if (!editor) {
     return (

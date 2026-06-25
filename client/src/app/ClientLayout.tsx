@@ -19,6 +19,7 @@ interface ClientLayoutProps {
 export default function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname();
   const isDashboard = pathname?.startsWith('/dashboard');
+  const isSales = pathname?.startsWith('/sales');
   const isCheckout = pathname?.startsWith('/checkout');
   const isAdmin = pathname?.startsWith('/admin');
   const [mounted, setMounted] = useState(false);
@@ -51,11 +52,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   return (
     <QueryProvider>
       <ThemeProvider>
-        {!isDashboard && <Navbar />}
+        {!isDashboard && !isSales && <Navbar />}
         <main className="min-h-screen">
           {children}
         </main>
-        {!isDashboard && <Footer />}
+        {!isDashboard && !isSales && <Footer />}
         
         {/* WhatsApp Button */}
         {shouldShowWhatsApp && <WhatsAppButton />}

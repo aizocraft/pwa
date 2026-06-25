@@ -21,6 +21,26 @@ const requireAdminOrSales = (req: Request & { user?: any }, res: Response, next:
   next();
 };
 
+const getSalesTransactionMatch = (req: Request & { user?: any }) => {
+  if (req.user?.role !== 'sales') {
+    return null;
+  }
+  const userId = req.user.userId;
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    // A sales user without a valid ID should not see any transactions.
+    return { recordedBy: new mongoose.Types.ObjectId('000000000000000000000000') };
+  }
+  return { recordedBy: new mongoose.Types.ObjectId(userId) };
+};
+
+const isSalesTransactionOwner = (req: Request & { user?: any }, transaction: any) => {
+  if (req.user?.role !== 'sales') {
+    return true;
+  }
+  const userId = req.user.userId?.toString();
+  return transaction.recordedBy?.toString() === userId;
+};
+
 // Helper function to calculate payment summary
 async function getOrderPaymentSummary(orderId: string) {
   const transactions = await TransactionModel.find({
@@ -115,22 +135,18 @@ router.get('/', authMiddleware, requireAdminOrSales, async (req: Request & { use
       ];
     }
 
-    // If sales role, only show transactions they created or invoices they own
-    if (req.user?.role === 'sales') {
-      // Sales can see all transactions (or filter by createdBy if needed)
-      // For now, show all transactions that have invoiceNumber or are from invoice source
-      // This ensures they can see invoice payments
-    }
+    const salesMatch = getSalesTransactionMatch(req);
+    const finalQuery = salesMatch ? { $and: [query, salesMatch] } : query;
 
     const [transactions, total] = await Promise.all([
-      TransactionModel.find(query)
+      TransactionModel.find(finalQuery)
         .populate('orderId', 'orderNumber total status')
         .populate('recordedBy', 'name email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      TransactionModel.countDocuments(query)
+      TransactionModel.countDocuments(finalQuery)
     ]);
 
     res.json({
@@ -146,7 +162,10 @@ router.get('/', authMiddleware, requireAdminOrSales, async (req: Request & { use
 // GET /api/transactions/stats - Transaction statistics
 router.get('/stats', authMiddleware, requireAdminOrSales, async (req: Request & { user?: any }, res: Response) => {
   try {
+    const salesMatch = getSalesTransactionMatch(req);
+    const matchStage = salesMatch ? { $match: salesMatch } : { $match: {} };
     const stats = await TransactionModel.aggregate([
+      matchStage,
       {
         $facet: {
           summary: [{
@@ -184,6 +203,10 @@ router.get('/:id', authMiddleware, requireAdminOrSales, async (req: Request & { 
     if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
+
+    if (!isSalesTransactionOwner(req, transaction)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     
     res.json(transaction);
   } catch (error: any) {
@@ -205,6 +228,10 @@ router.patch('/:id/status', authMiddleware, requireAdminOrSales, async (req: Req
     const transaction = await TransactionModel.findById(req.params.id);
     if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    if (!isSalesTransactionOwner(req, transaction)) {
+      return res.status(403).json({ error: 'Access denied' });
     }
     
     const oldStatus = transaction.status;
@@ -246,7 +273,10 @@ router.get('/export/csv', authMiddleware, requireAdminOrSales, async (req: Reque
       if (endDate) query.createdAt.$lte = new Date(endDate as string);
     }
     
-    const transactions = await TransactionModel.find(query)
+    const salesMatch = getSalesTransactionMatch(req);
+    const finalQuery = salesMatch ? { $and: [query, salesMatch] } : query;
+
+    const transactions = await TransactionModel.find(finalQuery)
       .populate('orderId', 'orderNumber')
       .sort({ createdAt: -1 })
       .lean();
@@ -283,9 +313,11 @@ router.get('/export/csv', authMiddleware, requireAdminOrSales, async (req: Reque
 });
 
 // GET /api/transactions/debug/latest - Debug endpoint to check latest transactions
-router.get('/debug/latest', authMiddleware, requireAdminOrSales, async (req: Request, res: Response) => {
+router.get('/debug/latest', authMiddleware, requireAdminOrSales, async (req: Request & { user?: any }, res: Response) => {
   try {
-    const transactions = await TransactionModel.find({})
+    const salesMatch = getSalesTransactionMatch(req);
+    const query = salesMatch ? salesMatch : {};
+    const transactions = await TransactionModel.find(query)
       .sort({ createdAt: -1 })
       .limit(10)
       .lean();

@@ -1,27 +1,42 @@
-// src/app/dashboard/sales/inventory/page.tsx
+// src/app/sales/inventory/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  Package, Search, Filter, ChevronDown, Loader2, RefreshCw,
-  TrendingUp, TrendingDown, AlertTriangle, CheckCircle, XCircle,
-  DollarSign, Box, ShoppingBag, Download, Plus, Minus,
-  Upload, FileSpreadsheet, FileJson, Trash2, Edit2,
-  Settings, BarChart3, PieChart, Zap, Shield, Truck,
-  Eye, Users, Star, Calendar, Clock, FileText, DownloadCloud,
-  UploadCloud, CheckSquare, Square, AlertOctagon
+import { useState, useEffect } from 'react';
+import {
+  Package,
+  Search,
+  Loader2,
+  RefreshCw,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  DollarSign,
+  Box,
+  Plus,
+  Download,
+  FileJson,
+  Trash2,
+  Settings,
+  Shield,
+  FileText,
+  DownloadCloud,
+  UploadCloud,
+  CheckSquare,
+  Square,
+  AlertOctagon,
+  Upload,
 } from 'lucide-react';
-import { 
-  getInventorySummary, 
-  getLowStockProducts, 
+import {
+  getInventorySummary,
+  getLowStockProducts,
   restockProduct,
   exportProducts,
   downloadImportTemplate,
   bulkImportProducts,
-  bulkUpdateProducts,
   bulkDeleteProducts,
   bulkAdjustStock,
-  getInventoryValuation
+  getInventoryValuation,
 } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 
@@ -30,7 +45,7 @@ const formatCurrency = (amount: number) => {
     style: 'currency',
     currency: 'KES',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(amount);
 };
 
@@ -38,7 +53,7 @@ const formatNumber = (num: number) => {
   return new Intl.NumberFormat('en-KE').format(num);
 };
 
-type TabType = 'low-stock' | 'valuation' | 'bulk-actions' | 'settings';
+type TabType = 'low-stock' | 'valuation' | 'bulk-actions';
 
 export default function InventoryPage() {
   const [summary, setSummary] = useState<any>(null);
@@ -74,7 +89,7 @@ export default function InventoryPage() {
       const [summaryRes, lowStockRes, valuationRes] = await Promise.all([
         getInventorySummary(),
         getLowStockProducts(10),
-        getInventoryValuation()
+        getInventoryValuation(),
       ]);
       setSummary(summaryRes.summary);
       setLowStockProducts(lowStockRes.products || []);
@@ -92,7 +107,7 @@ export default function InventoryPage() {
       await restockProduct(selectedProduct._id, {
         quantity: restockQuantity,
         buyingPrice: restockPrice || undefined,
-        reason: restockReason || undefined
+        reason: restockReason || undefined,
       });
 
       setShowRestockModal(false);
@@ -112,7 +127,6 @@ export default function InventoryPage() {
       a.download = `products_${Date.now()}.${format}`;
       a.click();
       URL.revokeObjectURL(url);
-
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Export failed');
     } finally {
@@ -129,7 +143,6 @@ export default function InventoryPage() {
       a.download = 'product_import_template.csv';
       a.click();
       URL.revokeObjectURL(url);
-   
     } catch (error: any) {
       toast.error('Failed to download template');
     }
@@ -142,8 +155,7 @@ export default function InventoryPage() {
     }
     setImporting(true);
     try {
-      const result = await bulkImportProducts(importFile);
-     
+      await bulkImportProducts(importFile);
       setShowBulkImportModal(false);
       setImportFile(null);
       fetchData();
@@ -160,13 +172,12 @@ export default function InventoryPage() {
       return;
     }
     try {
-      const adjustments = Array.from(selectedProducts).map(productId => ({
+      const adjustments = Array.from(selectedProducts).map((productId) => ({
         productId,
         quantity: bulkAdjustQuantity,
-        operation: bulkAdjustOperation
+        operation: bulkAdjustOperation,
       }));
-      const result = await bulkAdjustStock(adjustments, bulkAdjustReason);
-     
+      await bulkAdjustStock(adjustments, bulkAdjustReason);
       setShowBulkAdjustModal(false);
       setSelectedProducts(new Set());
       fetchData();
@@ -178,8 +189,7 @@ export default function InventoryPage() {
   const handleBulkDelete = async () => {
     if (selectedProducts.size === 0) return;
     try {
-      const result = await bulkDeleteProducts(Array.from(selectedProducts));
-    
+      await bulkDeleteProducts(Array.from(selectedProducts));
       setShowDeleteConfirm(false);
       setSelectedProducts(new Set());
       fetchData();
@@ -202,13 +212,13 @@ export default function InventoryPage() {
     if (selectedProducts.size === filteredProducts.length) {
       setSelectedProducts(new Set());
     } else {
-      setSelectedProducts(new Set(filteredProducts.map(p => p._id)));
+      setSelectedProducts(new Set(filteredProducts.map((p) => p._id)));
     }
   };
 
-  const filteredProducts = lowStockProducts.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         (p.sku?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredProducts = lowStockProducts.filter((p) => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.sku?.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = !categoryFilter || p.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -223,7 +233,6 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Inventory Management</h1>
@@ -231,8 +240,8 @@ export default function InventoryPage() {
             Track stock levels, manage inventory value, and perform bulk operations
           </p>
         </div>
-        <div className="flex gap-2">
-          <button 
+        <div className="flex gap-2 flex-wrap">
+          <button
             onClick={() => handleExport('csv')}
             disabled={exporting}
             className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
@@ -240,7 +249,7 @@ export default function InventoryPage() {
             {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <DownloadCloud className="w-4 h-4" />}
             Export CSV
           </button>
-          <button 
+          <button
             onClick={() => handleExport('json')}
             disabled={exporting}
             className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
@@ -248,28 +257,30 @@ export default function InventoryPage() {
             <FileJson className="w-4 h-4" />
             Export JSON
           </button>
-          <button 
+          <button
             onClick={() => setShowBulkImportModal(true)}
             className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2"
           >
             <UploadCloud className="w-4 h-4" />
             Bulk Import
           </button>
-          <button onClick={fetchData} className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2">
+          <button
+            onClick={fetchData}
+            className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+          >
             <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="border-b border-gray-200 dark:border-gray-700">
-        <nav className="flex gap-6">
+        <nav className="flex gap-6 overflow-x-auto pb-1">
           <button
             onClick={() => setActiveTab('low-stock')}
             className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
-              activeTab === 'low-stock' 
-                ? 'text-cyan-600 border-b-2 border-cyan-600' 
+              activeTab === 'low-stock'
+                ? 'text-cyan-600 border-b-2 border-cyan-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -279,19 +290,19 @@ export default function InventoryPage() {
           <button
             onClick={() => setActiveTab('valuation')}
             className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
-              activeTab === 'valuation' 
-                ? 'text-cyan-600 border-b-2 border-cyan-600' 
+              activeTab === 'valuation'
+                ? 'text-cyan-600 border-b-2 border-cyan-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            <BarChart3 className="w-4 h-4 inline mr-2" />
+            <TrendingUp className="w-4 h-4 inline mr-2" />
             Inventory Valuation
           </button>
           <button
             onClick={() => setActiveTab('bulk-actions')}
             className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
-              activeTab === 'bulk-actions' 
-                ? 'text-cyan-600 border-b-2 border-cyan-600' 
+              activeTab === 'bulk-actions'
+                ? 'text-cyan-600 border-b-2 border-cyan-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -301,7 +312,6 @@ export default function InventoryPage() {
         </nav>
       </div>
 
-      {/* Inventory Summary Cards - Always visible */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white">
           <div className="flex items-center justify-between">
@@ -333,10 +343,8 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Tab Content */}
       {activeTab === 'low-stock' && (
         <>
-          {/* Category Breakdown */}
           {summary?.categoryBreakdown?.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold mb-4">Inventory by Category</h2>
@@ -357,16 +365,15 @@ export default function InventoryPage() {
             </div>
           )}
 
-          {/* Low Stock Products Table */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="px-6 py-4 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5 text-amber-500" />
                   Low Stock Alert
                 </h2>
                 {selectedProducts.size > 0 && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={() => setShowBulkAdjustModal(true)}
                       className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
@@ -382,15 +389,15 @@ export default function InventoryPage() {
                   </div>
                 )}
               </div>
-              <div className="flex gap-3">
-                <div className="relative">
+              <div className="flex gap-3 flex-wrap">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
                     placeholder="Search products..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 border rounded-lg w-64"
+                    className="pl-10 pr-4 py-2 border rounded-lg w-full sm:w-64"
                   />
                 </div>
                 <select
@@ -413,19 +420,20 @@ export default function InventoryPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full text-left">
                   <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium">
+                      <th className="px-6 py-3 text-xs font-medium">
                         <button onClick={toggleAllProducts} className="flex items-center gap-2">
-                          {selectedProducts.size === filteredProducts.length ? 
-                            <CheckSquare className="w-4 h-4" /> : 
+                          {selectedProducts.size === filteredProducts.length ? (
+                            <CheckSquare className="w-4 h-4" />
+                          ) : (
                             <Square className="w-4 h-4" />
-                          }
+                          )}
                         </button>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium">Product</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium">SKU</th>
+                      <th className="px-6 py-3 text-xs font-medium">Product</th>
+                      <th className="px-6 py-3 text-xs font-medium">SKU</th>
                       <th className="px-6 py-3 text-right text-xs font-medium">Current Stock</th>
                       <th className="px-6 py-3 text-right text-xs font-medium">Selling Price</th>
                       <th className="px-6 py-3 text-right text-xs font-medium">Buying Price</th>
@@ -438,15 +446,15 @@ export default function InventoryPage() {
                       const profitPerUnit = product.price - (product.buyingPrice || 0);
                       const stockStatus = product.stock === 0 ? 'Out of Stock' : product.stock < 5 ? 'Critical' : 'Low Stock';
                       const statusColor = product.stock === 0 ? 'text-red-600' : product.stock < 5 ? 'text-orange-600' : 'text-amber-600';
-                      
                       return (
                         <tr key={product._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                           <td className="px-6 py-4">
                             <button onClick={() => toggleProductSelection(product._id)}>
-                              {selectedProducts.has(product._id) ? 
-                                <CheckSquare className="w-4 h-4 text-cyan-600" /> : 
+                              {selectedProducts.has(product._id) ? (
+                                <CheckSquare className="w-4 h-4 text-cyan-600" />
+                              ) : (
                                 <Square className="w-4 h-4 text-gray-400" />
-                              }
+                              )}
                             </button>
                           </td>
                           <td className="px-6 py-4">
@@ -494,10 +502,8 @@ export default function InventoryPage() {
         </>
       )}
 
-      {/* Valuation Tab */}
       {activeTab === 'valuation' && valuation && (
         <div className="space-y-6">
-          {/* Valuation Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white">
               <div className="flex items-center justify-between">
@@ -525,7 +531,6 @@ export default function InventoryPage() {
             </div>
           </div>
 
-          {/* Top Products by Value */}
           {valuation.topProductsByValue?.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold mb-4">Top Products by Inventory Value</h2>
@@ -546,7 +551,6 @@ export default function InventoryPage() {
             </div>
           )}
 
-          {/* Category Valuation Breakdown */}
           {valuation.categoryBreakdown?.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold mb-4">Category Valuation Breakdown</h2>
@@ -579,10 +583,8 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Bulk Actions Tab */}
       {activeTab === 'bulk-actions' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Bulk Stock Adjustment Card */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -596,7 +598,7 @@ export default function InventoryPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Operation</label>
-                <select 
+                <select
                   value={bulkAdjustOperation}
                   onChange={(e) => setBulkAdjustOperation(e.target.value as any)}
                   className="w-full px-4 py-2 border rounded-lg"
@@ -612,7 +614,7 @@ export default function InventoryPage() {
                   type="number"
                   min="1"
                   value={bulkAdjustQuantity}
-                  onChange={(e) => setBulkAdjustQuantity(parseInt(e.target.value))}
+                  onChange={(e) => setBulkAdjustQuantity(parseInt(e.target.value, 10))}
                   className="w-full px-4 py-2 border rounded-lg"
                 />
               </div>
@@ -625,7 +627,6 @@ export default function InventoryPage() {
             </div>
           </div>
 
-          {/* Bulk Delete Card */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-red-100 rounded-lg">
@@ -644,7 +645,6 @@ export default function InventoryPage() {
             </button>
           </div>
 
-          {/* Import/Export Card */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-emerald-100 rounded-lg">
@@ -673,7 +673,6 @@ export default function InventoryPage() {
             </div>
           </div>
 
-          {/* Instructions Card */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-purple-100 rounded-lg">
@@ -692,7 +691,6 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Restock Modal */}
       {showRestockModal && selectedProduct && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
@@ -714,7 +712,7 @@ export default function InventoryPage() {
                   type="number"
                   min="1"
                   value={restockQuantity}
-                  onChange={(e) => setRestockQuantity(parseInt(e.target.value))}
+                  onChange={(e) => setRestockQuantity(parseInt(e.target.value, 10))}
                   className="w-full px-4 py-2 border rounded-lg"
                 />
               </div>
@@ -738,7 +736,7 @@ export default function InventoryPage() {
                   placeholder="e.g., New shipment received"
                 />
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4 flex-col sm:flex-row">
                 <button
                   onClick={handleRestock}
                   className="flex-1 py-3 bg-cyan-600 text-white rounded-lg font-medium"
@@ -757,7 +755,6 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Bulk Import Modal */}
       {showBulkImportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
@@ -786,7 +783,7 @@ export default function InventoryPage() {
                   className="w-full border rounded-lg p-2"
                 />
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4 flex-col sm:flex-row">
                 <button
                   onClick={handleBulkImport}
                   disabled={importing || !importFile}
@@ -807,7 +804,6 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Bulk Stock Adjust Modal */}
       {showBulkAdjustModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
@@ -823,7 +819,7 @@ export default function InventoryPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Operation</label>
-                <select 
+                <select
                   value={bulkAdjustOperation}
                   onChange={(e) => setBulkAdjustOperation(e.target.value as any)}
                   className="w-full px-4 py-2 border rounded-lg"
@@ -839,7 +835,7 @@ export default function InventoryPage() {
                   type="number"
                   min="1"
                   value={bulkAdjustQuantity}
-                  onChange={(e) => setBulkAdjustQuantity(parseInt(e.target.value))}
+                  onChange={(e) => setBulkAdjustQuantity(parseInt(e.target.value, 10))}
                   className="w-full px-4 py-2 border rounded-lg"
                 />
               </div>
@@ -853,7 +849,7 @@ export default function InventoryPage() {
                   placeholder="e.g., Physical inventory count"
                 />
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4 flex-col sm:flex-row">
                 <button
                   onClick={handleBulkStockAdjust}
                   className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium"
@@ -872,7 +868,6 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
@@ -885,7 +880,7 @@ export default function InventoryPage() {
             <p className="text-gray-600 mb-4">
               Are you sure you want to delete {selectedProducts.size} product(s)? This action cannot be undone.
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-col sm:flex-row">
               <button
                 onClick={handleBulkDelete}
                 className="flex-1 py-3 bg-red-600 text-white rounded-lg font-medium"

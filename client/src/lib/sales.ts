@@ -1,4 +1,4 @@
-// lib/sales.ts - Updated with complete sales features including PROFIT TRACKING
+// lib/sales.ts
 
 import api from './api';
 import type { ApiResponse } from '@/types/api';

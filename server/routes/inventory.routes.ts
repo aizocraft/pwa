@@ -15,6 +15,8 @@ import mongoose from 'mongoose';
 const router = Router();
 
 const isAdmin = (req: Request & { user?: any }): boolean => req.user?.role === 'admin';
+const isSales = (req: Request & { user?: any }): boolean => req.user?.role === 'sales';
+const isAdminOrSales = (req: Request & { user?: any }): boolean => isAdmin(req) || isSales(req);
 
 // Configure multer for CSV file uploads only
 const upload = multer({
@@ -277,8 +279,8 @@ router.get('/low-stock', authMiddleware, async (req: Request & { user?: any }, r
 // POST /api/inventory/restock/:productId - Record restock with notification
 router.post('/restock/:productId', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    if (!isAdminOrSales(req)) {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
 
     const { quantity, buyingPrice, reason } = req.body;
@@ -366,8 +368,8 @@ router.post('/restock/:productId', authMiddleware, async (req: Request & { user?
 
 router.get('/export', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    if (!isAdminOrSales(req)) {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
 
     const { format = 'csv', category, supplier, minPrice, maxPrice, search } = req.query;
@@ -455,8 +457,8 @@ router.get('/export', authMiddleware, async (req: Request & { user?: any }, res:
 
 router.get('/export/template', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    if (!isAdminOrSales(req)) {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
 
     const template = [{
@@ -493,8 +495,8 @@ router.get('/export/template', authMiddleware, async (req: Request & { user?: an
 
 router.post('/import', authMiddleware, upload.single('file'), async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    if (!isAdminOrSales(req)) {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
 
     if (!req.file) {

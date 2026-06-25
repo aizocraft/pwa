@@ -38,6 +38,7 @@ import { useCartStore } from '../../store/cart';
 import { cn, formatCurrency } from '../../lib/utils';
 import ReviewComponent from '../../components/Review';
 import OrderToWhatsApp from '../../components/OrderToWhatsApp';
+import RichTextRenderer from '@/components/RichTextRenderer';
 // Animation variants
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -486,9 +487,7 @@ export default function ProductDetail() {
                 >
                   {activeTab === 'description' && (
                     <div className="prose prose-sm max-w-none">
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                        {product.description || 'Premium quality product engineered for maximum performance and durability.'}
-                      </p>
+                      <RichTextRenderer content={product.description || '<p>Premium quality product engineered for maximum performance and durability.</p>'} />
                       {product.tags && product.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-2 sm:mt-3">
                           {product.tags.map(tag => (

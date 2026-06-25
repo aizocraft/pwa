@@ -1,7 +1,7 @@
 // app/sales/layout.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -29,10 +29,13 @@ import {
   Calendar,
   Clock,
   UserCircle,
-  Home
+  Home,
+  Package
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'react-hot-toast';
+import { useNotifications, useUnreadCount, useMarkAllAsRead } from '@/lib/notifications';
+import { Notification } from '@/types/notification';
 
 // Navigation items with icons and descriptions
 const navItems = [
@@ -58,13 +61,6 @@ const navItems = [
     description: 'Track payments'
   },
   { 
-    id: 'orders', 
-    label: 'Orders', 
-    icon: ShoppingBag, 
-    href: '/sales/orders',
-    description: 'Fulfillment'
-  },
-  { 
     id: 'customers', 
     label: 'Customers', 
     icon: Users2, 
@@ -72,19 +68,21 @@ const navItems = [
     description: 'Client management'
   },
   { 
+    id: 'inventory', 
+    label: 'Inventory', 
+    icon: Package, 
+    href: '/sales/inventory',
+    description: 'Stock & products'
+  },
+
+  { 
     id: 'transactions', 
     label: 'Transactions', 
     icon: Receipt, 
     href: '/sales/transactions',
     description: 'Payment history'
   },
-  { 
-    id: 'analytics', 
-    label: 'Analytics', 
-    icon: BarChart3, 
-    href: '/sales/analytics',
-    description: 'Performance insights'
-  },
+
 ];
 
 // Quick action items
@@ -105,13 +103,66 @@ export default function SalesLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: 'New quotation created', time: '5 min ago', read: false },
-    { id: 2, title: 'Payment received KES 5,000', time: '1 hour ago', read: false },
-    { id: 3, title: 'Invoice INV-001 is overdue', time: '2 hours ago', read: true },
-  ]);
+  const notificationsRef = useRef<HTMLDivElement | null>(null);
+
+  const {
+    data: notificationsData,
+    isLoading: notificationsLoading,
+    isError: notificationsError,
+  } = useNotifications({ limit: 5, page: 1 });
+
+  const { data: unreadCountData } = useUnreadCount();
+  const markAllAsReadMutation = useMarkAllAsRead();
+
+  const notifications = notificationsData?.data?.notifications ?? [];
+  const unreadCount = unreadCountData?.data?.unreadCount ?? 0;
+
+  const handleSearch = () => {
+    const query = searchTerm.trim();
+    if (!query) return;
+
+    let target = pathname;
+    if (!target?.startsWith('/sales') || target === '/sales' || target === '/sales/overview') {
+      target = '/sales/transactions';
+    }
+
+    router.push(`${target}?search=${encodeURIComponent(query)}`);
+    setSearchTerm('');
+  };
+
+  const markAllNotificationsRead = () => {
+    if (markAllAsReadMutation.isPending) return;
+    markAllAsReadMutation.mutate();
+  };
+
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+    if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+    if (days < 7) return `${days} day${days !== 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Check if user has access
   useEffect(() => {
@@ -160,8 +211,6 @@ export default function SalesLayout({
     toast.success('Logged out successfully');
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-
   if (!user || !hasSalesAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -181,19 +230,19 @@ export default function SalesLayout({
         <div className="px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
             {/* Logo / Brand */}
-            <Link href="/sales" className="flex items-center gap-3 group">
+            <Link href="/" className="flex items-center gap-3 group">
               <div className="relative">
-                <div className="w-9 h-9 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
-                  <LayoutDashboard className="w-5 h-5 text-white" />
-                </div>
-                {isAdmin && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-gray-900 animate-pulse" />
-                )}
+              <div className="w-9 h-9 rounded-xl overflow-hidden bg-white shadow-lg flex items-center justify-center">
+                <img src="/logo.png" alt="Sales Logo" className="w-full h-full object-contain" />
               </div>
-              <div>
-                <span className="font-bold text-gray-900 dark:text-white hidden sm:inline">
-                  Sales Portal
-                </span>
+              {isAdmin && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-gray-900 animate-pulse" />
+              )}
+            </div>
+            <div>
+              <span className="font-bold text-gray-900 dark:text-white hidden sm:inline">
+                Sales Portal
+              </span>
                 {isAdmin && (
                   <span className="hidden sm:inline ml-2 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
                     Admin
@@ -235,8 +284,18 @@ export default function SalesLayout({
                 <input
                   type="text"
                   placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   className="bg-transparent border-none outline-none text-sm w-32 lg:w-48 text-gray-700 dark:text-gray-300 placeholder:text-gray-400"
                 />
+                <button
+                  type="button"
+                  onClick={handleSearch}
+                  className="text-xs text-cyan-600 hover:text-cyan-700"
+                >
+                  Search
+                </button>
                 <kbd className="hidden lg:block text-xs text-gray-400 bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded">⌘K</kbd>
               </div>
 
@@ -255,7 +314,7 @@ export default function SalesLayout({
               </div>
 
               {/* Notifications */}
-              <div className="relative">
+              <div className="relative" ref={notificationsRef}>
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
                   className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
@@ -273,30 +332,65 @@ export default function SalesLayout({
                   <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden z-50">
                     <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
                       <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                      <button className="text-xs text-cyan-600 hover:text-cyan-700">Mark all read</button>
+                      <button
+                        onClick={markAllNotificationsRead}
+                        className="text-xs text-cyan-600 hover:text-cyan-700"
+                      >
+                        Mark all read
+                      </button>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
-                      {notifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`p-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer ${
-                            !notification.read ? 'bg-cyan-50 dark:bg-cyan-900/10' : ''
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <div className={`w-2 h-2 rounded-full mt-1.5 ${!notification.read ? 'bg-cyan-500' : 'bg-gray-300'}`} />
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-900 dark:text-white">{notification.title}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">{notification.time}</p>
+                      {notificationsLoading ? (
+                        <div className="space-y-2 p-3">
+                          {[...Array(3)].map((_, index) => (
+                            <div key={index} className="animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800 h-16" />
+                          ))}
+                        </div>
+                      ) : notificationsError ? (
+                        <div className="p-4 text-sm text-red-600 dark:text-red-400">Unable to load notifications.</div>
+                      ) : notifications.length === 0 ? (
+                        <div className="p-4 text-sm text-gray-600 dark:text-gray-400">
+                          No recent notifications yet.
+                        </div>
+                      ) : (
+                        notifications.map((notification: Notification) => (
+                          <div
+                            key={notification._id}
+                            className={`p-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                              !notification.read ? 'bg-cyan-50 dark:bg-cyan-900/10' : ''
+                            }`}
+                          >
+                            <div className="flex items-start gap-2">
+                              <div className={`w-2 h-2 rounded-full mt-1.5 ${!notification.read ? 'bg-cyan-500' : 'bg-gray-300'}`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{notification.title}</p>
+                                  <span className="text-[11px] text-gray-500 dark:text-gray-400">{formatRelativeTime(notification.createdAt)}</span>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{notification.message}</p>
+                                {notification.actionUrl && (
+                                  <Link
+                                    href={notification.actionUrl}
+                                    className="mt-2 inline-flex text-xs text-cyan-600 dark:text-cyan-400 hover:underline"
+                                    onClick={() => setShowNotifications(false)}
+                                  >
+                                    View details
+                                  </Link>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                     <div className="p-2 border-t border-gray-200 dark:border-gray-800">
-                      <button className="w-full text-center text-sm text-cyan-600 hover:text-cyan-700 py-1">
+                      <Link
+                        href="/notifications"
+                        onClick={() => setShowNotifications(false)}
+                        className="w-full block text-center text-sm text-cyan-600 hover:text-cyan-700 py-1"
+                      >
                         View all notifications
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -468,7 +562,7 @@ export default function SalesLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             <div className="flex items-center gap-4">
-              <span>© 2024 Sales Portal</span>
+              <span>©Sales Portal</span>
               <span className="hidden sm:inline">•</span>
               <span className="text-xs">v2.0.0</span>
             </div>

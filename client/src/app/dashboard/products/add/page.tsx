@@ -89,6 +89,7 @@ export default function AddProductPage() {
   const [specKey, setSpecKey] = useState('');
   const [specValue, setSpecValue] = useState('');
   const [newUrlImage, setNewUrlImage] = useState('');
+  const [isSlugEdited, setIsSlugEdited] = useState(false);
 
   // Calculate profit
   const profitAmount = formData.price - formData.buyingPrice;
@@ -112,7 +113,7 @@ export default function AddProductPage() {
     setFormData(prev => ({
       ...prev,
       name,
-      slug: generateSlug(name)
+      slug: isSlugEdited ? prev.slug : generateSlug(name)
     }));
   };
 
@@ -348,7 +349,10 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <input
                     type="text"
                     value={formData.slug}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                    onChange={(e) => {
+                      setIsSlugEdited(true);
+                      setFormData(prev => ({ ...prev, slug: e.target.value }));
+                    }}
                     className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800 font-mono text-sm"
                     placeholder="auto-generated"
                   />
