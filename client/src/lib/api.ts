@@ -4,6 +4,7 @@ import { Product, ProductListResponse } from '@/types/product';
 import { User, UserListResponse, UserResponse, BulkStatusResponse, CreateUserRequest, UpdateUserRequest } from '@/types/user';
 import type { Order, OrderListResponse, CreateOrderRequest } from '@/types/order';
 import toast from 'react-hot-toast';
+import { authSuccessToast } from './authToast';
 import { getToken } from './auth';
 import type { ContactStatus, CreateContactRequest, ContactSubmissionResponse, ContactListResponse, ContactMessage } from '@/types/contact';
 import type {
@@ -82,10 +83,11 @@ export async function loginUser(credentials: { email: string; password: string }
     localStorage.setItem('user', JSON.stringify(user));
     return { token, user };
   } catch (error: any) {
-    toast.error(error.response?.data?.error || 'Login failed');
+    // UI layer should handle toasts to avoid duplicates
     throw error;
   }
 }
+
 
 export async function registerUser(userData: { 
   name: string; 
@@ -98,7 +100,7 @@ export async function registerUser(userData: {
     const { token, user } = response.data;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
-    toast.success('Registration successful');
+    authSuccessToast('Registration successful');
     return { token, user };
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Registration failed');
@@ -133,13 +135,13 @@ export async function updateProfile(data: {
     const response = await api.put('/auth/profile', data);
     const { user } = response.data;
     localStorage.setItem('user', JSON.stringify(user));
-    toast.success('Profile updated successfully');
     return user;
   } catch (error: any) {
-    toast.error(error.response?.data?.error || 'Failed to update profile');
+    // UI layer should handle toasts to avoid duplicates
     throw error;
   }
 }
+
 
 export async function forgotPassword(email: string) {
   try {
@@ -170,7 +172,7 @@ export async function logout() {
   } finally {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    toast.success('Logged out successfully');
+    authSuccessToast('Logged out successfully');
     if (typeof window !== 'undefined') {
       window.location.href = '/';
     }

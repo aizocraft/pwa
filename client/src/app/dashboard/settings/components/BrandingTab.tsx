@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useRef, Dispatch, SetStateAction } from 'react'
 import { Image as ImageIcon, Loader2, ImagePlus, UploadCloud, Trash, CheckCircle2, X, ExternalLink } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { settingsErrorToast, settingsSuccessToast } from '@/lib/settingsToast'
+
+
 import { getLogoUrl, getFaviconUrl } from '@/lib/company'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -54,7 +57,7 @@ export default function BrandingTab({
   const handleLogoUpload = async (file: File) => {
     // Validate file size
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB')
+      settingsErrorToast('File size must be less than 5MB')
       return
     }
     

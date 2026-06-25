@@ -84,6 +84,12 @@ export default function AddProductPage() {
     featured: false,
     rating: 0,
   });
+  // Local draft for rich text description to avoid triggering global autosave
+  const [descriptionDraft, setDescriptionDraft] = useState<string>(formData.description || '');
+
+  useEffect(() => {
+    setDescriptionDraft(formData.description || '');
+  }, [formData.description]);
 
   const [newTag, setNewTag] = useState('');
   const [specKey, setSpecKey] = useState('');
@@ -248,7 +254,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       price: Number(formData.price),
       buyingPrice: Number(formData.buyingPrice),
       compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
-      description: formData.description,
+      description: descriptionDraft,
       specs: formData.specs,
       stock: Number(formData.stock),
       tags: formData.tags,
@@ -587,8 +593,8 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
             <div className="p-5 sm:p-6">
 <RichTextEditor
-  value={formData.description}
-  onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
+  value={descriptionDraft}
+  onChange={(value) => setDescriptionDraft(value)}
   placeholder="Write a detailed description with rich formatting..."
 />
               <p className="text-xs text-gray-500 mt-2">

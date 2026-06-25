@@ -130,24 +130,26 @@ const companySettingsSchema = new Schema<ICompanySettings>(
       type: FaviconSchema,
       default: null
     },
-    themeColors: {
+  themeColors: {
       light: {
-        primary: { type: String, default: '#000063' },
-        primaryForeground: { type: String, default: '#ffffff' },
-        primaryMid: { type: String, default: '#0043b3' },
-        primaryLight: { type: String, default: '#009dff' }
+        primary: { type: String, default: '#000063', trim: true },
+        primaryForeground: { type: String, default: '#ffffff', trim: true },
+        primaryMid: { type: String, default: '#0043b3', trim: true },
+        primaryLight: { type: String, default: '#009dff', trim: true }
       },
       dark: {
-        primary: { type: String, default: '#000063' },
-        primaryForeground: { type: String, default: '#ffffff' },
-        primaryMid: { type: String, default: '#0043b3' },
-        primaryLight: { type: String, default: '#009dff' }
+        primary: { type: String, default: '#000063', trim: true },
+        primaryForeground: { type: String, default: '#ffffff', trim: true },
+        primaryMid: { type: String, default: '#0043b3', trim: true },
+        primaryLight: { type: String, default: '#009dff', trim: true }
       }
     }
   },
   { 
     timestamps: true, 
-    minimize: false 
+    minimize: false,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
 

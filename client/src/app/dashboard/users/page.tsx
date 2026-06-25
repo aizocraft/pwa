@@ -109,7 +109,7 @@ export default function UsersPage() {
           phone: formData.phone
         }
         await updateUser.mutateAsync({ id: editingUser._id!, data: updateData })
-        toast.success('User updated successfully')
+        
       } else {
         const createData: CreateUserRequest = {
           name: formData.name,
@@ -119,7 +119,7 @@ export default function UsersPage() {
           phone: formData.phone
         }
         await createUser.mutateAsync(createData)
-        toast.success('User created successfully')
+       
       }
       handleCloseModal()
     } catch (error) {
@@ -138,7 +138,7 @@ export default function UsersPage() {
     try {
       const { resetUserPassword } = await import('@/lib/api')
       await resetUserPassword(resetPasswordUser._id!, newPassword)
-      toast.success(`Password reset for ${resetPasswordUser.name}`)
+   
       handleCloseResetModal()
     } catch (error) {
       // Error handled in API
@@ -152,7 +152,7 @@ export default function UsersPage() {
     }
     if (confirm(`⚠️ Are you sure you want to delete ${user.name}? This action cannot be undone.`)) {
       await deleteUser.mutateAsync(user._id!)
-      toast.success('User deleted successfully')
+      
     }
   }
 
@@ -180,7 +180,7 @@ export default function UsersPage() {
       a.click()
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
-      toast.success('Users exported successfully')
+    
     } catch (error) {
       // Error handled in mutation
     }
@@ -204,7 +204,7 @@ export default function UsersPage() {
       try {
         const { bulkUpdateUserStatus } = await import('@/lib/api')
         await bulkUpdateUserStatus(filteredUsers, isActive)
-        toast.success(`${filteredUsers.length} user(s) updated`)
+      
         setSelectedUsers([])
         refetch()
       } catch (error) {

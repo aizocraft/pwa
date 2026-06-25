@@ -23,8 +23,9 @@ export interface ContactEmailData {
 
 export interface OrderEmailData {
   orderId: string;
-  orderNumber: string;
+  orderNumber?: string;
   customerName: string;
+
   customerEmail: string;
   subtotal: number;
   shippingCost: number;

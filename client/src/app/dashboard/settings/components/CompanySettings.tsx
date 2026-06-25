@@ -8,8 +8,10 @@ import {
 } from 'lucide-react'
 import { useCompanySettings } from '@/lib/use-company-settings'
 import { getLogoUrl, getFaviconUrl } from '@/lib/company'
-import toast from 'react-hot-toast'
+import { settingsErrorToast, settingsSuccessToast } from '@/lib/settingsToast'
+
 import BrandingTab from './BrandingTab'
+
 
 export default function CompanySettings() {
   const { 
@@ -78,6 +80,7 @@ export default function CompanySettings() {
       
       const data = {
         companyName: formData.companyName,
+
         slogan: formData.slogan || undefined,
         description: formData.description || undefined,
         address: formData.address || undefined,
@@ -92,14 +95,16 @@ export default function CompanySettings() {
       }
       
       await update.mutateAsync(data)
-      toast.success('Company settings updated successfully!')
+      settingsSuccessToast('Company settings updated successfully!')
       setEditing(false)
+
     } catch (error: any) {
       console.error('Update error:', error)
-      toast.error(error.message || 'Failed to update settings')
+      settingsErrorToast(error.message || 'Failed to update settings')
     } finally {
       setLoading(false)
     }
+
   }
 
   const addSocialLink = () => {
@@ -194,6 +199,7 @@ export default function CompanySettings() {
 
       <form onSubmit={handleSubmit}>
         <div className="p-6 space-y-6">
+
           {/* Tabs */}
           <div className="flex border-b border-gray-200 dark:border-gray-800 overflow-x-auto">
             {tabs.map((tab) => {

@@ -3,7 +3,9 @@
 
 import { useState, useEffect } from 'react'
 import { User, Mail, Phone, Edit3, Save, X, Loader2, CheckCircle } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { settingsErrorToast, settingsSuccessToast } from '@/lib/settingsToast'
+
+
 
 interface ProfileSettingsProps {
   profile: any
@@ -27,21 +29,25 @@ export default function ProfileSettings({ profile, updateProfile }: ProfileSetti
   }, [profile])
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
+
     e.preventDefault()
     
     if (!profileForm.name?.trim()) {
-      toast.error('Name is required')
+      settingsErrorToast('Name is required')
+
       return
     }
     
     if (!profileForm.email?.trim()) {
-      toast.error('Email is required')
+      settingsErrorToast('Email is required')
+
       return
     }
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(profileForm.email)) {
-      toast.error('Please enter a valid email')
+      settingsErrorToast('Please enter a valid email')
+
       return
     }
     
@@ -49,11 +55,15 @@ export default function ProfileSettings({ profile, updateProfile }: ProfileSetti
     setSaveSuccess(false)
     try {
       await updateProfile.mutateAsync(profileForm)
+      settingsSuccessToast('Profile updated successfully!', 3000)
+
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
       setEditingProfile(false)
+
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to update profile')
+      settingsErrorToast(error?.message || 'Failed to update profile', 3000)
+
     } finally {
       setLoading(false)
     }

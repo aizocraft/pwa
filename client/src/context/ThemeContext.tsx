@@ -28,14 +28,26 @@ const DEFAULT_THEME_COLORS: CompanySettings['themeColors'] = {
   }
 }
 
+function normalizeHex(input: string | undefined | null) {
+  const s = (input ?? '').trim()
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ? s : null
+}
+
 function applyThemeColors(theme: Theme, themeColors: CompanySettings['themeColors'] | null | undefined) {
-  const colors = themeColors?.[theme] ?? DEFAULT_THEME_COLORS[theme]
+  const fallback = DEFAULT_THEME_COLORS[theme]
+  const colors = themeColors?.[theme] ?? fallback
+
+  const primary = normalizeHex(colors.primary) ?? fallback.primary
+  const primaryForeground = normalizeHex(colors.primaryForeground) ?? fallback.primaryForeground
+  const primaryMid = normalizeHex(colors.primaryMid) ?? fallback.primaryMid
+  const primaryLight = normalizeHex(colors.primaryLight) ?? fallback.primaryLight
+
   const root = document.documentElement
 
-  root.style.setProperty('--primary', colors.primary)
-  root.style.setProperty('--primary-foreground', colors.primaryForeground)
-  root.style.setProperty('--primary-mid', colors.primaryMid)
-  root.style.setProperty('--primary-light', colors.primaryLight)
+  root.style.setProperty('--primary', primary)
+  root.style.setProperty('--primary-foreground', primaryForeground)
+  root.style.setProperty('--primary-mid', primaryMid)
+  root.style.setProperty('--primary-light', primaryLight)
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)

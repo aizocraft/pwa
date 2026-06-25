@@ -61,10 +61,7 @@ export default function RegisterPage() {
         queryClient.invalidateQueries({ queryKey: ["user"] })
         queryClient.refetchQueries({ queryKey: ["user"] })
         
-        toast.success(`🎉 Welcome ${user.name}! Account created at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`, {
-          duration: 5000,
-          position: 'top-right',
-        });
+
         
         // Determine redirect path based on user role
         let redirectPath = "/orders"

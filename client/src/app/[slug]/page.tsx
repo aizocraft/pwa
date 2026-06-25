@@ -66,6 +66,8 @@ export default function ProductDetail() {
   const [showAddedToCart, setShowAddedToCart] = useState(false);
   const [activeTab, setActiveTab] = useState<'description' | 'specs' | 'shipping'>('description');
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+  const [thumbnailImageErrors, setThumbnailImageErrors] = useState<Record<number, boolean>>({});
+  const [relatedImageErrors, setRelatedImageErrors] = useState<Record<string, boolean>>({});
   const [isImageLoading, setIsImageLoading] = useState(true);
 
   const { data: product, isLoading, error } = useQuery({
@@ -105,6 +107,8 @@ export default function ProductDetail() {
     setSelectedImage(0);
     setQty(1);
     setImageErrors({});
+    setThumbnailImageErrors({});
+    setRelatedImageErrors({});
     setIsImageLoading(true);
   }, [product?._id]);
 
@@ -157,7 +161,7 @@ export default function ProductDetail() {
     ? product.stock > 10 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
     : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
 
-  const currentImageUrl = getProductImageUrl(product, selectedImage);
+  const currentImageUrl = getProductImageUrl(product, selectedImage) || '/placeholder-product.jpg';
   const hasMultipleImages = product.images && product.images.length > 1;
 
   return (
@@ -212,7 +216,7 @@ export default function ProductDetail() {
                   priority
                   onLoadingComplete={() => setIsImageLoading(false)}
                   onError={() => handleImageError(selectedImage)}
-                  unoptimized={currentImageUrl.includes('/api/')}
+                  unoptimized={true}
                 />
                 
                 {/* Zoom Button - Only show if no error */}
@@ -258,14 +262,13 @@ export default function ProductDetail() {
                           )}
                         >
                           <Image
-                            src={thumbUrl}
+                            src={thumbnailImageErrors[index] ? '/placeholder-product.jpg' : thumbUrl}
                             alt={`${product.name} view ${index + 1}`}
                             fill
                             className="object-cover"
                             sizes="80px"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
-                            }}
+                            onError={() => setThumbnailImageErrors(prev => ({ ...prev, [index]: true }))}
+                            unoptimized={true}
                           />
                         </motion.button>
                       );
@@ -571,42 +574,45 @@ export default function ProductDetail() {
               
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {relatedProducts.products
-                  .filter(p => p._id !== product._id)
+                  .filter((p) => p._id !== product._id)
                   .slice(0, 4)
-                  .map((relatedProduct, idx) => (
-                    <motion.div
-                      key={relatedProduct._id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.1 }}
-                      whileHover={{ y: -4 }}
-                    >
-                      <Link href={`/products/${relatedProduct.slug}`} className="block group">
-                        <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 hover:shadow-lg transition-all">
-                          <div className="relative aspect-square bg-gray-100 dark:bg-gray-800">
-                            <Image
-                              src={getProductImageUrl(relatedProduct, 0)}
-                              alt={relatedProduct.name}
-                              fill
-                              className="object-cover group-hover:scale-105 transition-transform duration-300"
-                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
-                              }}
-                            />
+                  .map((relatedProduct, idx) => {
+                    const relatedId = String(relatedProduct._id || relatedProduct.slug || idx)
+                    const relatedThumbUrl = getProductImageUrl(relatedProduct, 0) || '/placeholder-product.jpg'
+                    return (
+                      <motion.div
+                        key={relatedId}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        whileHover={{ y: -4 }}
+                      >
+                        <Link href={`/${relatedProduct.slug}`} className="block group">
+                          <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 hover:shadow-lg transition-all">
+                            <div className="relative aspect-square bg-gray-100 dark:bg-gray-800">
+                              <Image
+                                src={relatedImageErrors[relatedId] ? '/placeholder-product.jpg' : relatedThumbUrl}
+                                alt={relatedProduct.name}
+                                fill
+                                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                onError={() => setRelatedImageErrors((prev) => ({ ...prev, [relatedId]: true }))}
+                                unoptimized={true}
+                              />
+                            </div>
+                            <div className="p-2 sm:p-3">
+                              <h3 className="font-semibold text-xs sm:text-sm text-gray-900 dark:text-white line-clamp-1">
+                                {relatedProduct.name}
+                              </h3>
+                              <p className="text-sm sm:text-base font-bold text-blue-600 dark:text-blue-400 mt-0.5 sm:mt-1">
+                                {formatCurrency(Number(relatedProduct.price))}
+                              </p>
+                            </div>
                           </div>
-                          <div className="p-2 sm:p-3">
-                            <h3 className="font-semibold text-xs sm:text-sm text-gray-900 dark:text-white line-clamp-1">
-                              {relatedProduct.name}
-                            </h3>
-                            <p className="text-sm sm:text-base font-bold text-blue-600 dark:text-blue-400 mt-0.5 sm:mt-1">
-                              {formatCurrency(Number(relatedProduct.price))}
-                            </p>
-                          </div>
-                        </div>
-                      </Link>
-                    </motion.div>
-                  ))}
+                        </Link>
+                      </motion.div>
+                    )
+                  })}
               </div>
             </motion.div>
           )}
@@ -644,7 +650,7 @@ export default function ProductDetail() {
                 className="object-contain"
                 sizes="90vw"
                 priority
-                unoptimized={lightboxImg.includes('/api/')}
+                unoptimized={true}
               />
             </motion.div>
           </motion.div>

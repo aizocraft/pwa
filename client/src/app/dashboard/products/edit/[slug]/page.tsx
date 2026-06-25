@@ -82,6 +82,13 @@ export default function EditProductPage() {
     rating: 0,
   });
 
+  // Local draft for rich text description to avoid auto-saving while formatting
+  const [descriptionDraft, setDescriptionDraft] = useState<string>(formData.description || '');
+
+  useEffect(() => {
+    setDescriptionDraft(formData.description || '');
+  }, [formData.description]);
+
   // Image handling
   const [newUploadImages, setNewUploadImages] = useState<File[]>([]);
   const [newPreviewImages, setNewPreviewImages] = useState<string[]>([]);
@@ -262,7 +269,7 @@ export default function EditProductPage() {
         price: Number(formData.price),
         buyingPrice: Number(formData.buyingPrice),
         compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
-        description: formData.description,
+        description: descriptionDraft,
         specs: formData.specs,
         stock: Number(formData.stock),
         tags: formData.tags,
@@ -630,12 +637,13 @@ export default function EditProductPage() {
             </div>
             <div className="p-5 sm:p-6">
 <RichTextEditor
-  value={formData.description}
-  onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
+  value={descriptionDraft}
+  onChange={(value) => setDescriptionDraft(value)}
   placeholder="Write a detailed description with rich formatting..."
-/>
+/
+>
               <p className="text-xs text-gray-500 mt-2">
-                {formData.description.length} characters
+                {descriptionDraft.length} characters
               </p>
             </div>
           </div>

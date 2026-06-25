@@ -115,6 +115,36 @@ router.put('/', authMiddleware, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'socialLinks must be an array' });
     }
 
+    // Validate & sanitize theme colors (prevents bad values breaking the UI)
+    const isValidHex = (v: unknown) => {
+      if (typeof v !== 'string') return false;
+      const s = v.trim();
+      return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s);
+    };
+
+    const DEFAULT_LIGHT = { primary: '#000063', primaryForeground: '#ffffff', primaryMid: '#0043b3', primaryLight: '#009dff' };
+    const DEFAULT_DARK = { primary: '#000063', primaryForeground: '#ffffff', primaryMid: '#0043b3', primaryLight: '#009dff' };
+
+    if (updateData.themeColors) {
+      const incoming = updateData.themeColors;
+      const light = incoming?.light ?? {};
+      const dark = incoming?.dark ?? {};
+
+      const sanitizeTheme = (t: any, defaults: any) => {
+        const out: any = {};
+        for (const k of ['primary', 'primaryForeground', 'primaryMid', 'primaryLight'] as const) {
+          out[k] = isValidHex(t?.[k]) ? t[k].trim() : defaults[k];
+        }
+        return out;
+      };
+
+      updateData.themeColors = {
+        light: sanitizeTheme(light, DEFAULT_LIGHT),
+        dark: sanitizeTheme(dark, DEFAULT_DARK)
+      };
+    }
+
+
     // Remove undefined fields
     Object.keys(updateData).forEach(key => {
       if (updateData[key] === undefined) delete updateData[key];

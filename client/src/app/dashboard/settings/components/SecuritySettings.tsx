@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { settingsErrorToast, settingsSuccessToast } from '@/lib/settingsToast'
 
 export default function SecuritySettings() {
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' })
@@ -15,23 +15,25 @@ export default function SecuritySettings() {
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
     if (passwordForm.new !== passwordForm.confirm) {
-      toast.error('New passwords do not match')
+      settingsErrorToast('New passwords do not match')
       return
     }
     if (passwordForm.new.length < 6) {
-      toast.error('Password must be at least 6 characters')
+      settingsErrorToast('Password must be at least 6 characters')
       return
     }
+
     
     setLoading(true)
     try {
       // TODO: Implement password change API
       await new Promise(resolve => setTimeout(resolve, 1000))
-      toast.success('Password changed successfully!')
+settingsSuccessToast('Password changed successfully!', 3000)
       setPasswordForm({ current: '', new: '', confirm: '' })
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to change password')
+      settingsErrorToast(error?.message || 'Failed to change password')
     } finally {
+
       setLoading(false)
     }
   }
