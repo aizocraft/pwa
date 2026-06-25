@@ -18,25 +18,14 @@ import {
   Layers, 
   Truck, 
   Shield, 
-  RefreshCw,
   Heart,
   Share2,
   Check,
   Minus,
   Plus,
   ChevronRight,
-  Sparkles,
-  Award,
-  Clock,
-  MapPin,
-  CreditCard,
-  Zap,
   ZoomIn,
   AlertCircle,
-  Facebook,
-  Twitter,
-  Link as LinkIcon,
-  Copy,
   CheckCircle
 } from 'lucide-react';
 import { getProduct, getProducts, getProductImageUrl } from '../../lib/api';
@@ -46,14 +35,6 @@ import ReviewComponent from '../../components/Review';
 import OrderToWhatsApp from '../../components/OrderToWhatsApp';
 import RichTextRenderer from '@/components/RichTextRenderer';
 import { toast } from 'react-hot-toast';
-
-// Animation variants
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 },
-  transition: { duration: 0.4 }
-};
 
 interface ProductDetailClientProps {
   product: any;
@@ -117,7 +98,6 @@ export default function ProductDetailClient({ product: initialProduct }: Product
     setRelatedImageErrors(prev => ({ ...prev, [id]: true }));
   }, []);
 
-  // Share functionality
   const handleShare = async () => {
     const url = window.location.href;
     const title = `Check out ${product?.name} on Plasma Water Africa`;
@@ -133,7 +113,6 @@ export default function ProductDetailClient({ product: initialProduct }: Product
         // User cancelled or error
       }
     } else {
-      // Fallback - copy to clipboard
       try {
         await navigator.clipboard.writeText(url);
         setCopiedLink(true);
@@ -145,7 +124,6 @@ export default function ProductDetailClient({ product: initialProduct }: Product
     }
   };
 
-  // Wishlist toggle
   const handleWishlist = () => {
     setIsWishlisted(!isWishlisted);
     toast.success(isWishlisted ? 'Removed from wishlist' : 'Added to wishlist');
@@ -191,7 +169,7 @@ export default function ProductDetailClient({ product: initialProduct }: Product
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6">The product you're looking for doesn't exist or has been removed.</p>
           <Link 
             href="/products"
-            className="inline-flex items-center gap-2 px-5 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all hover:scale-105"
+            className="inline-flex items-center gap-2 px-5 py-2.5 sm:px-6 sm:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all hover:scale-105"
           >
             <ChevronLeft className="w-4 h-4" />
             Browse Products
@@ -218,8 +196,8 @@ export default function ProductDetailClient({ product: initialProduct }: Product
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-4 lg:py-6">
-        
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-4 lg:py-6 mt-4 sm:mt-6 lg:mt-8">
+
         {/* Breadcrumb */}
         <motion.nav 
           initial={{ opacity: 0, x: -20 }}
@@ -240,105 +218,114 @@ export default function ProductDetailClient({ product: initialProduct }: Product
           </span>
         </motion.nav>
 
+        {/* Desktop: 2-column layout */}
         <div className="grid lg:grid-cols-2 gap-6 lg:gap-10 xl:gap-12">
           
-          {/* Left Column - Images */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-3 sm:space-y-4"
-          >
-            {/* Main Image */}
-            <div className="relative aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-lg group">
-              {isImageLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 z-10">
-                  <div className="animate-pulse">
-                    <Package className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400" />
+          {/* Left Column - Images + Reviews (desktop) */}
+          <div className="space-y-6 lg:space-y-8">
+            {/* Product Images */}
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-3 sm:space-y-4"
+            >
+              {/* Main Image */}
+              <div className="relative aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-lg group">
+                {isImageLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 z-10">
+                    <div className="animate-pulse">
+                      <Package className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400" />
+                    </div>
+                  </div>
+                )}
+                <Image
+                  src={imageErrors[selectedImage] ? '/placeholder-product.jpg' : currentImageUrl}
+                  alt={product.name}
+                  fill
+                  className={cn(
+                    "object-cover transition-all duration-500",
+                    isImageLoading ? "opacity-0 scale-105" : "opacity-100 scale-100 group-hover:scale-105",
+                    !imageErrors[selectedImage] && "cursor-zoom-in"
+                  )}
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  priority
+                  onLoadingComplete={() => setIsImageLoading(false)}
+                  onError={() => handleImageError(selectedImage)}
+                  unoptimized={true}
+                />
+                
+                {/* Discount Badge */}
+                {discountPercent > 0 && (
+                  <div className="absolute top-3 right-3 sm:top-4 sm:right-4 px-2 py-1 sm:px-3 sm:py-1.5 bg-red-500 text-white text-xs sm:text-sm font-bold rounded-full shadow-lg z-20">
+                    -{discountPercent}%
+                  </div>
+                )}
+                
+                {/* Zoom Button */}
+                {!imageErrors[selectedImage] && (
+                  <button
+                    onClick={() => {
+                      setLightboxImg(currentImageUrl);
+                      setIsLightbox(true);
+                    }}
+                    className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 p-1.5 sm:p-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full shadow-lg hover:scale-110 transition-transform z-20"
+                    aria-label="Zoom image"
+                  >
+                    <ZoomIn className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 dark:text-gray-300" />
+                  </button>
+                )}
+
+                {/* Stock Badge */}
+                <div className={`absolute top-3 left-3 sm:top-4 sm:left-4 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium ${stockColor} shadow-lg backdrop-blur-sm z-20`}>
+                  {stockStatus}
+                </div>
+              </div>
+
+              {/* Thumbnails */}
+              {hasMultipleImages && (
+                <div className="relative">
+                  <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-thin px-0.5">
+                    {product.images.map((img: any, index: number) => {
+                      const thumbUrl = getProductImageUrl(product, index);
+                      return (
+                        <motion.button
+                          key={index}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            setSelectedImage(index);
+                            setIsImageLoading(true);
+                          }}
+                          className={cn(
+                            'flex-shrink-0 relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg sm:rounded-xl overflow-hidden transition-all duration-200',
+                            selectedImage === index 
+                              ? 'ring-2 ring-blue-500 shadow-lg' 
+                              : 'ring-1 ring-gray-200 dark:ring-gray-700 hover:ring-blue-300 dark:hover:ring-blue-700 opacity-70 hover:opacity-100'
+                          )}
+                          aria-label={`View ${product.name} image ${index + 1}`}
+                        >
+                          <Image
+                            src={thumbnailImageErrors[index] ? '/placeholder-product.jpg' : thumbUrl}
+                            alt={`${product.name} - view ${index + 1}`}
+                            fill
+                            className="object-cover"
+                            sizes="80px"
+                            onError={() => handleThumbnailError(index)}
+                            unoptimized={true}
+                          />
+                        </motion.button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
-              <Image
-                src={imageErrors[selectedImage] ? '/placeholder-product.jpg' : currentImageUrl}
-                alt={product.name}
-                fill
-                className={cn(
-                  "object-cover transition-all duration-500",
-                  isImageLoading ? "opacity-0 scale-105" : "opacity-100 scale-100 group-hover:scale-105",
-                  !imageErrors[selectedImage] && "cursor-zoom-in"
-                )}
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                priority
-                onLoadingComplete={() => setIsImageLoading(false)}
-                onError={() => handleImageError(selectedImage)}
-                unoptimized={true}
-              />
-              
-              {/* Discount Badge */}
-              {discountPercent > 0 && (
-                <div className="absolute top-3 right-3 sm:top-4 sm:right-4 px-2 py-1 sm:px-3 sm:py-1.5 bg-red-500 text-white text-xs sm:text-sm font-bold rounded-full shadow-lg z-20">
-                  -{discountPercent}%
-                </div>
-              )}
-              
-              {/* Zoom Button */}
-              {!imageErrors[selectedImage] && (
-                <button
-                  onClick={() => {
-                    setLightboxImg(currentImageUrl);
-                    setIsLightbox(true);
-                  }}
-                  className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 p-1.5 sm:p-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full shadow-lg hover:scale-110 transition-transform z-20"
-                  aria-label="Zoom image"
-                >
-                  <ZoomIn className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 dark:text-gray-300" />
-                </button>
-              )}
+            </motion.div>
 
-              {/* Stock Badge */}
-              <div className={`absolute top-3 left-3 sm:top-4 sm:left-4 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium ${stockColor} shadow-lg backdrop-blur-sm z-20`}>
-                {stockStatus}
-              </div>
+            {/* Reviews - Desktop: Below images on left column */}
+            <div className="hidden lg:block">
+              <ReviewComponent productId={product._id!} productName={product.name} />
             </div>
-
-            {/* Thumbnails */}
-            {hasMultipleImages && (
-              <div className="relative">
-                <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-thin px-0.5">
-                  {product.images.map((img: any, index: number) => {
-                    const thumbUrl = getProductImageUrl(product, index);
-                    return (
-                      <motion.button
-                        key={index}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => {
-                          setSelectedImage(index);
-                          setIsImageLoading(true);
-                        }}
-                        className={cn(
-                          'flex-shrink-0 relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg sm:rounded-xl overflow-hidden transition-all duration-200',
-                          selectedImage === index 
-                            ? 'ring-2 ring-blue-500 shadow-lg' 
-                            : 'ring-1 ring-gray-200 dark:ring-gray-700 hover:ring-blue-300 dark:hover:ring-blue-700 opacity-70 hover:opacity-100'
-                        )}
-                        aria-label={`View ${product.name} image ${index + 1}`}
-                      >
-                        <Image
-                          src={thumbnailImageErrors[index] ? '/placeholder-product.jpg' : thumbUrl}
-                          alt={`${product.name} - view ${index + 1}`}
-                          fill
-                          className="object-cover"
-                          sizes="80px"
-                          onError={() => handleThumbnailError(index)}
-                          unoptimized={true}
-                        />
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </motion.div>
+          </div>
 
           {/* Right Column - Product Info */}
           <motion.div 
@@ -388,7 +375,7 @@ export default function ProductDetailClient({ product: initialProduct }: Product
                     onClick={() => {
                       document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium transition-colors"
+                    className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium transition-colors lg:hidden"
                   >
                     Write a review
                   </button>
@@ -473,7 +460,7 @@ export default function ProductDetailClient({ product: initialProduct }: Product
                   
                   <button
                     onClick={handleAddToCart}
-                    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 px-4 sm:py-2.5 sm:px-6 rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1.5 sm:gap-2 shadow-md hover:shadow-lg text-sm sm:text-base"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:py-2.5 sm:px-6 rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1.5 sm:gap-2 shadow-md hover:shadow-lg text-sm sm:text-base"
                     aria-label={`Add ${qty} ${product.name} to cart`}
                   >
                     <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -542,7 +529,7 @@ export default function ProductDetailClient({ product: initialProduct }: Product
                 className="pt-3 sm:pt-4"
               >
                 {activeTab === 'description' && (
-                  <div className="prose prose-sm max-w-none">
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
                     <RichTextRenderer content={product.description || '<p>Premium quality product engineered for maximum performance and durability.</p>'} />
                     {product.tags && product.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-2 sm:mt-3">
@@ -601,15 +588,10 @@ export default function ProductDetailClient({ product: initialProduct }: Product
           </motion.div>
         </div>
 
-        {/* Customer Reviews */}
-        <motion.div 
-          id="reviews"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-10 sm:mt-12 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-800"
-        >
+        {/* Reviews - Mobile/Tablet: Below product info */}
+        <div className="lg:hidden mt-8 sm:mt-10">
           <ReviewComponent productId={product._id!} productName={product.name} />
-        </motion.div>
+        </div>
 
         {/* Related Products */}
         {relatedProducts && relatedProducts.products && relatedProducts.products.filter((p: any) => p._id !== product._id).length > 0 && (

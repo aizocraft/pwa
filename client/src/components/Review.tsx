@@ -143,8 +143,8 @@ const ReviewForm = ({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+  >
           {isSubmitting ? 'Submitting...' : existingReview ? 'Update Review' : 'Submit Review'}
         </button>
         <button
@@ -191,7 +191,7 @@ const ReviewCard = ({ review, onEdit, onDelete, isCurrentUser }: {
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white font-semibold">
+          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">            
             {getUserInitial()}
           </div>
           <div>
@@ -391,8 +391,8 @@ export default function ReviewComponent({ productId, productName }: ReviewCompon
         {canWriteReview && (
           <button
             onClick={() => setShowForm(true)}
-            className="mt-4 sm:mt-0 px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105"
-          >
+            className="mt-4 sm:mt-0 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105"
+>
             Write a Review
           </button>
         )}
