@@ -15,6 +15,42 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import Color from '@tiptap/extension-color'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
+import  { Table } from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableCell from '@tiptap/extension-table-cell'
+import TableHeader from '@tiptap/extension-table-header'
+import Youtube from '@tiptap/extension-youtube'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { createLowlight } from 'lowlight'
+import Mention from '@tiptap/extension-mention'
+import Subscript from '@tiptap/extension-subscript'
+import Superscript from '@tiptap/extension-superscript'
+import { debounce } from 'lodash'
+import EmojiPicker, { Theme } from 'emoji-picker-react'
+
+// Then create the lowlight instance:
+const lowlight = createLowlight()
+
+// Import languages
+import javascript from 'highlight.js/lib/languages/javascript'
+import python from 'highlight.js/lib/languages/python'
+import css from 'highlight.js/lib/languages/css'
+import html from 'highlight.js/lib/languages/xml'
+import json from 'highlight.js/lib/languages/json'
+import typescript from 'highlight.js/lib/languages/typescript'
+import bash from 'highlight.js/lib/languages/bash'
+import sql from 'highlight.js/lib/languages/sql'
+
+// Register languages
+lowlight.register('javascript', javascript)
+lowlight.register('python', python)
+lowlight.register('css', css)
+lowlight.register('html', html)
+lowlight.register('json', json)
+lowlight.register('typescript', typescript)
+lowlight.register('bash', bash)
+lowlight.register('sql', sql)
+
 import {
   Bold,
   Italic,
@@ -39,8 +75,25 @@ import {
   Minus,
   Heading4,
   ListChecks,
+  Table as TableIcon,
+  Video,
+  Code2,
+  Smile,
+  Upload,
+  Maximize,
+  Minimize,
+  FileDown,
+  Eraser,
+  IndentIncrease,
+  IndentDecrease,
+  Subscript as SubscriptIcon,
+  Superscript as SuperscriptIcon,
+  X,
+  Check,
+  Type,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'react-hot-toast'
 
 export interface RichTextEditorHandle {
   getHTML: () => string
@@ -60,6 +113,22 @@ interface RichTextEditorProps {
   onReady?: (handle: RichTextEditorHandle) => void
   /** Called whenever content changes - for live preview */
   onChange?: (content: string, isEmpty: boolean) => void
+  /** Max character limit */
+  maxChars?: number
+  /** Show character/word count */
+  showCount?: boolean
+  /** Enable auto-save */
+  autoSave?: boolean
+  /** Auto-save key for localStorage */
+  autoSaveKey?: string
+  /** Enable fullscreen */
+  enableFullscreen?: boolean
+  /** Enable emoji picker */
+  enableEmoji?: boolean
+  /** Enable mentions */
+  enableMentions?: boolean
+  /** Mention suggestions */
+  mentionSuggestions?: string[]
 }
 
 interface ToolbarButtonProps {
@@ -68,6 +137,7 @@ interface ToolbarButtonProps {
   children: React.ReactNode
   disabled?: boolean
   title?: string
+  className?: string
 }
 
 const ToolbarButton = ({
@@ -76,6 +146,7 @@ const ToolbarButton = ({
   children,
   disabled = false,
   title = '',
+  className = '',
 }: ToolbarButtonProps) => (
   <button
     type="button"
@@ -86,11 +157,59 @@ const ToolbarButton = ({
       isActive
         ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 shadow-sm'
         : 'hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-700 dark:text-gray-300'
-    } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+    } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'} ${className}`}
   >
     {children}
   </button>
 )
+
+const FontSizeDropdown = ({ editor }: { editor: any }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [currentSize, setCurrentSize] = useState('16px')
+
+  const sizes = [
+    { label: 'Small', value: '12px' },
+    { label: 'Normal', value: '16px' },
+    { label: 'Medium', value: '18px' },
+    { label: 'Large', value: '24px' },
+    { label: 'XL', value: '32px' },
+    { label: 'XXL', value: '48px' },
+  ]
+
+  const setFontSize = (size: string) => {
+    editor.chain().focus().setFontSize(size).run()
+    setCurrentSize(size)
+    setIsOpen(false)
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-2 py-1 text-xs bg-transparent border border-gray-200 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1"
+      >
+        <span className="hidden sm:inline">Size</span>
+        <span className="text-[10px] opacity-50">{currentSize}</span>
+      </button>
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 min-w-[120px]">
+          {sizes.map((size) => (
+            <button
+              key={size.value}
+              type="button"
+              onClick={() => setFontSize(size.value)}
+              className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm"
+              style={{ fontSize: size.value }}
+            >
+              {size.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function RichTextEditor({
   initialValue = '',
@@ -99,20 +218,41 @@ export default function RichTextEditor({
   readOnly = false,
   onReady,
   onChange,
+  maxChars = 10000,
+  showCount = true,
+  autoSave = false,
+  autoSaveKey = 'editor-content',
+  enableFullscreen = true,
+  enableEmoji = true,
+  enableMentions = true,
+  mentionSuggestions = ['John Doe', 'Jane Smith', 'Admin', 'Team', 'Support'],
 }: RichTextEditorProps) {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [linkText, setLinkText] = useState('')
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
   const [selectedColor, setSelectedColor] = useState('#000000')
+  const [wordCount, setWordCount] = useState(0)
+  const [charCount, setCharCount] = useState(0)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [showFindReplace, setShowFindReplace] = useState(false)
+  const [findText, setFindText] = useState('')
+  const [replaceText, setReplaceText] = useState('')
+  const [showTableModal, setShowTableModal] = useState(false)
+  const [tableRows, setTableRows] = useState(3)
+  const [tableCols, setTableCols] = useState(3)
+  const [showCodeBlock, setShowCodeBlock] = useState(false)
+  const [selectedLanguage, setSelectedLanguage] = useState('javascript')
 
   const didInitRef = useRef(false)
+  const editorRef = useRef<HTMLDivElement>(null)
 
-  const editor = useEditor({
-    extensions: [
+  const editorExtensions = useMemo(() => {
+    const extensions: any[] = [
       StarterKit.configure({
         heading: {
-          levels: [1, 2, 3, 4],
+          levels: [1, 2, 3, 4, 5, 6],
         },
       }),
       TextAlign.configure({
@@ -153,14 +293,85 @@ export default function RichTextEditor({
       Color.configure({
         types: ['textStyle'],
       }),
-    ],
+      Table.configure({
+        resizable: true,
+        HTMLAttributes: {
+          class: 'border-collapse border border-gray-300 dark:border-gray-600',
+        },
+      }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      Youtube.configure({
+        width: 640,
+        height: 480,
+        inline: false,
+        HTMLAttributes: {
+          class: 'rounded-lg shadow-lg my-4',
+        },
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
+        HTMLAttributes: {
+          class: 'rounded-lg overflow-hidden',
+        },
+      }),
+      Subscript,
+      Superscript,
+    ]
+
+    if (enableMentions) {
+      extensions.push(
+        Mention.configure({
+          HTMLAttributes: {
+            class: 'mention bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-1 rounded font-medium',
+          },
+          suggestion: {
+            char: '@',
+            items: ({ query }: { query: string }) => {
+              return mentionSuggestions.filter(item =>
+                item.toLowerCase().startsWith(query.toLowerCase())
+              )
+            },
+          },
+        })
+      )
+    }
+
+    return extensions
+  }, [placeholder, enableMentions, mentionSuggestions])
+
+  const editor = useEditor({
+    extensions: editorExtensions,
     editable: !readOnly,
     content: initialValue || '<p></p>',
     onUpdate: ({ editor }) => {
       const html = editor.getHTML()
+      const text = editor.getText()
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0
+      const chars = text.length
+      
+      setWordCount(words)
+      setCharCount(chars)
+
+      // Check character limit
+      if (chars > maxChars) {
+        toast.error(`Character limit exceeded (${maxChars})`)
+        // Truncate content
+        const truncated = text.slice(0, maxChars)
+        editor.commands.setContent(truncated)
+        return
+      }
+
       const isEmpty = !html || html.trim() === '' || html.trim() === '<p></p>'
       
-      // Always trigger onChange for live preview - parent decides when to save
+      // Auto-save with debounce
+      if (autoSave && !isEmpty) {
+        debounce(() => {
+          localStorage.setItem(autoSaveKey, html)
+        }, 1000)()
+      }
+
       onChange?.(html, isEmpty)
     },
     editorProps: {
@@ -169,6 +380,16 @@ export default function RichTextEditor({
       },
     },
   })
+
+  // Restore auto-saved content
+  useEffect(() => {
+    if (!editor || !autoSave || readOnly) return
+    
+    const saved = localStorage.getItem(autoSaveKey)
+    if (saved && !initialValue) {
+      editor.commands.setContent(saved)
+    }
+  }, [editor, autoSave, autoSaveKey, initialValue, readOnly])
 
   // Initialize editor
   useEffect(() => {
@@ -188,9 +409,14 @@ export default function RichTextEditor({
     onReady?.(handle)
     const isEmpty = handle.isEmpty()
     onChange?.(editor.getHTML(), isEmpty)
+
+    // Initial word/char count
+    const text = editor.getText()
+    setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0)
+    setCharCount(text.length)
   }, [editor, onReady, onChange])
 
-  // Update content when initialValue changes (for loading existing product)
+  // Update content when initialValue changes
   useEffect(() => {
     if (!editor) return
     if (readOnly) return
@@ -199,32 +425,71 @@ export default function RichTextEditor({
     const currentHTML = editor.getHTML()
     const isCurrentlyEmpty = !currentHTML || currentHTML.trim() === '' || currentHTML.trim() === '<p></p>'
 
-    // Only update if editor is empty and initialValue is provided
     if (isCurrentlyEmpty && initialValue && initialValue !== currentHTML) {
       editor.commands.setContent(initialValue)
     }
   }, [initialValue, editor, readOnly])
 
-  const colors = useMemo(
-    () => [
-      '#000000', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71',
-      '#3498db', '#9b59b6', '#1abc9c', '#e84393', '#6c5ce7',
-      '#00b894', '#fdcb6e', '#e17055', '#0984e3', '#00cec9', '#fd79a8',
-    ],
-    []
-  )
+  // Fullscreen mode
+  useEffect(() => {
+    if (!enableFullscreen) return
+    
+    if (isFullscreen) {
+      document.documentElement.requestFullscreen?.().catch(() => {})
+    } else {
+      document.exitFullscreen?.().catch(() => {})
+    }
+  }, [isFullscreen, enableFullscreen])
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
 
   const fontFamilies = useMemo(
     () => [
       { label: 'Default', value: 'inherit' },
-      { label: 'Inter', value: 'Inter, sans-serif' },
+      { label: 'Inter', value: 'Inter, system-ui, -apple-system, sans-serif' },
       { label: 'Georgia', value: 'Georgia, serif' },
-      { label: 'Arial', value: 'Arial, sans-serif' },
+      { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
       { label: 'Times New Roman', value: 'Times New Roman, serif' },
       { label: 'Courier New', value: 'Courier New, monospace' },
+      { label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
+      { label: 'Tahoma', value: 'Tahoma, Geneva, sans-serif' },
+      { label: 'Trebuchet MS', value: 'Trebuchet MS, sans-serif' },
+      { label: 'Impact', value: 'Impact, sans-serif' },
+      { label: 'Comic Sans MS', value: 'Comic Sans MS, cursive' },
+      { label: 'Roboto', value: 'Roboto, sans-serif' },
+      { label: 'Open Sans', value: 'Open Sans, sans-serif' },
+      { label: 'Lato', value: 'Lato, sans-serif' },
+      { label: 'Montserrat', value: 'Montserrat, sans-serif' },
+      { label: 'Playfair Display', value: 'Playfair Display, serif' },
+      { label: 'Merriweather', value: 'Merriweather, serif' },
+      { label: 'Pacifico', value: 'Pacifico, cursive' },
     ],
     []
   )
+
+  const colors = useMemo(
+    () => [
+      '#000000', '#1a1a1a', '#333333', '#4d4d4d', '#666666',
+      '#e74c3c', '#e67e22', '#f39c12', '#f1c40f', '#2ecc71',
+      '#27ae60', '#1abc9c', '#3498db', '#2980b9', '#9b59b6',
+      '#8e44ad', '#e84393', '#6c5ce7', '#00b894', '#fdcb6e',
+      '#e17055', '#0984e3', '#00cec9', '#fd79a8', '#a29bfe',
+    ],
+    []
+  )
+
+  const codeLanguages = [
+    'javascript', 'typescript', 'python', 'html', 'css', 
+    'json', 'bash', 'sql', 'markdown', 'yaml', 'xml', 'php',
+    'java', 'csharp', 'go', 'ruby', 'rust', 'swift'
+  ]
 
   if (!editor) {
     return (
@@ -270,13 +535,82 @@ export default function RichTextEditor({
     }
   }
 
+  const addVideo = () => {
+    const url = window.prompt('Enter YouTube or Vimeo URL:')
+    if (url) {
+      editor.chain().focus().setYoutubeVideo({ src: url }).run()
+    }
+  }
+
+  const insertTable = () => {
+    if (tableRows < 1 || tableCols < 1) return
+    editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: true }).run()
+    setShowTableModal(false)
+  }
+
+  const addCodeBlock = () => {
+    editor
+      .chain()
+      .focus()
+      .setCodeBlock({ language: selectedLanguage })
+      .run()
+    setShowCodeBlock(false)
+  }
+
+  const handleClearFormatting = () => {
+    editor.chain().focus().clearNodes().unsetAllMarks().run()
+    toast.success('Formatting cleared')
+  }
+
+const handleFindReplace = () => {
+  const content = editor.getText()
+  if (!findText) {
+    toast.error('Please enter text to find')
+    return
+  }
+  // Use replace with global flag instead of replaceAll
+  const newContent = content.replace(new RegExp(findText, 'g'), replaceText)
+  editor.commands.setContent(newContent)
+  setShowFindReplace(false)
+  toast.success(`Replaced all occurrences of "${findText}"`)
+}
+
+  const handleFileUpload = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string
+      if (file.type.startsWith('image/')) {
+        editor.chain().focus().setImage({ src: base64 }).run()
+      } else {
+        const link = `<a href="${base64}" target="_blank" rel="noopener noreferrer">${file.name}</a>`
+        editor.chain().focus().insertContent(link).run()
+      }
+      toast.success(`Uploaded ${file.name}`)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const insertEmoji = (emoji: any) => {
+    editor.chain().focus().insertContent(emoji.native).run()
+    setShowEmojiPicker(false)
+  }
+
+  const exportHTML = () => {
+    const html = editor.getHTML()
+    navigator.clipboard.writeText(html)
+    toast.success('HTML copied to clipboard!')
+  }
+
+  const isContentEmpty = !editor.getHTML() || editor.getHTML().trim() === '' || editor.getHTML().trim() === '<p></p>'
+
   return (
     <div
-      className={`rich-text-editor border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900 shadow-sm ${className}`}
+      ref={editorRef}
+      className={`rich-text-editor border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900 shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''} ${className}`}
     >
       {/* Toolbar */}
       {!readOnly && (
-        <div className="flex flex-wrap items-center gap-0.5 p-2 bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center gap-0.5 p-2 bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 backdrop-blur-sm max-h-[200px] overflow-y-auto">
           {/* Headings */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
@@ -307,6 +641,20 @@ export default function RichTextEditor({
             >
               <Heading4 className="w-4 h-4" />
             </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 5 }).run()}
+              isActive={editor.isActive('heading', { level: 5 })}
+              title="Heading 5"
+            >
+              <span className="text-xs font-bold">H5</span>
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 6 }).run()}
+              isActive={editor.isActive('heading', { level: 6 })}
+              title="Heading 6"
+            >
+              <span className="text-xs font-bold">H6</span>
+            </ToolbarButton>
           </div>
 
           {/* Text formatting */}
@@ -314,21 +662,21 @@ export default function RichTextEditor({
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBold().run()}
               isActive={editor.isActive('bold')}
-              title="Bold"
+              title="Bold (Ctrl+B)"
             >
               <Bold className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleItalic().run()}
               isActive={editor.isActive('italic')}
-              title="Italic"
+              title="Italic (Ctrl+I)"
             >
               <Italic className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleUnderline().run()}
               isActive={editor.isActive('underline')}
-              title="Underline"
+              title="Underline (Ctrl+U)"
             >
               <UnderlineIcon className="w-4 h-4" />
             </ToolbarButton>
@@ -338,6 +686,20 @@ export default function RichTextEditor({
               title="Strikethrough"
             >
               <Strikethrough className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleSubscript().run()}
+              isActive={editor.isActive('subscript')}
+              title="Subscript"
+            >
+              <SubscriptIcon className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleSuperscript().run()}
+              isActive={editor.isActive('superscript')}
+              title="Superscript"
+            >
+              <SuperscriptIcon className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleHighlight().run()}
@@ -360,7 +722,7 @@ export default function RichTextEditor({
                     editor.chain().focus().setFontFamily(value).run()
                   }
                 }}
-                className="px-2 py-1 text-xs bg-transparent border border-gray-200 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+                className="px-2 py-1 text-xs bg-transparent border border-gray-200 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer max-w-[120px] truncate"
                 title="Font Family"
               >
                 {fontFamilies.map((font) => (
@@ -370,6 +732,8 @@ export default function RichTextEditor({
                 ))}
               </select>
             </div>
+
+            <FontSizeDropdown editor={editor} />
 
             <div className="relative">
               <ToolbarButton
@@ -387,8 +751,8 @@ export default function RichTextEditor({
               </ToolbarButton>
 
               {isColorPickerOpen && (
-                <div className="absolute top-full left-0 mt-1 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 w-[160px]">
-                  <div className="grid grid-cols-4 gap-1">
+                <div className="absolute top-full left-0 mt-1 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 w-[180px]">
+                  <div className="grid grid-cols-5 gap-1">
                     {colors.map((color) => (
                       <button
                         type="button"
@@ -437,9 +801,21 @@ export default function RichTextEditor({
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleTaskList().run()}
               isActive={editor.isActive('taskList')}
-              title="Task List"
+              title="Task List (Checkbox)"
             >
               <ListChecks className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().sinkListItem('listItem').run()}
+              title="Increase Indent"
+            >
+              <IndentIncrease className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().liftListItem('listItem').run()}
+              title="Decrease Indent"
+            >
+              <IndentDecrease className="w-4 h-4" />
             </ToolbarButton>
           </div>
 
@@ -460,7 +836,52 @@ export default function RichTextEditor({
             </ToolbarButton>
           </div>
 
-          {/* Links & Images */}
+          {/* Tables */}
+          <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
+            <ToolbarButton
+              onClick={() => setShowTableModal(true)}
+              title="Insert Table"
+            >
+              <TableIcon className="w-4 h-4" />
+            </ToolbarButton>
+            {editor.isActive('table') && (
+              <>
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().addColumnBefore().run()}
+                  title="Add Column Before"
+                >
+                  <span className="text-xs font-bold">+C</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().addColumnAfter().run()}
+                  title="Add Column After"
+                >
+                  <span className="text-xs font-bold">C+</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().addRowBefore().run()}
+                  title="Add Row Before"
+                >
+                  <span className="text-xs font-bold">+R</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().addRowAfter().run()}
+                  title="Add Row After"
+                >
+                  <span className="text-xs font-bold">R+</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().deleteTable().run()}
+                  title="Delete Table"
+                  className="text-red-500 hover:text-red-600"
+                >
+                  <X className="w-4 h-4" />
+                </ToolbarButton>
+              </>
+            )}
+          </div>
+
+          {/* Links, Images, Videos */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
               onClick={() => setIsLinkModalOpen(true)}
@@ -471,6 +892,46 @@ export default function RichTextEditor({
             </ToolbarButton>
             <ToolbarButton onClick={addImage} title="Insert Image">
               <ImageIcon className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton onClick={addVideo} title="Insert Video (YouTube/Vimeo)">
+              <Video className="w-4 h-4" />
+            </ToolbarButton>
+            <div className="relative">
+              <input
+                type="file"
+                accept="image/*,.pdf,.doc,.docx,.txt,.csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleFileUpload(file)
+                  e.target.value = ''
+                }}
+                className="hidden"
+                id="file-upload"
+              />
+              <ToolbarButton
+                onClick={() => document.getElementById('file-upload')?.click()}
+                title="Upload File"
+              >
+                <Upload className="w-4 h-4" />
+              </ToolbarButton>
+            </div>
+          </div>
+
+          {/* Code */}
+          <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
+            <ToolbarButton
+              onClick={() => setShowCodeBlock(!showCodeBlock)}
+              isActive={showCodeBlock}
+              title="Code Block"
+            >
+              <Code2 className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleCode().run()}
+              isActive={editor.isActive('code')}
+              title="Inline Code"
+            >
+              <span className="text-xs font-mono font-bold">&lt;/&gt;</span>
             </ToolbarButton>
           </div>
 
@@ -506,15 +967,54 @@ export default function RichTextEditor({
             </ToolbarButton>
           </div>
 
+          {/* Extra Tools */}
+          <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
+            <ToolbarButton
+              onClick={handleClearFormatting}
+              title="Clear Formatting"
+            >
+              <Eraser className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => setShowFindReplace(!showFindReplace)}
+              isActive={showFindReplace}
+              title="Find & Replace"
+            >
+              <Type className="w-4 h-4" />
+            </ToolbarButton>
+            {enableEmoji && (
+              <ToolbarButton
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                isActive={showEmojiPicker}
+                title="Insert Emoji"
+              >
+                <Smile className="w-4 h-4" />
+              </ToolbarButton>
+            )}
+            <ToolbarButton onClick={exportHTML} title="Export HTML">
+              <FileDown className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
+
           {/* Undo/Redo */}
-          <div className="flex items-center gap-0.5">
-            <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo">
+          <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
+            <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo (Ctrl+Z)">
               <Undo className="w-4 h-4" />
             </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo">
+            <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo (Ctrl+Y)">
               <Redo className="w-4 h-4" />
             </ToolbarButton>
           </div>
+
+          {/* Fullscreen */}
+          {enableFullscreen && (
+            <ToolbarButton
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </ToolbarButton>
+          )}
         </div>
       )}
 
@@ -568,8 +1068,183 @@ export default function RichTextEditor({
         </div>
       )}
 
+      {/* Table Modal */}
+      {showTableModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Insert Table
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-gray-700 dark:text-gray-300">Rows:</label>
+                <input
+                  type="number"
+                  value={tableRows}
+                  onChange={(e) => setTableRows(Math.max(1, parseInt(e.target.value) || 1))}
+                  min="1"
+                  max="10"
+                  className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-gray-700 dark:text-gray-300">Columns:</label>
+                <input
+                  type="number"
+                  value={tableCols}
+                  onChange={(e) => setTableCols(Math.max(1, parseInt(e.target.value) || 1))}
+                  min="1"
+                  max="10"
+                  className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                type="button"
+                onClick={insertTable}
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all hover:shadow-lg"
+              >
+                Insert
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTableModal(false)}
+                className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Code Block Modal */}
+      {showCodeBlock && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Insert Code Block
+            </h3>
+            <div className="space-y-3">
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+              >
+                {codeLanguages.map((lang) => (
+                  <option key={lang} value={lang}>
+                    {lang.charAt(0).toUpperCase() + lang.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                type="button"
+                onClick={addCodeBlock}
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all hover:shadow-lg"
+              >
+                Insert
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCodeBlock(false)}
+                className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Find & Replace Modal */}
+      {showFindReplace && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Find & Replace
+            </h3>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={findText}
+                onChange={(e) => setFindText(e.target.value)}
+                placeholder="Find..."
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                value={replaceText}
+                onChange={(e) => setReplaceText(e.target.value)}
+                placeholder="Replace with..."
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleFindReplace()
+                }}
+              />
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                type="button"
+                onClick={handleFindReplace}
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all hover:shadow-lg"
+              >
+                Replace All
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFindReplace(false)
+                  setFindText('')
+                  setReplaceText('')
+                }}
+                className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+<EmojiPicker
+  onEmojiClick={(emojiData) => {
+    const emoji = emojiData.emoji
+    editor.chain().focus().insertContent(emoji).run()
+    setShowEmojiPicker(false)
+  }}
+  theme={document.documentElement.classList.contains('dark') ? Theme.DARK : Theme.LIGHT}
+  width={320}
+  height={400}
+  previewConfig={{ showPreview: false }}
+/>
       {/* Editor Content */}
       <EditorContent editor={editor} className={readOnly ? 'bg-gray-50/50 dark:bg-gray-800/30' : ''} />
+
+      {/* Word/Character Count */}
+      {showCount && !readOnly && (
+        <div className="flex justify-between items-center px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 text-xs text-gray-400 dark:text-gray-500">
+          <div className="flex items-center gap-4">
+            <span>{wordCount} words</span>
+            <span>{charCount} characters</span>
+            {maxChars && <span className={charCount > maxChars * 0.9 ? 'text-yellow-500' : ''}>
+              {charCount}/{maxChars}
+            </span>}
+          </div>
+          {autoSave && (
+            <span className="flex items-center gap-1">
+              <Check className="w-3 h-3 text-green-500" />
+              Auto-saved
+            </span>
+          )}
+          {isContentEmpty && (
+            <span className="text-gray-400 italic">Empty content</span>
+          )}
+        </div>
+      )}
 
       <style jsx global>{`
         .rich-text-editor .ProseMirror {
@@ -608,6 +1283,20 @@ export default function RichTextEditor({
           font-size: 1.1em;
           font-weight: 600;
           margin: 0.6rem 0 0.3rem;
+        }
+
+        .rich-text-editor .ProseMirror h5 {
+          font-size: 1em;
+          font-weight: 600;
+          margin: 0.5rem 0 0.2rem;
+        }
+
+        .rich-text-editor .ProseMirror h6 {
+          font-size: 0.9em;
+          font-weight: 600;
+          margin: 0.4rem 0 0.2rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
         }
 
         .rich-text-editor .ProseMirror ul {
@@ -678,6 +1367,33 @@ export default function RichTextEditor({
           background: rgba(59, 130, 246, 0.1);
         }
 
+        .rich-text-editor .ProseMirror table {
+          border-collapse: collapse;
+          margin: 1rem 0;
+          width: 100%;
+        }
+
+        .rich-text-editor .ProseMirror table td,
+        .rich-text-editor .ProseMirror table th {
+          border: 1px solid #e2e8f0;
+          padding: 0.5rem 0.75rem;
+          text-align: left;
+        }
+
+        .dark .rich-text-editor .ProseMirror table td,
+        .dark .rich-text-editor .ProseMirror table th {
+          border-color: #334155;
+        }
+
+        .rich-text-editor .ProseMirror table th {
+          background: #f1f5f9;
+          font-weight: 600;
+        }
+
+        .dark .rich-text-editor .ProseMirror table th {
+          background: #1e293b;
+        }
+
         .rich-text-editor .ProseMirror code {
           background: #f1f5f9;
           padding: 0.15rem 0.4rem;
@@ -693,25 +1409,20 @@ export default function RichTextEditor({
         }
 
         .rich-text-editor .ProseMirror pre {
-          background: #f1f5f9;
+          background: #1e293b;
           padding: 1rem;
           border-radius: 8px;
           overflow-x: auto;
           font-family: 'Courier New', monospace;
           font-size: 0.9rem;
           margin: 0.5rem 0;
-          border: 1px solid #e2e8f0;
-        }
-
-        .dark .rich-text-editor .ProseMirror pre {
-          background: #1e293b;
-          border-color: #334155;
+          border: 1px solid #334155;
         }
 
         .rich-text-editor .ProseMirror pre code {
           background: transparent;
           padding: 0;
-          color: inherit;
+          color: #e2e8f0;
         }
 
         .rich-text-editor .ProseMirror img {
@@ -750,6 +1461,19 @@ export default function RichTextEditor({
           border-color: #334155;
         }
 
+        .rich-text-editor .ProseMirror .mention {
+          background: #dbeafe;
+          color: #1d4ed8;
+          padding: 0.1rem 0.3rem;
+          border-radius: 4px;
+          font-weight: 500;
+        }
+
+        .dark .rich-text-editor .ProseMirror .mention {
+          background: #1e3a5f;
+          color: #60a5fa;
+        }
+
         .rich-text-editor .ProseMirror .is-editor-empty:first-child::before {
           content: attr(data-placeholder);
           float: left;
@@ -771,7 +1495,9 @@ export default function RichTextEditor({
         .dark .rich-text-editor .ProseMirror h1,
         .dark .rich-text-editor .ProseMirror h2,
         .dark .rich-text-editor .ProseMirror h3,
-        .dark .rich-text-editor .ProseMirror h4 {
+        .dark .rich-text-editor .ProseMirror h4,
+        .dark .rich-text-editor .ProseMirror h5,
+        .dark .rich-text-editor .ProseMirror h6 {
           color: #f1f5f9;
         }
 
@@ -783,6 +1509,13 @@ export default function RichTextEditor({
           background: rgba(59, 130, 246, 0.3);
         }
 
+        .rich-text-editor .ProseMirror .youtube {
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+          margin: 1rem 0;
+        }
+
         @media (max-width: 640px) {
           .rich-text-editor .flex-wrap {
             gap: 0.25rem;
@@ -791,6 +1524,10 @@ export default function RichTextEditor({
             border-right: none !important;
             padding-right: 0 !important;
             margin-right: 0 !important;
+          }
+          .rich-text-editor .ProseMirror {
+            padding: 0.75rem;
+            min-height: 150px;
           }
         }
       `}</style>
