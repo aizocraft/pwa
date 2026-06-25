@@ -342,39 +342,6 @@ export default function EmailsPage() {
           )}
         </AnimatePresence>
 
-        {/* Stats Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
-        >
-          {templates.map((template, idx) => {
-            const Icon = template.icon;
-            return (
-              <motion.div
-                key={template.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: idx * 0.05 }}
-                whileHover={{ y: -4 }}
-                className={`bg-gradient-to-r ${template.bgGradient} rounded-xl p-5 text-white shadow-lg cursor-pointer transition-all duration-300`}
-                onClick={() => setActiveTab(template.id)}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <Icon className="w-8 h-8 opacity-90" />
-                  <ChevronRight className="w-5 h-5 opacity-70" />
-                </div>
-                <h3 className="font-semibold text-lg">{template.name}</h3>
-                <p className="text-white/80 text-sm mt-1">{template.description}</p>
-                <div className="mt-3 flex items-center gap-2 text-xs text-white/70">
-                  <span>Click to send</span>
-                  <Sparkles className="w-3 h-3" />
-                </div>
-              </motion.div>
-            );
-          })}
-        </motion.div>
 
         {/* Main Card */}
         <motion.div

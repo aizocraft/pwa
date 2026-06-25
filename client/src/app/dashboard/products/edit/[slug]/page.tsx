@@ -1,3 +1,5 @@
+// src/app/dashboard/products/edit/[slug]/page.tsx
+
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
@@ -269,6 +271,7 @@ export default function EditProductPage() {
         price: Number(formData.price),
         buyingPrice: Number(formData.buyingPrice),
         compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
+        descriptionDraft: descriptionDraft,
         description: descriptionDraft,
         specs: formData.specs,
         stock: Number(formData.stock),

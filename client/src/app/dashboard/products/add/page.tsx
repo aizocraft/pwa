@@ -1,3 +1,4 @@
+// src/app/dashboard/products/add/page.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
@@ -244,7 +245,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       finalSku = `${prefix}-${random}`;
     }
 
-    const productData = {
+      const productData = {
       name: formData.name,
       slug: formData.slug,
       sku: finalSku, // Ensure this is always a string, never undefined

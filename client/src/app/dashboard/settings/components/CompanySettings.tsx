@@ -95,7 +95,7 @@ export default function CompanySettings() {
       }
       
       await update.mutateAsync(data)
-      settingsSuccessToast('Company settings updated successfully!')
+
       setEditing(false)
 
     } catch (error: any) {

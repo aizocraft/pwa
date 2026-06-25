@@ -963,33 +963,6 @@ export default function UsersPage() {
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    {editingUser ? 'New Password (optional)' : 'Password *'}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      required={!editingUser}
-                      minLength={6}
-                      className="w-full px-4 py-2.5 pr-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      placeholder={editingUser ? 'Leave blank to keep current' : 'Minimum 6 characters'}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {editingUser && (
-                    <p className="text-xs text-gray-500 mt-1">Leave blank to keep current password</p>
-                  )}
-                </div>
-
                 <div className="flex gap-3 pt-4">
                   <button
                     type="submit"
