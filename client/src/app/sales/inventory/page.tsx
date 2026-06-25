@@ -1,3 +1,4 @@
+// src/app/sales/inventory/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -38,7 +39,8 @@ import {
   getInventoryValuation,
 } from '@/lib/api';
 import { toast } from 'react-hot-toast';
-import DashboardProductsPage from '@/app/dashboard/products/page';
+// ✅ Import the dedicated sales products page
+import SalesProductsPage from '../products/page';
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-KE', {
@@ -55,7 +57,7 @@ const formatNumber = (num: number) => {
 
 type TabType = 'low-stock' | 'valuation' | 'bulk-actions' | 'products';
 
-export default function InventoryPage() {
+export default function SalesInventoryPage() {
   const [summary, setSummary] = useState<any>(null);
   const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
   const [valuation, setValuation] = useState<any>(null);
@@ -357,10 +359,10 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Products Tab */}
+      {/* Products Tab - Now using SalesProductsPage */}
       {activeTab === 'products' && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
-          <DashboardProductsPage viewMode="sales" />
+          <SalesProductsPage />
         </div>
       )}
 

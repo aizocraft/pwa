@@ -1,4 +1,4 @@
-// src/app/dashboard/products/page.tsx
+// src/app/sales/products/page.tsx
 'use client'
 
 import { useState, useMemo } from 'react'
@@ -9,7 +9,7 @@ import {
   Plus, Eye, Edit, Trash2, Search, Filter, ChevronDown, Package, RefreshCw, 
   X, AlertTriangle, CheckCircle, XCircle, Star, TrendingUp, Clock, 
   DollarSign, ShoppingBag, Zap, Grid, List, ChevronLeft, ChevronRight,
-  TrendingDown, Tag, Building2, Layers, Settings, Percent
+  TrendingDown, Tag, Building2, Layers, Settings, Percent, Sparkles
 } from 'lucide-react'
 import { getImageUrl } from '@/lib/api'
 import Link from 'next/link'
@@ -22,14 +22,14 @@ import { getProducts, deleteProduct, updateProduct } from '@/lib/api'
 const fadeInUp = "transition-all duration-300 ease-out transform hover:translate-y-[-2px]"
 const buttonHover = "transition-all duration-200 transform hover:scale-105 active:scale-95"
 
-export default function DashboardProductsPage() {
+export default function SalesProductsPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   
-  // Admin has full permissions
-  const canDelete = true
-  const canEdit = true
-  const canAdd = true
+  // ✅ Sales permissions
+  const canDelete = false // Sales cannot delete
+  const canEdit = true   // Sales can edit
+  const canAdd = true    // Sales can add
   
   // UI State
   const [search, setSearch] = useState('')
@@ -43,12 +43,8 @@ export default function DashboardProductsPage() {
   const [page, setPage] = useState(1)
   const [limit] = useState(12)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [productsViewMode, setProductsViewMode] = useState<'grid' | 'table'>('table')
+  const [productsViewMode, setProductsViewMode] = useState<'grid' | 'table'>('grid')
   
-  // Delete confirmation modal state
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
-
   // Build query params
   const buildQueryParams = () => {
     const params: any = { page, limit }
@@ -77,7 +73,7 @@ export default function DashboardProductsPage() {
 
   // Fetch products
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['dashboard-products', buildQueryParams()],
+    queryKey: ['sales-products', buildQueryParams()],
     queryFn: () => getProducts(buildQueryParams()),
     placeholderData: (previousData) => previousData || { 
       products: [], 
@@ -85,50 +81,15 @@ export default function DashboardProductsPage() {
     } as ProductListResponse,
   })
 
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: deleteProduct,
-    onMutate: async (productId) => {
-      await queryClient.cancelQueries({ queryKey: ['dashboard-products'] })
-      const previousData = queryClient.getQueryData<ProductListResponse>(['dashboard-products', buildQueryParams()])
-      
-      queryClient.setQueryData(['dashboard-products', buildQueryParams()], (old: any) => {
-        if (!old) return old
-        return {
-          ...old,
-          products: old.products.filter((p: Product) => p._id !== productId),
-          pagination: {
-            ...old.pagination,
-            total: old.pagination.total - 1
-          }
-        }
-      })
-      
-      return { previousData }
-    },
-    onSuccess: () => {
-      setDeleteModalOpen(false)
-      setProductToDelete(null)
-      toast.success('Product deleted successfully')
-    },
-    onError: (err, variables, context) => {
-      queryClient.setQueryData(['dashboard-products', buildQueryParams()], context?.previousData)
-      toast.error('Failed to delete product')
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard-products'] })
-    },
-  })
-
   // Toggle featured mutation
   const toggleFeaturedMutation = useMutation({
     mutationFn: ({ id, featured }: { id: string; featured: boolean }) => 
       updateProduct(id, { featured }),
     onMutate: async ({ id, featured }) => {
-      await queryClient.cancelQueries({ queryKey: ['dashboard-products'] })
-      const previousData = queryClient.getQueryData<ProductListResponse>(['dashboard-products', buildQueryParams()])
+      await queryClient.cancelQueries({ queryKey: ['sales-products'] })
+      const previousData = queryClient.getQueryData<ProductListResponse>(['sales-products', buildQueryParams()])
       
-      queryClient.setQueryData(['dashboard-products', buildQueryParams()], (old: any) => {
+      queryClient.setQueryData(['sales-products', buildQueryParams()], (old: any) => {
         if (!old) return old
         return {
           ...old,
@@ -141,11 +102,11 @@ export default function DashboardProductsPage() {
       return { previousData }
     },
     onError: (err, variables, context) => {
-      queryClient.setQueryData(['dashboard-products', buildQueryParams()], context?.previousData)
+      queryClient.setQueryData(['sales-products', buildQueryParams()], context?.previousData)
       toast.error('Failed to update featured status')
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard-products'] })
+      queryClient.invalidateQueries({ queryKey: ['sales-products'] })
     },
   })
 
@@ -163,22 +124,6 @@ export default function DashboardProductsPage() {
     
     return products
   }, [data?.products, minProfit])
-
-  const openDeleteModal = (product: Product) => {
-    setProductToDelete(product)
-    setDeleteModalOpen(true)
-  }
-
-  const confirmDelete = () => {
-    if (productToDelete) {
-      deleteMutation.mutate(productToDelete._id!)
-    }
-  }
-
-  const cancelDelete = () => {
-    setDeleteModalOpen(false)
-    setProductToDelete(null)
-  }
 
   const clearFilters = () => {
     setSearch('')
@@ -230,89 +175,31 @@ export default function DashboardProductsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Delete Confirmation Modal */}
-      {deleteModalOpen && productToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Delete Product</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">This action cannot be undone</p>
-              </div>
-            </div>
-            
-            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-              <div className="flex items-center gap-3">
-                {productToDelete?.images?.[0] ? (
-                  <img
-                    src={getImageUrl(productToDelete?.images?.[0] ?? '')}
-                    alt={productToDelete?.name ?? ''}
-                    className="w-12 h-12 rounded-lg object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
-                    }}
-                  />
-                ) : (
-                  <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-500 rounded-lg flex items-center justify-center">
-                    <Package className="w-6 h-6 text-white" />
-                  </div>
-                )}
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">{productToDelete?.name || ''}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">SKU: {productToDelete?.sku || 'N/A'}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={cancelDelete}
-                className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={deleteMutation.isPending}
-                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {deleteMutation.isPending ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4" />
-                    Delete Product
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Header Section */}
+      {/* ✅ Sales Header with badge */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="animate-slide-in-left">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-            Products
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
+              Products
+            </h1>
+            <span className="px-3 py-1 text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded-full border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              Sales View
+            </span>
+          </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Manage your inventory • {pagination?.total || 0} product{(pagination?.total || 0) !== 1 ? 's' : ''} total
           </p>
         </div>
-        <Link 
-          href="/dashboard/products/add" 
-          className={`inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl ${buttonHover}`}
-        >
-          <Plus className="w-4 h-4" />
-          Add Product
-        </Link>
+        {canAdd && (
+          <Link 
+            href="/sales/products/add" 
+            className={`inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl ${buttonHover}`}
+          >
+            <Plus className="w-4 h-4" />
+            Add Product
+          </Link>
+        )}
       </div>
 
       {/* Search and Filters Bar */}
@@ -522,7 +409,7 @@ export default function DashboardProductsPage() {
             </button>
           ) : (
             <Link 
-              href="/dashboard/products/add"
+              href="/sales/products/add"
               className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-all"
             >
               <Plus className="w-4 h-4" />
@@ -531,7 +418,6 @@ export default function DashboardProductsPage() {
           )}
         </div>
       ) : productsViewMode === 'grid' ? (
-        // Grid View
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {products.map((product, index) => {
             const stockConfig = getStockConfig(product.stock)
@@ -622,7 +508,7 @@ export default function DashboardProductsPage() {
 
                   <div className="flex gap-2">
                     <Link 
-                      href={`/dashboard/products/edit/${product.slug}`}
+                      href={`/sales/products/edit/${product.slug}`}
                       className="flex-1 py-2 bg-gray-50 text-gray-600 dark:bg-gray-700/50 dark:text-gray-400 rounded-xl text-sm font-medium transition-all hover:bg-gray-100 flex items-center justify-center gap-2"
                     >
                       <Edit className="w-4 h-4" />
@@ -638,10 +524,11 @@ export default function DashboardProductsPage() {
                     >
                       {product.featured ? 'Featured' : 'Mark Featured'}
                     </button>
+                    {/* ❌ Delete button disabled for sales */}
                     <button
-                      onClick={() => openDeleteModal(product)}
-                      className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 transition-all"
-                      title="Delete"
+                      disabled={true}
+                      className="p-2 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-700/50 dark:text-gray-500"
+                      title="Sales users cannot delete products"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -652,7 +539,6 @@ export default function DashboardProductsPage() {
           })}
         </div>
       ) : (
-        // Table View
         <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -767,17 +653,17 @@ export default function DashboardProductsPage() {
                           <Eye className="w-4 h-4" />
                         </Link>
                         <Link 
-                          href={`/dashboard/products/edit/${product.slug}`}
+                          href={`/sales/products/edit/${product.slug}`}
                           className="inline-flex p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all hover:scale-110"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </Link>
+                        {/* ❌ Delete button disabled for sales */}
                         <button
-                          onClick={() => openDeleteModal(product)}
-                          disabled={deleteMutation.isPending}
-                          className="inline-flex p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-all hover:scale-110 disabled:opacity-50"
-                          title="Delete"
+                          disabled={true}
+                          className="inline-flex p-1.5 rounded-lg text-gray-400 cursor-not-allowed"
+                          title="Sales users cannot delete products"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

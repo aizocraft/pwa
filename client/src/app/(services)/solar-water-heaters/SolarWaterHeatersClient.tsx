@@ -256,7 +256,7 @@ export default function SolarWaterHeatersClient() {
               <span className="text-blue-600 dark:text-blue-400">Products</span>
             </h2>
             <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-              Explore our range of high-quality solar water heaters designed for Kenyan homes
+              Explore our range of high-quality solar water heaters
             </p>
             <div className="w-20 h-0.5 bg-blue-600 dark:bg-blue-400 mx-auto mt-4 rounded-full" />
           </div>

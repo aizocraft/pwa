@@ -1,4 +1,18 @@
 // src/server/routes/productRoutes.ts
+/**
+ * Product Routes
+ * 
+ * Handles all product-related CRUD operations with proper route ordering:
+ * 1. Static routes (no parameters)
+ * 2. Slug-based routes (specific pattern)
+ * 3. ID-based routes (fallback for backward compatibility)
+ * 
+ * Route Order Matters:
+ * - Express matches routes in the order they are defined
+ * - Slug routes must come before ID routes to prevent slug values 
+ *   being interpreted as MongoDB ObjectIds
+ */
+
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import ProductModel, { IProduct, Image } from '../models/Product';
@@ -13,10 +27,20 @@ import UserModel from '../models/User';
 function productRoutes(productModel: typeof ProductModel) {
   const router = Router();
 
-  // Helper: Check if user is admin
+  // ============================================================================
+  // HELPERS & UTILITIES
+  // ============================================================================
+
+  /**
+   * Check if the current user has admin privileges
+   */
   const isAdmin = (req: Request): boolean => (req as any).user?.role === 'admin';
 
-  // Helper function to generate SKU
+  /**
+   * Generate a unique SKU for a product
+   * Format: {CATEGORY_PREFIX}-{SEQUENTIAL_NUMBER}
+   * Example: SOL-001, BATT-002, PUMP-003
+   */
   const generateSKU = async (category: string): Promise<string> => {
     const prefix = (category || 'GEN').substring(0, 3).toUpperCase();
     const finalPrefix = prefix.length < 3 ? prefix.padEnd(3, 'X') : prefix;
@@ -41,7 +65,11 @@ function productRoutes(productModel: typeof ProductModel) {
     return `${finalPrefix}-${paddedNumber}`;
   };
 
-  // Multer config for product images
+  /**
+   * Multer configuration for product image uploads
+   * - Max file size: 5MB
+   * - Allowed formats: JPEG, PNG, WebP, GIF, SVG
+   */
   const upload = multer({ 
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 },
@@ -56,10 +84,29 @@ function productRoutes(productModel: typeof ProductModel) {
   });
 
   // ============================================================================
-  // STATIC ROUTES (No parameters) - Must come before parameterized routes
+  // SECTION 1: STATIC ROUTES (No path parameters)
+  // These routes have fixed paths and must be defined first
   // ============================================================================
 
-  // GET /api/products - Get all products with filters, search, pagination, sorting
+  /**
+   * GET /api/products
+   * Get all products with advanced filtering, search, pagination, and sorting
+   * 
+   * Query Parameters:
+   * - category: Filter by category
+   * - q: Search term (matches name, description, tags, SKU, supplier)
+   * - sort: Sort field (default: createdAt)
+   * - order: Sort order (asc/desc, default: desc)
+   * - page: Page number (default: 1)
+   * - limit: Items per page (default: 12, max: 100)
+   * - featured: Filter featured products (true/false)
+   * - minPrice/maxPrice: Price range filter
+   * - minRating: Minimum rating filter
+   * - tags: Comma-separated tags
+   * - supplier: Filter by supplier (ID or name)
+   * - minProfitMargin: Minimum profit margin percentage
+   * - lowStock: Filter products with stock <= 10
+   */
   router.get('/', async (req: Request, res: Response) => {
     try {
       const {
@@ -79,17 +126,21 @@ function productRoutes(productModel: typeof ProductModel) {
         lowStock
       } = req.query;
 
+      // Build filter query
       const query: any = {};
 
       if (category) query.category = category;
       if (featured === 'true') query.featured = true;
       if (tags) query.tags = { $in: (tags as string).split(',') };
+      
       if (minPrice || maxPrice) {
         query.price = {};
         if (minPrice) query.price.$gte = parseFloat(minPrice as string);
         if (maxPrice) query.price.$lte = parseFloat(maxPrice as string);
       }
+      
       if (minRating) query.rating = { $gte: Number(minRating) };
+      
       if (supplier) {
         if (mongoose.Types.ObjectId.isValid(supplier as string)) {
           query.supplier = supplier;
@@ -97,10 +148,12 @@ function productRoutes(productModel: typeof ProductModel) {
           query.supplierName = { $regex: supplier, $options: 'i' };
         }
       }
+      
       if (lowStock === 'true') {
         query.stock = { $lte: 10 };
       }
 
+      // Search functionality
       if (search) {
         query.$or = [
           { name: { $regex: search, $options: 'i' } },
@@ -111,13 +164,16 @@ function productRoutes(productModel: typeof ProductModel) {
         ];
       }
 
+      // Pagination
       const pageNum = Math.max(1, parseInt(page as string));
       const limitNum = Math.max(1, Math.min(100, parseInt(limit as string)));
       const skip = (pageNum - 1) * limitNum;
 
+      // Sorting
       const sortObj: any = {};
       sortObj[sort as string] = order === 'desc' ? -1 : 1;
 
+      // Execute query
       let products = await ProductModel.find(query)
         .sort(sortObj)
         .limit(limitNum)
@@ -126,6 +182,7 @@ function productRoutes(productModel: typeof ProductModel) {
 
       const total = await ProductModel.countDocuments(query);
 
+      // Filter by profit margin (client-side filter)
       if (minProfitMargin) {
         const marginThreshold = parseFloat(minProfitMargin as string);
         products = products.filter(p => {
@@ -148,24 +205,32 @@ function productRoutes(productModel: typeof ProductModel) {
         }
       });
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching products:', error);
       res.status(500).json({ error: 'Error fetching products' });
     }
   });
 
-  // GET /api/products/brands - Get all unique brands
+  /**
+   * GET /api/products/brands
+   * Get all unique brands from products
+   * Used for filtering and autocomplete
+   */
   router.get('/brands', async (req: Request, res: Response) => {
     try {
       const brands = await ProductModel.distinct('brand');
       const validBrands = brands.filter(brand => brand && brand !== '');
       res.json(validBrands);
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching brands:', error);
       res.status(500).json({ error: 'Error fetching brands' });
     }
   });
 
-  // GET /api/products/suppliers/list - Get all unique suppliers (for filtering)
+  /**
+   * GET /api/products/suppliers/list
+   * Get all unique supplier names (Admin only)
+   * Used for filtering products by supplier
+   */
   router.get('/suppliers/list', authMiddleware, async (req: Request, res: Response) => {
     try {
       if (!isAdmin(req)) {
@@ -176,12 +241,15 @@ function productRoutes(productModel: typeof ProductModel) {
       const validSuppliers = suppliers.filter(s => s && s !== '');
       res.json(validSuppliers);
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching suppliers:', error);
       res.status(500).json({ error: 'Error fetching suppliers' });
     }
   });
 
-  // GET /api/products/image/:fileId - Serve product image from GridFS
+  /**
+   * GET /api/products/image/:fileId
+   * Serve product images from GridFS
+   */
   router.get('/image/:fileId', async (req: Request, res: Response) => {
     try {
       const { fileId } = req.params;
@@ -203,10 +271,17 @@ function productRoutes(productModel: typeof ProductModel) {
     }
   });
 
-  // POST /api/products/upload-images - Upload images without product association
+  /**
+   * POST /api/products/upload-images
+   * Upload product images without associating with a product yet
+   * Used during product creation workflow
+   */
   router.post('/upload-images', authMiddleware, upload.array('images', 6), async (req: Request, res: Response) => {
     try {
-      if (!isAdmin(req)) return res.status(403).json({ error: 'Admin access required' });
+      if (!isAdmin(req)) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+      
       if (!req.files || (req.files as any[]).length === 0) {
         return res.status(400).json({ error: 'No files uploaded' });
       }
@@ -249,7 +324,11 @@ function productRoutes(productModel: typeof ProductModel) {
     }
   });
 
-  // GET /api/products/stats/profit-summary - Get profit statistics
+  /**
+   * GET /api/products/stats/profit-summary
+   * Get profit statistics for all products (Admin only)
+   * Returns average profit margin, markup, inventory value, etc.
+   */
   router.get('/stats/profit-summary', authMiddleware, async (req: Request, res: Response) => {
     try {
       if (!isAdmin(req)) {
@@ -300,10 +379,108 @@ function productRoutes(productModel: typeof ProductModel) {
   });
 
   // ============================================================================
-  // DYNAMIC/PARAMETERIZED ROUTES - Must come after static routes
+  // SECTION 2: SLUG-BASED ROUTES (Specific pattern: /slug/:slug)
+  // These must come before ID routes to prevent slug values being treated as IDs
   // ============================================================================
 
-  // POST /api/products - Create a new product
+  /**
+   * GET /api/products/slug/:slug
+   * Get a single product by its slug
+   * 
+   * This is the PREFERRED method for retrieving products in the frontend
+   * as slugs are SEO-friendly and human-readable
+   */
+  router.get('/slug/:slug', async (req: Request, res: Response) => {
+    try {
+      const { slug } = req.params;
+      
+      const product = await ProductModel.findOne({ slug })
+        .populate('supplier', 'name email phone address paymentTerms')
+        .lean();
+      
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      
+      const productWithMetrics = {
+        ...product,
+        profitMargin: product.profitMargin,
+        profitAmount: product.profitAmount,
+        marginPercentage: product.marginPercentage
+      };
+      
+      res.json(productWithMetrics);
+    } catch (error) {
+      console.error('Error fetching product by slug:', error);
+      res.status(500).json({ error: 'Error fetching product' });
+    }
+  });
+
+  /**
+   * PUT /api/products/slug/:slug
+   * Update a product by its slug (Admin/Sales only)
+   */
+  router.put('/slug/:slug', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      if (!isAdmin(req)) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+      
+      const { slug } = req.params;
+      const updateData = { ...req.body };
+      
+      // Prevent updating immutable fields
+      delete updateData._id;
+      delete updateData.createdAt;
+      delete updateData.updatedAt;
+      
+      // Ensure price is a number
+      if (updateData.price !== undefined && updateData.price !== null) {
+        updateData.price = typeof updateData.price === 'string' 
+          ? parseFloat(updateData.price) 
+          : Number(updateData.price);
+      }
+      
+      // Ensure buyingPrice is a number
+      if (updateData.buyingPrice !== undefined && updateData.buyingPrice !== null) {
+        updateData.buyingPrice = typeof updateData.buyingPrice === 'string' 
+          ? parseFloat(updateData.buyingPrice) 
+          : Number(updateData.buyingPrice);
+      }
+      
+      const product = await ProductModel.findOneAndUpdate(
+        { slug },
+        updateData,
+        { new: true, runValidators: true }
+      );
+      
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      
+      res.json(product);
+    } catch (error: any) {
+      console.error('Update product by slug error:', error);
+      res.status(400).json({ error: error.message || 'Error updating product' });
+    }
+  });
+
+  // ============================================================================
+  // SECTION 3: PRODUCT CREATION (POST routes)
+  // These don't conflict with parameterized routes
+  // ============================================================================
+
+  /**
+   * POST /api/products
+   * Create a new product (Admin/Sales only)
+   * 
+   * Automatically:
+   * - Generates a SKU if not provided
+   * - Creates a slug from the product name
+   * - Links to supplier if supplierId is provided
+   * - Initializes buying price history
+   * - Sends notifications to admins
+   */
   router.post('/', authMiddleware, async (req: Request, res: Response) => {
     try {
       const role = (req as any).user?.role;
@@ -377,7 +554,7 @@ function productRoutes(productModel: typeof ProductModel) {
         });
       }
       
-      // Create notification
+      // Create notification for admins
       try {
         const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
         if (adminUsers.length > 0) {
@@ -414,16 +591,69 @@ function productRoutes(productModel: typeof ProductModel) {
     }
   });
 
-  // POST /api/products/:id/upload-images - Add images to existing product
+  // ============================================================================
+  // SECTION 4: ID-BASED ROUTES (/:id)
+  // These must come LAST as they catch any parameter
+  // They serve as fallback for backward compatibility
+  // ============================================================================
+
+  /**
+   * GET /api/products/:id
+   * Get a single product by its MongoDB ObjectId
+   * 
+   * NOTE: This is a FALLBACK method. The preferred method is using slug.
+   * This is kept for backward compatibility with existing systems.
+   */
+  router.get('/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Validate ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'Invalid product ID format' });
+      }
+      
+      const product = await ProductModel.findById(id)
+        .populate('supplier', 'name email phone address paymentTerms')
+        .lean();
+      
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      
+      const productWithMetrics = {
+        ...product,
+        profitMargin: product.profitMargin,
+        profitAmount: product.profitAmount,
+        marginPercentage: product.marginPercentage
+      };
+      
+      res.json(productWithMetrics);
+    } catch (error) {
+      console.error('Error fetching product by ID:', error);
+      res.status(500).json({ error: 'Error fetching product' });
+    }
+  });
+
+  /**
+   * POST /api/products/:id/upload-images
+   * Add images to an existing product (Admin only)
+   * Maximum 6 images per upload
+   */
   router.post('/:id/upload-images', authMiddleware, upload.array('images', 6), async (req: Request, res: Response) => {
     try {
-      if (!isAdmin(req)) return res.status(403).json({ error: 'Admin access required' });
+      if (!isAdmin(req)) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+      
       if (!req.files || (req.files as any[]).length === 0) {
         return res.status(400).json({ error: 'No files uploaded' });
       }
 
       const product = await ProductModel.findById(req.params.id);
-      if (!product) return res.status(404).json({ error: 'Product not found' });
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
 
       const bucket = getGridFSBucket();
       const newImages: Image[] = [];
@@ -472,13 +702,21 @@ function productRoutes(productModel: typeof ProductModel) {
     }
   });
 
-  // DELETE /api/products/:id/images/:index - Remove image from product
+  /**
+   * DELETE /api/products/:id/images/:index
+   * Remove a specific image from a product (Admin only)
+   * Also deletes the file from GridFS
+   */
   router.delete('/:id/images/:index', authMiddleware, async (req: Request, res: Response) => {
     try {
-      if (!isAdmin(req)) return res.status(403).json({ error: 'Admin access required' });
+      if (!isAdmin(req)) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
 
       const product = await ProductModel.findById(req.params.id);
-      if (!product) return res.status(404).json({ error: 'Product not found' });
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
 
       const index = parseInt(req.params.index);
       if (isNaN(index) || index < 0 || index >= product.images.length) {
@@ -494,14 +732,22 @@ function productRoutes(productModel: typeof ProductModel) {
       product.images.splice(index, 1);
       await product.save();
 
-      res.json({ success: true, message: 'Image deleted successfully', remaining: product.images.length });
+      res.json({ 
+        success: true, 
+        message: 'Image deleted successfully', 
+        remaining: product.images.length 
+      });
     } catch (error: any) {
       console.error('Delete image error:', error);
       res.status(500).json({ error: 'Failed to delete image' });
     }
   });
 
-  // PATCH /api/products/:id/buying-price - Update product buying price
+  /**
+   * PATCH /api/products/:id/buying-price
+   * Update product buying price and track history (Admin only)
+   * Maintains a price history log for auditing
+   */
   router.patch('/:id/buying-price', authMiddleware, async (req: Request, res: Response) => {
     try {
       if (!isAdmin(req)) {
@@ -522,6 +768,7 @@ function productRoutes(productModel: typeof ProductModel) {
       
       const newPrice = parseFloat(buyingPrice);
       
+      // Use model method if available, otherwise manual update
       if (typeof product.updateBuyingPrice === 'function') {
         await product.updateBuyingPrice(newPrice, (req.user as any).userId, reason);
       } else {
@@ -535,6 +782,7 @@ function productRoutes(productModel: typeof ProductModel) {
         await product.save();
       }
       
+      // Create notification
       await createNotification({
         userId: (req.user as any).userId,
         type: 'system',
@@ -565,177 +813,13 @@ function productRoutes(productModel: typeof ProductModel) {
     }
   });
 
-  // GET /api/products/:slug - Get single product by slug (must be before DELETE and PUT by ID)
-  router.get('/:slug', async (req: Request, res: Response) => {
-    try {
-      const { slug } = req.params;
-      
-      // Check if the parameter is a valid ObjectId
-      // If it is, try to find by ID first (backward compatibility)
-      if (mongoose.Types.ObjectId.isValid(slug)) {
-        const productById = await ProductModel.findById(slug)
-          .populate('supplier', 'name email phone address paymentTerms')
-          .lean();
-        
-        if (productById) {
-          const productWithMetrics = {
-            ...productById,
-            profitMargin: productById.profitMargin,
-            profitAmount: productById.profitAmount,
-            marginPercentage: productById.marginPercentage
-          };
-          return res.json(productWithMetrics);
-        }
-      }
-      
-      // Find by slug
-      const product = await ProductModel.findOne({ slug })
-        .populate('supplier', 'name email phone address paymentTerms')
-        .lean();
-      
-      if (!product) {
-        return res.status(404).json({ error: 'Product not found' });
-      }
-      
-      const productWithMetrics = {
-        ...product,
-        profitMargin: product.profitMargin,
-        profitAmount: product.profitAmount,
-        marginPercentage: product.marginPercentage
-      };
-      
-      res.json(productWithMetrics);
-    } catch (error) {
-      console.error('Error fetching product:', error);
-      res.status(500).json({ error: 'Error fetching product' });
-    }
-  });
-
-  // PUT /api/products/slug/:slug - Update product by slug
-  router.put('/slug/:slug', authMiddleware, async (req: Request, res: Response) => {
-    try {
-      if (!isAdmin(req)) {
-        return res.status(403).json({ error: 'Admin access required' });
-      }
-      
-      const { slug } = req.params;
-      const updateData = { ...req.body };
-      
-      // Remove ID fields if present
-      delete updateData._id;
-      delete updateData.createdAt;
-      delete updateData.updatedAt;
-      
-      // Ensure price is a number
-      if (updateData.price !== undefined && updateData.price !== null) {
-        updateData.price = typeof updateData.price === 'string' 
-          ? parseFloat(updateData.price) 
-          : Number(updateData.price);
-      }
-      
-      // Ensure buyingPrice is a number
-      if (updateData.buyingPrice !== undefined && updateData.buyingPrice !== null) {
-        updateData.buyingPrice = typeof updateData.buyingPrice === 'string' 
-          ? parseFloat(updateData.buyingPrice) 
-          : Number(updateData.buyingPrice);
-      }
-      
-      // Find and update by slug
-      const product = await ProductModel.findOneAndUpdate(
-        { slug },
-        updateData,
-        { new: true, runValidators: true }
-      );
-      
-      if (!product) {
-        return res.status(404).json({ error: 'Product not found' });
-      }
-      
-      res.json(product);
-    } catch (error: any) {
-      console.error('Update product by slug error:', error);
-      res.status(400).json({ error: error.message || 'Error updating product' });
-    }
-  });
-
-  // DELETE /api/products/:id - Delete product by ID
-  router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
-    try {
-      if (!isAdmin(req)) {
-        return res.status(403).json({ error: 'Admin access required' });
-      }
-      
-      const { id } = req.params;
-      
-      // Validate ObjectId
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ error: 'Invalid product ID' });
-      }
-      
-      // Find the product first
-      const product = await ProductModel.findById(id);
-      if (!product) {
-        return res.status(404).json({ error: 'Product not found' });
-      }
-      
-      // Delete associated GridFS images if any
-      const bucket = getGridFSBucket();
-      for (const image of product.images) {
-        if (image.type === 'gridfs' && image.fileId) {
-          try {
-            await bucket.delete(image.fileId);
-          } catch (err) {
-            console.error(`Failed to delete GridFS file ${image.fileId}:`, err);
-          }
-        }
-      }
-      
-      // Delete the product
-      await product.deleteOne();
-      
-      // Create audit log
-      await createAuditLog(req as any, {
-        action: 'delete',
-        resource: 'product',
-        resourceId: product._id.toString(),
-        details: `Product deleted: ${product.name}`,
-        skipIfNoUser: false
-      });
-      
-      // Create notification
-      try {
-        const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
-        if (adminUsers.length > 0) {
-          const notificationPromises = adminUsers.map(admin => 
-            createNotification({
-              userId: admin._id.toString(),
-              type: 'system',
-              title: `Product Deleted: ${product.name}`,
-              message: `Product "${product.name}" has been deleted from the store.`,
-              actionUrl: `/dashboard/products`,
-              metadata: {
-                productId: product._id.toString(),
-                productName: product.name,
-                productSlug: product.slug,
-                deletedBy: (req.user as any)?.email || (req.user as any)?.name || 'Admin',
-                deletedAt: new Date().toISOString()
-              }
-            })
-          );
-          await Promise.all(notificationPromises);
-        }
-      } catch (notificationErr) {
-        console.error('Failed to create product deletion notification:', notificationErr);
-      }
-      
-      res.json({ message: 'Product deleted successfully' });
-    } catch (error) {
-      console.error('Delete product error:', error);
-      res.status(500).json({ error: 'Error deleting product' });
-    }
-  });
-
-  // PUT /api/products/:id - Update product by ID (must be last as it catches all ID routes)
+  /**
+   * PUT /api/products/:id
+   * Update a product by its ID (Admin/Sales only)
+   * 
+   * NOTE: This is a FALLBACK method. The preferred method is using slug.
+   * This is kept for backward compatibility with existing systems.
+   */
   router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
     try {
       const role = (req as any).user?.role;
@@ -746,17 +830,20 @@ function productRoutes(productModel: typeof ProductModel) {
       const { id } = req.params;
       const updateData = { ...req.body };
       
+      // Get original product for comparison
       const originalProduct = await ProductModel.findById(id);
       if (!originalProduct) {
         return res.status(404).json({ error: 'Product not found' });
       }
       
+      // Ensure price is a number
       if (updateData.price !== undefined) {
         updateData.price = typeof updateData.price === 'string' 
           ? parseFloat(updateData.price) 
           : Number(updateData.price);
       }
       
+      // Handle buying price changes with history tracking
       let buyingPriceChanged = false;
       if (updateData.buyingPrice !== undefined && updateData.buyingPrice !== originalProduct.buyingPrice) {
         buyingPriceChanged = true;
@@ -774,6 +861,7 @@ function productRoutes(productModel: typeof ProductModel) {
         }
       }
       
+      // Handle supplier reference
       if (updateData.supplierId) {
         const supplier = await SupplierModel.findById(updateData.supplierId);
         if (supplier) {
@@ -783,6 +871,7 @@ function productRoutes(productModel: typeof ProductModel) {
         delete updateData.supplierId;
       }
       
+      // Handle compare at price
       if (updateData.compareAtPrice !== undefined) {
         if (updateData.compareAtPrice === '' || updateData.compareAtPrice === null) {
           updateData.compareAtPrice = null;
@@ -798,6 +887,7 @@ function productRoutes(productModel: typeof ProductModel) {
         }
       }
       
+      // Perform update
       let product;
       if (buyingPriceChanged && typeof originalProduct.updateBuyingPrice === 'function') {
         product = await ProductModel.findByIdAndUpdate(
@@ -817,7 +907,7 @@ function productRoutes(productModel: typeof ProductModel) {
         return res.status(404).json({ error: 'Product not found' });
       }
       
-      // Create notifications for changes
+      // Create notifications for significant changes
       try {
         const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
         const changes: string[] = [];
@@ -825,6 +915,7 @@ function productRoutes(productModel: typeof ProductModel) {
         if (originalProduct.stock !== product.stock) {
           changes.push(`stock changed from ${originalProduct.stock} to ${product.stock}`);
           
+          // Low stock alert
           if (product.stock < 10 && product.stock > 0 && adminUsers.length > 0) {
             const lowStockTemplate = NOTIFICATION_TEMPLATES.lowStock(product.name, product.stock);
             const notificationPromises = adminUsers.map(admin => 
@@ -858,6 +949,7 @@ function productRoutes(productModel: typeof ProductModel) {
           changes.push(`supplier changed from ${originalProduct.supplierName || 'None'} to ${product.supplierName || 'None'}`);
         }
         
+        // Send notifications if there are changes
         if (changes.length > 0 && adminUsers.length > 0) {
           const notificationPromises = adminUsers.map(admin => 
             createNotification({
@@ -884,6 +976,89 @@ function productRoutes(productModel: typeof ProductModel) {
     } catch (error: any) {
       console.error('Update product error:', error);
       res.status(400).json({ error: error.message || 'Error updating product' });
+    }
+  });
+
+  /**
+   * DELETE /api/products/:id
+   * Delete a product by its ID (Admin only)
+   * Also removes associated images from GridFS
+   * 
+   * NOTE: This is a FALLBACK method. The preferred method is using slug.
+   * This is kept for backward compatibility with existing systems.
+   */
+  router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      if (!isAdmin(req)) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+      
+      const { id } = req.params;
+      
+      // Validate ObjectId
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'Invalid product ID' });
+      }
+      
+      const product = await ProductModel.findById(id);
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      
+      // Delete associated GridFS images
+      const bucket = getGridFSBucket();
+      for (const image of product.images) {
+        if (image.type === 'gridfs' && image.fileId) {
+          try {
+            await bucket.delete(image.fileId);
+          } catch (err) {
+            console.error(`Failed to delete GridFS file ${image.fileId}:`, err);
+          }
+        }
+      }
+      
+      // Delete the product
+      await product.deleteOne();
+      
+      // Create audit log
+      await createAuditLog(req as any, {
+        action: 'delete',
+        resource: 'product',
+        resourceId: product._id.toString(),
+        details: `Product deleted: ${product.name}`,
+        skipIfNoUser: false
+      });
+      
+      // Create notification for admins
+      try {
+        const adminUsers = await UserModel.find({ role: 'admin', isActive: true });
+        if (adminUsers.length > 0) {
+          const notificationPromises = adminUsers.map(admin => 
+            createNotification({
+              userId: admin._id.toString(),
+              type: 'system',
+              title: `Product Deleted: ${product.name}`,
+              message: `Product "${product.name}" has been deleted from the store.`,
+              actionUrl: `/dashboard/products`,
+              metadata: {
+                productId: product._id.toString(),
+                productName: product.name,
+                productSlug: product.slug,
+                deletedBy: (req.user as any)?.email || (req.user as any)?.name || 'Admin',
+                deletedAt: new Date().toISOString()
+              }
+            })
+          );
+          await Promise.all(notificationPromises);
+        }
+      } catch (notificationErr) {
+        console.error('Failed to create product deletion notification:', notificationErr);
+      }
+      
+      res.json({ message: 'Product deleted successfully' });
+    } catch (error) {
+      console.error('Delete product error:', error);
+      res.status(500).json({ error: 'Error deleting product' });
     }
   });
 

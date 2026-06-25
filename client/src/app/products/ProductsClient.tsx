@@ -1,5 +1,28 @@
 'use client';
 
+/**
+ * Products Client Component
+ * 
+ * A full-featured product listing page with advanced filtering, sorting, 
+ * pagination, and both grid/list view modes. Uses React Query for data 
+ * fetching and caching with optimistic UI updates.
+ * 
+ * Features:
+ * - Search by product name, description, SKU, and supplier
+ * - Category and brand filtering with dropdown menus
+ * - Price range filtering with dual-range sliders
+ * - In-stock only toggle
+ * - Multiple sort options (featured, price, rating, name)
+ * - Grid and list view modes
+ * - Pagination with page numbers
+ * - Rich text rendering for product descriptions
+ * - Persistent URL state for shareable filters
+ * - Cart integration with floating cart button
+ * - Excludes Labour, Transport, and Other categories
+ * - Responsive design with mobile-first approach
+ * - Dark mode support
+ */
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -22,68 +45,121 @@ import { Product } from '@/types/product';
 import ProductCard from '@/components/ProductCard';
 import { useCartStore } from '@/store/cart';
 import { getProducts, getBrands } from '@/lib/api';
+import RichTextRenderer from '@/components/RichTextRenderer';
 
-// Categories to exclude from display
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/** Categories that should be hidden from the public product listing */
 const EXCLUDED_CATEGORIES = ['Labour', 'Transport', 'Other'];
 
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
 export default function ProductsClient() {
+  // --------------------------------------------------------------------------
+  // URL State Management (Read from URL params on mount)
+  // --------------------------------------------------------------------------
+  
   const searchParams = useSearchParams();
 
+  /** Search query string for product name/description filtering */
   const [search, setSearch] = useState(searchParams.get('q') || '');
+  
+  /** Currently selected category filter ('all' means no filter) */
   const [selectedCategory, setSelectedCategory] = useState(
     searchParams.get('category') || 'all',
   );
+  
+  /** Currently selected brand filter ('all' means no filter) */
   const [selectedBrand, setSelectedBrand] = useState(searchParams.get('brand') || 'all');
 
+  /** Minimum price for range filtering */
   const [minPrice, setMinPrice] = useState(() => {
     const min = searchParams.get('minPrice');
     return min ? parseInt(min) : 0;
   });
 
+  /** Maximum price for range filtering */
   const [maxPrice, setMaxPrice] = useState(() => {
     const max = searchParams.get('maxPrice');
     return max ? parseInt(max) : 1000000;
   });
 
+  /** Current sort method for product ordering */
   const [sortBy, setSortBy] = useState<
     'all' | 'featured' | 'price-low' | 'price-high' | 'rating' | 'name'
   >((searchParams.get('sort') as any) || 'all');
 
+  /** Display mode: 'grid' for card layout, 'list' for row layout */
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  /** Toggle to show only products with stock > 0 */
   const [showInStockOnly, setShowInStockOnly] = useState(searchParams.get('inStock') === 'true');
 
+  /** Mobile responsive filter panel visibility */
   const [showFilters, setShowFilters] = useState(false);
 
+  /** Current pagination page number (1-indexed) */
   const [currentPage, setCurrentPage] = useState(() => {
     const page = searchParams.get('page');
     return page ? parseInt(page) : 1;
   });
 
+  // --------------------------------------------------------------------------
+  // Constants & Store
+  // --------------------------------------------------------------------------
+  
+  /** Number of products to display per page */
   const itemsPerPage = 12;
+  
+  /** Total items in the user's cart for the floating cart button */
   const cartItemsCount = useCartStore((state) => state.totalItems);
 
-  // Fetch brands separately (just for pre-fetching, but we'll use all products for filter options)
+  // --------------------------------------------------------------------------
+  // Data Fetching
+  // --------------------------------------------------------------------------
+
+  /**
+   * Pre-fetch all brands for the filter dropdown
+   * This runs in the background and caches brand names for autocomplete
+   */
   useQuery({
     queryKey: ['brands'],
     queryFn: () => getBrands().catch(() => []),
-    staleTime: 30 * 60 * 1000,
+    staleTime: 30 * 60 * 1000, // 30 minutes cache
     placeholderData: [],
   });
 
-  // Fetch all products for filter options (client-side filtering of excluded categories)
+  /**
+   * Fetch ALL products (unpaginated) for building filter options
+   * This allows us to show accurate category/brand counts and price ranges
+   */
   const { data: allProductsData } = useQuery({
     queryKey: ['all-products-for-filters'],
     queryFn: () => getProducts({ limit: 1000 }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 
-  // Filter out excluded categories from the full product list
+  /**
+   * Filter out excluded categories from the full product list
+   * This ensures Labour, Transport, and Other categories are never shown
+   */
   const allProducts = useMemo(() => {
     const products = (allProductsData?.products || []) as Product[];
     return products.filter((product) => !EXCLUDED_CATEGORIES.includes(product.category));
   }, [allProductsData]);
 
-  // Build categories list from filtered allProducts
+  // --------------------------------------------------------------------------
+  // Filter Options Builders
+  // --------------------------------------------------------------------------
+
+  /**
+   * Build category filter options with counts
+   * Shows all categories except excluded ones with product counts
+   */
   const categories = useMemo(() => {
     const categoriesMap = new Map<string, number>();
     allProducts.forEach((p) => {
@@ -102,9 +178,15 @@ export default function ProductsClient() {
     ];
   }, [allProducts]);
 
+  /**
+   * Normalize brand names for case-insensitive deduplication
+   */
   const normalizeBrand = (value?: string | null) => (value || '').trim().toLowerCase();
 
-  // Build brands list from filtered allProducts
+  /**
+   * Build brand filter options with counts
+   * Deduplicates brand names and shows product counts
+   */
   const allBrands = useMemo(() => {
     const brandsMap = new Map<string, { value: string; label: string; count: number }>();
 
@@ -125,6 +207,10 @@ export default function ProductsClient() {
     ];
   }, [allProducts]);
 
+  /**
+   * Calculate the overall price range from all products
+   * Used for initializing the price slider min/max values
+   */
   const priceRange = useMemo(() => {
     const prices = allProducts.map((p) => Number(p.price)).filter((p) => !isNaN(p));
     if (prices.length === 0) return { min: 0, max: 1000000 };
@@ -134,7 +220,14 @@ export default function ProductsClient() {
     };
   }, [allProducts]);
 
-  // Sync min/max price with range on initial load
+  // --------------------------------------------------------------------------
+  // Effects
+  // --------------------------------------------------------------------------
+
+  /**
+   * Sync min/max price with the actual price range on initial load
+   * Prevents the slider from being out of bounds
+   */
   useEffect(() => {
     if (priceRange.max > 0) {
       setMaxPrice((prev) => (prev > priceRange.max ? priceRange.max : prev));
@@ -142,21 +235,31 @@ export default function ProductsClient() {
     }
   }, [priceRange]);
 
-  // Build API params for the main product query (excluding categories are filtered client-side as well for safety)
+  /**
+   * Build API parameters for the main product query
+   * Transforms UI state into API-compatible query params
+   */
   const getApiParams = useMemo(() => {
     const params: any = {
       page: currentPage,
       limit: itemsPerPage,
     };
 
+    // Search filtering
     if (search.trim()) params.q = search.trim();
+    
+    // Category and brand filters
     if (selectedCategory !== 'all') params.category = selectedCategory;
     if (selectedBrand !== 'all' && selectedBrand !== '') params.brand = selectedBrand;
 
+    // Price range filters
     if (minPrice > 0 && !isNaN(minPrice)) params.minPrice = minPrice;
     if (maxPrice < priceRange.max && !isNaN(maxPrice)) params.maxPrice = maxPrice;
+    
+    // Stock availability filter
     if (showInStockOnly) params.minStock = 1;
 
+    // Sort options mapping
     switch (sortBy) {
       case 'price-low':
         params.sort = 'price';
@@ -177,6 +280,9 @@ export default function ProductsClient() {
       case 'featured':
         params.featured = true;
         break;
+      default:
+        // 'all' - no additional sorting
+        break;
     }
 
     return params;
@@ -192,20 +298,29 @@ export default function ProductsClient() {
     priceRange.max,
   ]);
 
-  // Main query for paginated products
+  /**
+   * Main product query with pagination and filtering
+   * Uses keepPreviousData for smooth pagination transitions
+   */
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['products', getApiParams],
     queryFn: () => getProducts(getApiParams),
     placeholderData: keepPreviousData,
   });
 
-  // Filter API products to exclude unwanted categories (double safety)
+  /**
+   * Filter API products to exclude unwanted categories (double safety)
+   * Ensures Labour, Transport, and Other are never displayed
+   */
   const apiProducts = useMemo(() => {
     const products = (data?.products || []) as Product[];
     return products.filter((product) => !EXCLUDED_CATEGORIES.includes(product.category));
   }, [data?.products]);
 
-  // Update URL params when filters change
+  /**
+   * Update URL query params when filters change
+   * Enables shareable and bookmarkable filtered states
+   */
   useEffect(() => {
     const params = new URLSearchParams();
     if (selectedCategory !== 'all') params.set('category', selectedCategory);
@@ -232,6 +347,14 @@ export default function ProductsClient() {
     priceRange.max,
   ]);
 
+  // --------------------------------------------------------------------------
+  // Helper Functions
+  // --------------------------------------------------------------------------
+
+  /**
+   * Format price in Kenyan Shillings (KES)
+   * Removes decimal places for cleaner display
+   */
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
@@ -241,6 +364,9 @@ export default function ProductsClient() {
     }).format(price).replace('KSh', 'KSh');
   };
 
+  /**
+   * Count active filters for the clear button badge
+   */
   const activeFiltersCount =
     (selectedCategory !== 'all' ? 1 : 0) +
     (selectedBrand !== 'all' ? 1 : 0) +
@@ -248,6 +374,10 @@ export default function ProductsClient() {
     (showInStockOnly ? 1 : 0) +
     (search ? 1 : 0);
 
+  /**
+   * Reset all filters to their default states
+   * Also resets pagination to page 1
+   */
   const clearAllFilters = () => {
     setSelectedCategory('all');
     setSelectedBrand('all');
@@ -258,7 +388,9 @@ export default function ProductsClient() {
     setCurrentPage(1);
   };
 
-  // Get the original pagination info from API
+  /**
+   * Get pagination info from API response
+   */
   const apiPagination = data?.pagination as
     | {
         page: number;
@@ -270,29 +402,31 @@ export default function ProductsClient() {
       }
     | undefined;
 
-
-  // Check if we have enough products to fill the grid after excluding categories
+  /**
+   * Check if we have enough products to fill the grid
+   * Used to determine if "Next" page should be active
+   */
   const filteredProducts = apiProducts;
   const expectedPerPage = itemsPerPage;
-  const isLastPagePotentiallyShort = filteredProducts.length < expectedPerPage && apiPagination?.hasNext === false;
+  const hasMorePages = apiPagination?.hasNext === true && filteredProducts.length === expectedPerPage;
 
-  // Use the API pagination but note that the actual total might be lower due to excluded categories
-  // We'll adjust total count by estimating based on the ratio of filtered to total products from first page?
-  // Not perfect, but gives a better user experience.
+  // --------------------------------------------------------------------------
+  // Pagination Controls
+  // --------------------------------------------------------------------------
 
-  // For a more accurate count, we fetch total from API but we don't know how many excluded categories exist.
-  // As a UX improvement, we'll rely on API total and inform users if categories are excluded.
-  // But to avoid gaps, we'll just show the products that are returned after filtering.
-
-  const totalProductsDisplayed = filteredProducts.length;
-  const hasMorePages = apiPagination?.hasNext === true && totalProductsDisplayed === expectedPerPage;
-
-  // Hand-crafted pagination controls that work with our filtered results
+  /**
+   * Navigate to a specific page
+   * Scrolls to top smoothly for better UX
+   */
   const goToPage = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  /**
+   * Navigate to the next page
+   * Only works if there are more pages available
+   */
   const handleNextPage = () => {
     if (hasMorePages) {
       setCurrentPage((p) => p + 1);
@@ -300,6 +434,10 @@ export default function ProductsClient() {
     }
   };
 
+  /**
+   * Navigate to the previous page
+   * Only works if we're not on page 1
+   */
   const handlePrevPage = () => {
     if (currentPage > 1) {
       setCurrentPage((p) => p - 1);
@@ -307,29 +445,46 @@ export default function ProductsClient() {
     }
   };
 
-  // Generate page numbers for pagination UI
+  /**
+   * Generate pagination range with ellipsis for large page counts
+   * Shows current page, neighbors, and first/last pages
+   */
   const getPaginationRange = () => {
     const totalPages = apiPagination?.pages || 1;
     const current = currentPage;
-    const delta = 2;
+    const delta = 2; // Number of pages to show on each side of current
     const range = [];
+    
+    // Add pages between 2 and current - delta
     for (let i = Math.max(2, current - delta); i <= Math.min(totalPages - 1, current + delta); i++) {
       range.push(i);
     }
+    
+    // Add ellipsis for gaps
     if (current - delta > 2) {
       range.unshift('...');
     }
     if (current + delta < totalPages - 1) {
       range.push('...');
     }
+    
+    // Add first and last pages
     range.unshift(1);
     if (totalPages !== 1) range.push(totalPages);
+    
     return range;
   };
 
   const paginationRange = getPaginationRange();
 
-  // Loading state
+  // --------------------------------------------------------------------------
+  // Loading & Error States
+  // --------------------------------------------------------------------------
+
+  /**
+   * Loading skeleton with animated placeholders
+   * Shown while initial data is being fetched
+   */
   if (isLoading && !data) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
@@ -348,6 +503,10 @@ export default function ProductsClient() {
     );
   }
 
+  /**
+   * Error state with retry button
+   * Shown when the product fetch fails
+   */
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -366,12 +525,23 @@ export default function ProductsClient() {
     );
   }
 
+  // --------------------------------------------------------------------------
+  // Main Render
+  // --------------------------------------------------------------------------
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pt-8 md:pt-12 lg:pt-16">
-        {/* Header and Filters */}
+        
+        {/* ====================================================================
+          FILTERS & SEARCH HEADER
+        ==================================================================== */}
         <div className="mb-6 space-y-4">
+          
+          {/* Search Bar and Sort Controls */}
           <div className="flex flex-col sm:flex-row gap-3">
+            
+            {/* Search Input */}
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -380,13 +550,16 @@ export default function ProductsClient() {
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
-                  setCurrentPage(1);
+                  setCurrentPage(1); // Reset pagination on search
                 }}
                 className="w-full pl-11 pr-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
 
+            {/* Sort and View Controls */}
             <div className="flex gap-2">
+              
+              {/* Sort Dropdown */}
               <div className="relative">
                 <select
                   value={sortBy}
@@ -412,6 +585,7 @@ export default function ProductsClient() {
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
               </div>
 
+              {/* Mobile Filter Toggle */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="lg:hidden px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl"
@@ -419,12 +593,14 @@ export default function ProductsClient() {
                 <SlidersHorizontal className="w-4 h-4" />
               </button>
 
+              {/* View Mode Toggle (Desktop) */}
               <div className="hidden sm:flex items-center gap-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1">
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2 rounded-lg transition-all ${
                     viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-gray-600 dark:text-gray-400'
                   }`}
+                  aria-label="Grid view"
                 >
                   <Grid className="w-4 h-4" />
                 </button>
@@ -433,6 +609,7 @@ export default function ProductsClient() {
                   className={`p-2 rounded-lg transition-all ${
                     viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600 dark:text-gray-400'
                   }`}
+                  aria-label="List view"
                 >
                   <List className="w-4 h-4" />
                 </button>
@@ -440,7 +617,7 @@ export default function ProductsClient() {
             </div>
           </div>
 
-          {/* Filter chips */}
+          {/* Filter Chips - Category, Brand, Price, Stock, Clear */}
           <div className="flex flex-wrap gap-2 items-center">
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Filters:</span>
 
@@ -508,7 +685,7 @@ export default function ProductsClient() {
               </div>
             </div>
 
-            {/* Price Filter Dropdown */}
+            {/* Price Range Filter Dropdown */}
             <div className="relative group">
               <button className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-medium hover:border-blue-500 transition-colors">
                 Price: {formatPrice(minPrice)} - {formatPrice(maxPrice)}
@@ -541,6 +718,7 @@ export default function ProductsClient() {
                         setCurrentPage(1);
                       }}
                       className="w-full mt-2 accent-blue-600"
+                      aria-label="Minimum price"
                     />
                     <input
                       type="range"
@@ -553,13 +731,14 @@ export default function ProductsClient() {
                         setCurrentPage(1);
                       }}
                       className="w-full accent-blue-600"
+                      aria-label="Maximum price"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* In Stock Toggle */}
+            {/* In-Stock Only Toggle */}
             <button
               onClick={() => {
                 setShowInStockOnly(!showInStockOnly);
@@ -570,16 +749,18 @@ export default function ProductsClient() {
                   ? 'bg-green-100 dark:bg-green-900/30 text-green-700 border-green-300'
                   : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
               }`}
+              aria-label="Show only in-stock products"
             >
               {showInStockOnly && <Check className="w-3 h-3" />}
               In Stock Only
             </button>
 
-            {/* Clear Filters */}
+            {/* Clear All Filters Button */}
             {activeFiltersCount > 0 && (
               <button
                 onClick={clearAllFilters}
                 className="flex items-center gap-1 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors"
+                aria-label="Clear all filters"
               >
                 <X className="w-3 h-3" />
                 Clear ({activeFiltersCount})
@@ -588,7 +769,9 @@ export default function ProductsClient() {
           </div>
         </div>
 
-        {/* Results count */}
+        {/* ====================================================================
+          RESULTS COUNT
+        ==================================================================== */}
         <div className="mb-4 flex justify-between items-center">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Showing{' '}
@@ -602,8 +785,11 @@ export default function ProductsClient() {
           </p>
         </div>
 
-        {/* Product Grid / List */}
+        {/* ====================================================================
+          PRODUCT GRID / LIST VIEW
+        ==================================================================== */}
         {filteredProducts.length === 0 ? (
+          // Empty State
           <div className="text-center py-16">
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-900 mb-2">No products found</h3>
@@ -616,22 +802,49 @@ export default function ProductsClient() {
             </button>
           </div>
         ) : viewMode === 'grid' ? (
+          // Grid View - Product Cards with Rich Text Description
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filteredProducts.map((product) => (
-              <ProductCard key={product._id} product={product} />
+              <div key={product._id} className="group">
+                <ProductCard product={product} />
+                {/* Rich Text Description - Shows below the card in grid view */}
+                {product.description && (
+                  <div className="mt-2 px-2 text-xs text-gray-600 dark:text-gray-400 line-clamp-6">
+                    <RichTextRenderer 
+                      content={product.description} 
+                      className="prose prose-xs max-w-none [&>p]:mb-1 [&>p]:text-xs"
+                    />
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         ) : (
+          // List View - Full width product cards
           <div className="space-y-4">
             {filteredProducts.map((product) => (
-              <ProductCard key={product._id} product={product} variant="list" />
+              <div key={product._id}>
+                <ProductCard key={product._id} product={product} variant="list" />
+                {/* Rich Text Description - Shows below the card in list view */}
+                {product.description && (
+                  <div className="mt-1 px-4 text-sm text-gray-600 dark:text-gray-400">
+                    <RichTextRenderer 
+                      content={product.description} 
+                      className="prose prose-sm max-w-none [&>p]:mb-1"
+                    />
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
 
-        {/* Pagination */}
+        {/* ====================================================================
+          PAGINATION
+        ==================================================================== */}
         {apiPagination && apiPagination.pages > 1 && (
           <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            {/* Previous Page Button */}
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
@@ -641,6 +854,7 @@ export default function ProductsClient() {
               <ChevronLeft className="w-4 h-4" />
             </button>
 
+            {/* Page Number Buttons */}
             <div className="flex flex-wrap justify-center gap-1">
               {paginationRange.map((page, idx) => (
                 <button
@@ -654,12 +868,14 @@ export default function ProductsClient() {
                       ? 'bg-transparent cursor-default'
                       : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
+                  aria-label={`Go to page ${page}`}
                 >
                   {page}
                 </button>
               ))}
             </div>
 
+            {/* Next Page Button */}
             <button
               onClick={handleNextPage}
               disabled={!hasMorePages}
@@ -671,12 +887,15 @@ export default function ProductsClient() {
           </div>
         )}
 
-        {/* Cart Button */}
+        {/* ====================================================================
+          FLOATING CART BUTTON
+        ==================================================================== */}
         {cartItemsCount > 0 && (
           <div className="fixed bottom-6 right-6 z-50">
             <Link
               href="/cart"
               className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-xl shadow-xl transition-all transform hover:scale-105 active:scale-95"
+              aria-label={`View cart with ${cartItemsCount} items`}
             >
               <ShoppingCart className="w-4 h-4" />
               Cart ({cartItemsCount})

@@ -1,3 +1,4 @@
+// app/productSeo.ts
 export function buildProductSeoTitle(name: string) {
   return `${name} | Plasma Water Africa`;
 }
