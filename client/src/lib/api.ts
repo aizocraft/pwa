@@ -14,13 +14,19 @@ import type {
   PublicFeedbackResponse,
   FeedbackStatsResponse
 } from '@/types/feedback';
-import type { 
+
+import { 
   Review, 
   CreateReviewRequest, 
   UpdateReviewRequest, 
   ReviewListResponse,
-  ReviewStats 
+  ReviewStats,
+  HasReviewedResponse,
+  AdminReviewListResponse,
+  AdminReviewStats,
+  normalizeReview 
 } from '@/types/review';
+
 import type { SendOrderEmailRequest, SendContactEmailRequest, SendStatusUpdateRequest, EmailResponse, SendOrderEmailsResponse
 } from '@/types/email';
 import type { ShippingArea, CreateShippingAreaRequest, UpdateShippingAreaRequest } from '@/types/order';
@@ -1025,40 +1031,46 @@ export async function sendPasswordResetEmail(email: string): Promise<EmailRespon
 }
 
 // ========== REVIEWS API ==========
-export async function getProductReviews(productId: string, params?: { page?: number; limit?: number }): Promise<{
-  reviews: Review[];
-  pagination: { page: number; limit: number; total: number; pages: number };
-  stats: { averageRating: number; totalReviews: number };
-}> {
+
+
+export async function getProductReviews(productId: string, params?: { page?: number; limit?: number }): Promise<ReviewListResponse> {
   try {
     const query = new URLSearchParams();
     if (params?.page) query.append('page', params.page.toString());
     if (params?.limit) query.append('limit', params.limit.toString());
     const url = `/reviews/${productId}${query.toString() ? `?${query.toString()}` : ''}`;
     const response = await api.get(url);
-    return response.data;
+    
+    // Normalize the reviews
+    const reviews = (response.data.reviews || []).map(normalizeReview);
+    
+    return {
+      reviews,
+      pagination: response.data.pagination || { page: 1, limit: 10, total: 0, pages: 0 },
+      stats: response.data.stats || { averageRating: 0, totalReviews: 0 }
+    };
   } catch (error: any) {
     console.error('Failed to fetch product reviews:', error);
     throw error;
   }
 }
 
-export async function createReview(data: { productId: string; rating: number; review?: string }): Promise<any> {
+export async function createReview(data: CreateReviewRequest): Promise<Review> {
   try {
     const response = await api.post('/reviews', data);
     toast.success('Review submitted successfully!');
-    return response.data;
+    return normalizeReview(response.data);
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Failed to submit review');
     throw error;
   }
 }
 
-export async function updateReview(id: string, data: { rating?: number; review?: string }): Promise<any> {
+export async function updateReview(id: string, data: UpdateReviewRequest): Promise<Review> {
   try {
     const response = await api.put(`/reviews/${id}`, data);
     toast.success('Review updated successfully!');
-    return response.data;
+    return normalizeReview(response.data);
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Failed to update review');
     throw error;
@@ -1075,7 +1087,7 @@ export async function deleteReview(id: string): Promise<void> {
   }
 }
 
-export async function getProductReviewStats(productId: string): Promise<{ averageRating: number; totalReviews: number }> {
+export async function getProductReviewStats(productId: string): Promise<ReviewStats> {
   try {
     const response = await api.get(`/reviews/${productId}/stats`);
     return response.data;
@@ -1085,29 +1097,41 @@ export async function getProductReviewStats(productId: string): Promise<{ averag
   }
 }
 
-export async function hasUserReviewed(productId: string): Promise<{ hasReviewed: boolean; reviewId?: string }> {
+export async function hasUserReviewed(productId: string): Promise<HasReviewedResponse> {
   try {
     const response = await api.get(`/reviews/user/${productId}/has-reviewed`);
-    return response.data;
+    return {
+      hasReviewed: response.data.hasReviewed || false,
+      reviewId: response.data.reviewId,
+      status: response.data.status || null
+    };
   } catch (error: any) {
     console.error('Failed to check user review status:', error);
     return { hasReviewed: false };
   }
 }
 
-export async function getAdminReviews(params?: { page?: number; limit?: number; status?: string; rating?: number; search?: string }): Promise<{
-  data: Review[];
-  pagination: { page: number; limit: number; total: number; pages: number };
-}> {
+export async function getAdminReviews(params?: { 
+  page?: number; 
+  limit?: number; 
+  status?: string; 
+  rating?: number; 
+  search?: string 
+}): Promise<AdminReviewListResponse> {
   try {
     const query = new URLSearchParams();
-    Object.entries(params || {}).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        query.append(key, String(value));
-      }
-    });
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.status) query.append('status', params.status);
+    if (params?.rating) query.append('rating', params.rating.toString());
+    if (params?.search) query.append('search', params.search);
+    
     const response = await api.get(`/reviews/admin${query.toString() ? `?${query.toString()}` : ''}`);
-    return response.data;
+    
+    return {
+      data: (response.data.data || []).map(normalizeReview),
+      pagination: response.data.pagination || { page: 1, limit: 10, total: 0, pages: 0 }
+    };
   } catch (error: any) {
     console.error('Failed to fetch admin reviews:', error);
     toast.error('Failed to load reviews');
@@ -1115,21 +1139,21 @@ export async function getAdminReviews(params?: { page?: number; limit?: number; 
   }
 }
 
-export async function getAdminReviewStats(): Promise<{ total: number; averageRating: number }> {
+export async function getAdminReviewStats(): Promise<AdminReviewStats> {
   try {
     const response = await api.get('/reviews/admin/stats');
-    return response.data;
+    return response.data || { total: 0, averageRating: 0, pending: 0, approved: 0, rejected: 0 };
   } catch (error: any) {
     console.error('Failed to fetch review stats:', error);
-    return { total: 0, averageRating: 0 };
+    return { total: 0, averageRating: 0, pending: 0, approved: 0, rejected: 0 };
   }
 }
 
 export async function updateReviewStatus(reviewId: string, status: 'pending' | 'approved' | 'rejected'): Promise<Review> {
   try {
     const response = await api.patch(`/reviews/admin/${reviewId}/status`, { status });
-    toast.success('Review status updated successfully');
-    return response.data;
+    toast.success(`Review ${status} successfully`);
+    return normalizeReview(response.data);
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Failed to update review status');
     throw error;

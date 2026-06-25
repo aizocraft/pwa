@@ -34,7 +34,7 @@ const notifyAdmins = async (title: string, message: string, actionUrl: string, m
 
 async function updateProductRating(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>, productId: string) {
   const result = await ReviewModel.aggregate([
-    { $match: { productId: new mongoose.Types.ObjectId(productId), isApproved: true } },
+    { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
     {
       $group: {
         _id: '$productId',
@@ -54,7 +54,6 @@ async function updateProductRating(ReviewModel: Model<IReview>, ProductModel: Mo
 function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>) {
   const router = Router();
 
-  // Admin middleware (reuse authMiddleware, assumes admin check exists)
   const adminMiddleware = authMiddleware;
 
   // Test route
@@ -63,7 +62,6 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
   });
 
   // ========== ADMIN DASHBOARD ENDPOINTS ==========
-  // GET /api/reviews/admin - List all reviews with filters/pagination/search
   router.get('/admin', adminMiddleware, async (req: any, res: Response) => {
     try {
       const {
@@ -78,13 +76,11 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
       const limitNum = parseInt(limit as string);
       const skip = (pageNum - 1) * limitNum;
 
-      const match: any = { isApproved: true };
-
+      const match: any = {};
       if (status) match.status = status;
       if (rating) match.rating = parseInt(rating as string);
 
       const pipeline: any[] = [
-        { $match: match },
         { $sort: { createdAt: -1 } },
         { $skip: skip },
         { $limit: limitNum },
@@ -93,22 +89,26 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
             from: 'users',
             localField: 'userId',
             foreignField: '_id',
-            as: 'userId',
-            pipeline: [{ $project: { name: 1, email: 1 } }]
+            as: 'userData',
+            pipeline: [{ $project: { name: 1, email: 1, avatar: 1 } }]
           }
         },
-        { $unwind: { path: '$userId', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$userData', preserveNullAndEmptyArrays: true } },
         {
           $lookup: {
             from: 'products',
             localField: 'productId',
             foreignField: '_id',
-            as: 'productId',
+            as: 'productData',
             pipeline: [{ $project: { name: 1, images: { $arrayElemAt: ['$images', 0] } } }]
           }
         },
-        { $unwind: { path: '$productId', preserveNullAndEmptyArrays: true } }
+        { $unwind: { path: '$productData', preserveNullAndEmptyArrays: true } }
       ];
+
+      if (Object.keys(match).length > 0) {
+        pipeline.unshift({ $match: match });
+      }
 
       if (search) {
         pipeline.unshift({
@@ -123,8 +123,33 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
         ReviewModel.countDocuments(match)
       ]);
 
+      // Format response with proper field names
+      const formattedReviews = reviews.map((review: any) => ({
+        _id: review._id,
+        id: review._id,
+        productId: review.productId,
+        userId: review.userId,
+        rating: review.rating,
+        review: review.review,
+        status: review.status,
+        isApproved: review.status === 'approved',
+        createdAt: review.createdAt,
+        updatedAt: review.updatedAt,
+        user: review.userData ? {
+          _id: review.userData._id,
+          name: review.userData.name || 'Anonymous',
+          email: review.userData.email,
+          avatar: review.userData.avatar
+        } : null,
+        product: review.productData ? {
+          _id: review.productData._id,
+          name: review.productData.name,
+          image: review.productData.images
+        } : null
+      }));
+
       res.json({
-        data: reviews,
+        data: formattedReviews,
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -138,36 +163,40 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
     }
   });
 
-  // GET /api/reviews/admin/stats - Aggregate stats for dashboard
+  // GET /api/reviews/admin/stats
   router.get('/admin/stats', adminMiddleware, async (req: any, res: Response) => {
     try {
       const stats = await ReviewModel.aggregate([
         {
-          $match: { isApproved: true }
-        },
-        {
           $group: {
             _id: null,
             total: { $sum: 1 },
-            averageRating: { $avg: '$rating' }
+            averageRating: { $avg: '$rating' },
+            pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+            approved: { $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] } },
+            rejected: { $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] } }
           }
         },
         {
           $project: {
             _id: 0,
             total: 1,
-            averageRating: { $round: ['$averageRating', 1] }
+            averageRating: { $round: ['$averageRating', 1] },
+            pending: 1,
+            approved: 1,
+            rejected: 1
           }
         }
       ]);
-      res.json(stats[0] || { total: 0, averageRating: 0 });
+      
+      res.json(stats[0] || { total: 0, averageRating: 0, pending: 0, approved: 0, rejected: 0 });
     } catch (error: any) {
       console.error('Get admin stats error:', error);
       res.status(500).json({ error: error.message || 'Server error' });
     }
   });
 
-  // PATCH /api/reviews/admin/:id/status - Update review status with notification
+  // PATCH /api/reviews/admin/:id/status
   router.patch('/admin/:id/status', adminMiddleware, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
@@ -181,9 +210,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
         return res.status(400).json({ error: 'Invalid review ID' });
       }
 
-      const oldReview = await ReviewModel.findById(id)
-        .populate('userId', 'name email')
-        .populate('productId', 'name');
+      const oldReview = await ReviewModel.findById(id);
 
       if (!oldReview) {
         return res.status(404).json({ error: 'Review not found' });
@@ -191,26 +218,25 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
 
       const review = await ReviewModel.findByIdAndUpdate(
         id,
-        { 
-          status,
-          isApproved: status === 'approved',
-          updatedAt: new Date()
-        },
+        { status },
         { new: true, runValidators: true }
-      ).populate('userId', 'name email').populate('productId', 'name images');
+      );
 
       if (!review) {
         return res.status(404).json({ error: 'Review not found' });
       }
 
-      if (status === 'approved' || status === 'rejected') {
-        await updateProductRating(ReviewModel, ProductModel, review.productId as any);
+      if (status === 'approved') {
+        await updateProductRating(ReviewModel, ProductModel, review.productId.toString());
       }
 
-      // ✅ NOTIFICATION: Review status changed
+      // Get user and product details for notification
+      const user = await UserModel.findById(review.userId).select('name email');
+      const product = await ProductModel.findById(review.productId).select('name');
+
       const statusIcon = status === 'approved' ? '✅' : status === 'rejected' ? '❌' : '⏳';
-      const productName = (review.productId as any)?.name || 'Unknown Product';
-      const customerName = (review.userId as any)?.name || 'Anonymous Customer';
+      const productName = product?.name || 'Unknown Product';
+      const customerName = user?.name || 'Anonymous Customer';
       const rating = review.rating;
 
       await notifyAdmins(
@@ -232,14 +258,37 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
         }
       );
 
-      res.json(review);
+      // Format response
+      const formattedReview = {
+        _id: review._id,
+        id: review._id,
+        productId: review.productId,
+        userId: review.userId,
+        rating: review.rating,
+        review: review.review,
+        status: review.status,
+        isApproved: review.status === 'approved',
+        createdAt: review.createdAt,
+        updatedAt: review.updatedAt,
+        user: user ? {
+          _id: user._id,
+          name: user.name || 'Anonymous',
+          email: user.email
+        } : null,
+        product: product ? {
+          _id: product._id,
+          name: product.name
+        } : null
+      };
+
+      res.json(formattedReview);
     } catch (error: any) {
       console.error('Update review status error:', error);
       res.status(500).json({ error: error.message || 'Server error' });
     }
   });
 
-  // DELETE /api/reviews/admin/:id - Delete review (admin) with notification
+  // DELETE /api/reviews/admin/:id
   router.delete('/admin/:id', adminMiddleware, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
@@ -248,23 +297,23 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
         return res.status(400).json({ error: 'Invalid review ID' });
       }
 
-      const review = await ReviewModel.findById(id)
-        .populate('userId', 'name email')
-        .populate('productId', 'name');
+      const review = await ReviewModel.findById(id);
 
       if (!review) {
         return res.status(404).json({ error: 'Review not found' });
       }
 
       const productId = review.productId.toString();
-      const productName = (review.productId as any)?.name || 'Unknown Product';
-      const customerName = (review.userId as any)?.name || 'Anonymous Customer';
+      const product = await ProductModel.findById(productId).select('name');
+      const user = await UserModel.findById(review.userId).select('name email');
+      
+      const productName = product?.name || 'Unknown Product';
+      const customerName = user?.name || 'Anonymous Customer';
       const rating = review.rating;
 
       await ReviewModel.findByIdAndDelete(id);
       await updateProductRating(ReviewModel, ProductModel, productId);
 
-      // ✅ NOTIFICATION: Review deleted by admin
       await notifyAdmins(
         '🗑️ Review Deleted by Admin',
         `${req.user?.email || req.user?.name} deleted a ${rating}-star review for "${productName}" by ${customerName}`,
@@ -290,7 +339,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
     }
   });
 
-  // GET /api/reviews/user/:productId/has-reviewed - Check if user has reviewed
+  // GET /api/reviews/user/:productId/has-reviewed
   router.get('/user/:productId/has-reviewed', authMiddleware, async (req: any, res: Response) => {
     try {
       const { productId } = req.params;
@@ -310,7 +359,8 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
       
       res.json({ 
         hasReviewed: !!review,
-        reviewId: review?._id 
+        reviewId: review?._id,
+        status: review?.status || null
       });
     } catch (error: any) {
       console.error('Check user review error:', error);
@@ -318,7 +368,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
     }
   });
 
-  // GET /api/reviews/:productId/stats - Get review stats
+  // GET /api/reviews/:productId/stats
   router.get('/:productId/stats', async (req: Request, res: Response) => {
     try {
       const { productId } = req.params;
@@ -328,7 +378,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
       }
       
       const stats = await ReviewModel.aggregate([
-        { $match: { productId: new mongoose.Types.ObjectId(productId), isApproved: true } },
+        { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
         {
           $group: {
             _id: null,
@@ -345,7 +395,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
     }
   });
 
-  // GET /api/reviews/:productId - Get product reviews with pagination
+  // GET /api/reviews/:productId
   router.get('/:productId', async (req: Request, res: Response) => {
     try {
       const { productId } = req.params;
@@ -358,15 +408,15 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
       }
 
       const [reviews, total, avgStats] = await Promise.all([
-        ReviewModel.find({ productId, isApproved: true })
+        ReviewModel.find({ productId, status: 'approved' })
           .populate('userId', 'name avatar')
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
           .lean(),
-        ReviewModel.countDocuments({ productId, isApproved: true }),
+        ReviewModel.countDocuments({ productId, status: 'approved' }),
         ReviewModel.aggregate([
-          { $match: { productId: new mongoose.Types.ObjectId(productId), isApproved: true } },
+          { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
           {
             $group: {
               _id: null,
@@ -377,12 +427,31 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
         ])
       ]);
 
+      // Format response - use 'userId' field from populated data
+      const formattedReviews = reviews.map((review: any) => {
+        // The populated user data is in the 'userId' field
+        const userData = review.userId;
+        return {
+          _id: review._id,
+          id: review._id,
+          productId: review.productId,
+          userId: review.userId?._id || review.userId,
+          rating: review.rating,
+          review: review.review,
+          status: review.status,
+          isApproved: review.status === 'approved',
+          createdAt: review.createdAt,
+          updatedAt: review.updatedAt,
+          user: userData ? {
+            _id: userData._id,
+            name: userData.name || 'Anonymous',
+            avatar: userData.avatar
+          } : null
+        };
+      });
+
       res.json({
-        reviews: reviews.map((r: any) => ({
-          ...r,
-          id: r._id,
-          user: r.userId
-        })),
+        reviews: formattedReviews,
         pagination: {
           page,
           limit,
@@ -397,7 +466,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
     }
   });
 
-  // POST /api/reviews - Create review with admin notification
+  // POST /api/reviews
   router.post('/', authMiddleware, async (req: any, res: Response) => {
     try {
       const { productId, rating, review } = req.body;
@@ -432,14 +501,33 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
         userId: req.user.userId,
         rating,
         review: review || '',
-        status: 'pending',
-        isApproved: false
+        status: 'pending'
       });
 
       const savedReview = await reviewData.save();
-      await savedReview.populate('userId', 'name avatar');
+      
+      // Get user data
+      const user = await UserModel.findById(req.user.userId).select('name avatar');
 
-      // ✅ NOTIFICATION: New review created (needs admin approval)
+      // Format response
+      const formattedReview = {
+        _id: savedReview._id,
+        id: savedReview._id,
+        productId: savedReview.productId,
+        userId: savedReview.userId,
+        rating: savedReview.rating,
+        review: savedReview.review,
+        status: savedReview.status,
+        isApproved: savedReview.status === 'approved',
+        createdAt: savedReview.createdAt,
+        updatedAt: savedReview.updatedAt,
+        user: user ? {
+          _id: user._id,
+          name: user.name || 'Anonymous',
+          avatar: user.avatar
+        } : null
+      };
+
       const ratingIcon = rating <= 2 ? '⚠️' : rating === 3 ? '📝' : '⭐';
       await notifyAdmins(
         `${ratingIcon} New Review Awaiting Approval`,
@@ -454,23 +542,18 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
           customerName: req.user.name || req.user.email,
           rating,
           reviewText: (review || '').substring(0, 500),
-          status: 'pending',
-          requiresApproval: true
+          status: 'pending'
         }
       );
 
-      res.status(201).json({
-        id: savedReview._id,
-        ...savedReview.toObject(),
-        user: savedReview.userId
-      });
+      res.status(201).json(formattedReview);
     } catch (error: any) {
       console.error('Create review error:', error);
       res.status(400).json({ error: error.message || 'Invalid data' });
     }
   });
 
-  // PUT /api/reviews/:id - Update review (user updates their own review)
+  // PUT /api/reviews/:id
   router.put('/:id', authMiddleware, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
@@ -484,8 +567,7 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
         return res.status(400).json({ error: 'Invalid review ID' });
       }
 
-      const reviewDoc = await ReviewModel.findOne({ _id: id, userId: req.user.userId })
-        .populate('productId', 'name');
+      const reviewDoc = await ReviewModel.findOne({ _id: id, userId: req.user.userId });
 
       if (!reviewDoc) {
         return res.status(404).json({ error: 'Review not found or not authorized' });
@@ -493,7 +575,10 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
 
       const oldRating = reviewDoc.rating;
       const oldReviewText = reviewDoc.review;
-      const productName = (reviewDoc.productId as any)?.name || 'Unknown Product';
+
+      // Get product for notification
+      const product = await ProductModel.findById(reviewDoc.productId).select('name');
+      const productName = product?.name || 'Unknown Product';
 
       if (rating !== undefined) {
         if (rating < 1 || rating > 5) {
@@ -503,15 +588,32 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
       }
       if (review !== undefined) reviewDoc.review = review;
       
-      // Reset to pending approval when edited
+      // Reset to pending when edited
       reviewDoc.status = 'pending';
-      reviewDoc.isApproved = false;
       
       const updated = await reviewDoc.save();
-      await updateProductRating(ReviewModel, ProductModel, reviewDoc.productId.toString());
-      await updated.populate('userId', 'name avatar');
 
-      // ✅ NOTIFICATION: Review updated (needs re-approval)
+      // Get user data
+      const user = await UserModel.findById(req.user.userId).select('name avatar');
+
+      const formattedReview = {
+        _id: updated._id,
+        id: updated._id,
+        productId: updated.productId,
+        userId: updated.userId,
+        rating: updated.rating,
+        review: updated.review,
+        status: updated.status,
+        isApproved: updated.status === 'approved',
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+        user: user ? {
+          _id: user._id,
+          name: user.name || 'Anonymous',
+          avatar: user.avatar
+        } : null
+      };
+
       await notifyAdmins(
         '✏️ Review Updated - Needs Re-approval',
         `${req.user.name || req.user.email} updated their ${oldRating}→${rating}-star review for "${productName}". Status: PENDING RE-APPROVAL`,
@@ -531,18 +633,14 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
         }
       );
 
-      res.json({
-        id: updated._id,
-        ...updated.toObject(),
-        user: updated.userId
-      });
+      res.json(formattedReview);
     } catch (error: any) {
       console.error('Update review error:', error);
       res.status(400).json({ error: error.message || 'Update failed' });
     }
   });
 
-  // DELETE /api/reviews/:id - Delete review (user deletes their own review)
+  // DELETE /api/reviews/:id
   router.delete('/:id', authMiddleware, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
@@ -558,19 +656,21 @@ function reviewRoutes(ReviewModel: Model<IReview>, ProductModel: Model<IProduct>
       const review = await ReviewModel.findOneAndDelete({ 
         _id: id, 
         userId: req.user.userId 
-      }).populate('productId', 'name');
+      });
 
       if (!review) {
         return res.status(404).json({ error: 'Review not found or not authorized' });
       }
 
       const productId = review.productId.toString();
-      const productName = (review.productId as any)?.name || 'Unknown Product';
+      const product = await ProductModel.findById(productId).select('name');
+      const productName = product?.name || 'Unknown Product';
       const rating = review.rating;
 
-      await updateProductRating(ReviewModel, ProductModel, productId);
+      if (review.status === 'approved') {
+        await updateProductRating(ReviewModel, ProductModel, productId);
+      }
 
-      // ✅ NOTIFICATION: Review deleted by user (notify admins)
       await notifyAdmins(
         '🗑️ Review Deleted by Customer',
         `${req.user.name || req.user.email} deleted their ${rating}-star review for "${productName}"`,

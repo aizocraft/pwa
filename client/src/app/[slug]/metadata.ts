@@ -74,7 +74,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       url: `https://plasmawater.co.ke/${product.slug}`,
       siteName: 'Plasma Water Africa',
       locale: 'en_KE',
-      type: 'website', // ✅ Fixed: Changed from 'product' to 'website'
+      type: 'website',
       images: imageUrl ? [
         {
           url: imageUrl,

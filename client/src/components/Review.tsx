@@ -8,8 +8,6 @@ import { createReview, updateReview, deleteReview, getProductReviews, hasUserRev
 import type { Review, ReviewStats } from '@/types/review'
 import Image from 'next/image'
 
-
-
 interface ReviewComponentProps {
   productId: string
   productName?: string
@@ -78,7 +76,7 @@ const ReviewForm = ({
 }: { 
   productId: string;
   productName?: string;
-  existingReview?: Review | undefined;
+  existingReview?: Review | null;
   onSubmit: (rating: number, review: string) => Promise<void>;
   onCancel: () => void;
 }) => {
@@ -169,6 +167,22 @@ const ReviewCard = ({ review, onEdit, onDelete, isCurrentUser }: {
 }) => {
   const [showActions, setShowActions] = useState(false)
   
+  // Safely get user name
+  const getUserName = () => {
+    if (typeof review.userId === 'object' && review.userId !== null) {
+      return review.userId.name || 'Anonymous'
+    }
+    if (review.user && typeof review.user === 'object') {
+      return review.user.name || 'Anonymous'
+    }
+    return 'Anonymous'
+  }
+  
+  const getUserInitial = () => {
+    const name = getUserName()
+    return name.charAt(0).toUpperCase()
+  }
+  
   return (
     <div 
       className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-300"
@@ -178,13 +192,11 @@ const ReviewCard = ({ review, onEdit, onDelete, isCurrentUser }: {
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white font-semibold">
-            {(typeof review.userId === 'string' ? review.userId.charAt(0).toUpperCase() : (review.userId?.name || 'U').charAt(0).toUpperCase())} 
-
+            {getUserInitial()}
           </div>
           <div>
             <p className="font-semibold text-gray-900 dark:text-white">
-            {typeof review.userId === 'string' ? 'Anonymous' : review.userId?.name || 'Anonymous'} 
-
+              {getUserName()}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
               <Calendar className="w-3 h-3" />
@@ -244,8 +256,6 @@ export default function ReviewComponent({ productId, productName }: ReviewCompon
   const [totalPages, setTotalPages] = useState(1)
   const [showForm, setShowForm] = useState(false)
   const [editingReview, setEditingReview] = useState<Review | null>(null)
-
-  const [showUserReviewSection, setShowUserReviewSection] = useState(false)
   const [userHasReviewed, setUserHasReviewed] = useState(false)
   const [userReviewId, setUserReviewId] = useState<string | null>(null)
   
@@ -273,6 +283,14 @@ export default function ReviewComponent({ productId, productName }: ReviewCompon
       const result = await hasUserReviewed(productId)
       setUserHasReviewed(result.hasReviewed)
       setUserReviewId(result.reviewId || null)
+      
+      // If user has a review, find it in the current reviews list
+      if (result.hasReviewed && result.reviewId) {
+        const userReview = reviews.find(r => r._id === result.reviewId || r.id === result.reviewId)
+        if (userReview) {
+          setEditingReview(userReview)
+        }
+      }
     } catch (error) {
       console.error('Failed to check user review:', error)
     }
@@ -284,7 +302,7 @@ export default function ReviewComponent({ productId, productName }: ReviewCompon
   
   useEffect(() => {
     checkUserReview()
-  }, [productId, isLoggedIn])
+  }, [productId, isLoggedIn, reviews])
   
   const handleCreateReview = async (rating: number, reviewText: string) => {
     await createReview({
@@ -308,6 +326,7 @@ export default function ReviewComponent({ productId, productName }: ReviewCompon
     setEditingReview(null)
     setShowForm(false)
     await fetchReviews()
+    await checkUserReview()
   }
   
   const handleDeleteReview = async () => {
@@ -315,6 +334,9 @@ export default function ReviewComponent({ productId, productName }: ReviewCompon
     
     if (confirm('Are you sure you want to delete your review?')) {
       await deleteReview(userReviewId)
+      setUserHasReviewed(false)
+      setUserReviewId(null)
+      setEditingReview(null)
       await fetchReviews()
       await checkUserReview()
     }
@@ -328,6 +350,17 @@ export default function ReviewComponent({ productId, productName }: ReviewCompon
   const handleCancelForm = () => {
     setShowForm(false)
     setEditingReview(null)
+  }
+  
+  // Check if current user owns this review
+  const isUserReview = (review: Review): boolean => {
+    if (!isLoggedIn || !user) return false
+    
+    const userId = review.userId
+    if (typeof userId === 'object' && userId !== null) {
+      return userId._id === user.id
+    }
+    return userId === user.id
   }
   
   const canWriteReview = isLoggedIn && !userHasReviewed && !showForm
@@ -370,62 +403,64 @@ export default function ReviewComponent({ productId, productName }: ReviewCompon
         <ReviewForm
           productId={productId}
           productName={productName}
-          existingReview={editingReview || undefined}
+          existingReview={editingReview}
           onSubmit={editingReview ? handleUpdateReview : handleCreateReview}
           onCancel={handleCancelForm}
         />
       )}
       
-     {/* Existing User Review Display */}
-{userHasReviewed && !showForm && !editingReview && (
-  <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-    <div className="flex items-center justify-between mb-2">
-      <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
-        Your Review
-      </p>
-      <div className="flex gap-2">
-        <button
-          onClick={() => {
-            // Safely find user review regardless of userId type
+      {/* Existing User Review Display */}
+      {userHasReviewed && !showForm && !editingReview && (
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
+              Your Review
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const userReview = reviews.find(r => {
+                    const userId = r.userId
+                    if (typeof userId === 'object' && userId !== null) {
+                      return userId._id === user?.id
+                    }
+                    return userId === user?.id
+                  })
+                  if (userReview) handleEditClick(userReview)
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                <Edit2 className="w-3 h-3" />
+                Edit
+              </button>
+              <button
+                onClick={handleDeleteReview}
+                className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" />
+                Delete
+              </button>
+            </div>
+          </div>
+          
+          {/* Display user's review text */}
+          {(() => {
             const userReview = reviews.find(r => {
-              if (typeof r.userId === 'object' && r.userId !== null) {
-                return r.userId._id === user?.id
+              const userId = r.userId
+              if (typeof userId === 'object' && userId !== null) {
+                return userId._id === user?.id
               }
-              return r.userId === user?.id
+              return userId === user?.id
             })
-            if (userReview) handleEditClick(userReview)
-          }}
-          className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
-        >
-          <Edit2 className="w-3 h-3" />
-          Edit
-        </button>
-        <button
-          onClick={handleDeleteReview}
-          className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1"
-        >
-          <Trash2 className="w-3 h-3" />
-          Delete
-        </button>
-      </div>
-    </div>
-    
-    {/* Display user's review text */}
-    {(() => {
-      const userReview = reviews.find(r => {
-        if (typeof r.userId === 'object' && r.userId !== null) {
-          return r.userId._id === user?.id
-        }
-        return r.userId === user?.id
-      })
-      return userReview?.review && (
-        <p className="text-gray-700 dark:text-gray-300 text-sm">
-          {userReview.review}
-        </p>
-      )
-    })()}
-  </div>
-)}
+            return userReview?.review && (
+              <p className="text-gray-700 dark:text-gray-300 text-sm">
+                {userReview.review}
+              </p>
+            )
+          })()}
+        </div>
+      )}
+      
       {/* Reviews List */}
       {loading ? (
         <div className="space-y-4">
@@ -453,8 +488,7 @@ export default function ReviewComponent({ productId, productName }: ReviewCompon
               review={review}
               onEdit={() => handleEditClick(review)}
               onDelete={handleDeleteReview}
-  isCurrentUser={isLoggedIn && typeof review.userId === 'object' && review.userId?._id === user?.id} 
-
+              isCurrentUser={isUserReview(review)}
             />
           ))}
         </div>

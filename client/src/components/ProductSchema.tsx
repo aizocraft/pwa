@@ -1,3 +1,4 @@
+// src/components/ProductSchema.tsx
 'use client'
 
 import { Product } from '@/types/product';
@@ -8,23 +9,36 @@ interface ProductSchemaProps {
 
 export default function ProductSchema({ product }: ProductSchemaProps) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://plasmawater.co.ke';
-  const imageUrl = product.images?.[0]
-    ? product.images[0].url
-      ? product.images[0].url.startsWith('http')
-        ? product.images[0].url
-        : `${baseUrl}${product.images[0].url}`
-      : product.images[0].fileId
-        ? `${baseUrl}/api/products/image/${product.images[0].fileId}`
-        : undefined
-    : undefined;
+  
+  // Safely get image URL
+  const getImageUrl = () => {
+    if (!product.images?.[0]) return undefined;
+    
+    const img = product.images[0];
+    if (img.url) {
+      return img.url.startsWith('http') ? img.url : `${baseUrl}${img.url}`;
+    }
+    if (img.fileId) {
+      return `${baseUrl}/api/products/image/${img.fileId}`;
+    }
+    return undefined;
+  };
+
+  const imageUrl = getImageUrl();
+
+  // Safely get description
+  const getDescription = () => {
+    if (!product.description) return '';
+    return product.description.replace(/<[^>]*>/g, '').substring(0, 500);
+  };
 
   const productSchema = {
     '@context': 'https://schema.org/',
     '@type': 'Product',
-    name: product.name,
-    description: product.description?.replace(/<[^>]*>/g, '') || '',
-    sku: product.sku,
-    mpn: product.sku,
+    name: product.name || 'Product',
+    description: getDescription(),
+    sku: product.sku || '',
+    mpn: product.sku || '',
     brand: {
       '@type': 'Brand',
       name: product.brand || 'Plasma Water Africa',
@@ -33,12 +47,12 @@ export default function ProductSchema({ product }: ProductSchemaProps) {
     image: imageUrl,
     offers: {
       '@type': 'Offer',
-      url: `${baseUrl}/${product.slug}`,
+      url: `${baseUrl}/${product.slug || ''}`,
       priceCurrency: 'KES',
-      price: product.price,
+      price: product.price || 0,
       priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       itemCondition: 'https://schema.org/NewCondition',
-      availability: product.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      availability: (product.stock || 0) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       seller: {
         '@type': 'Organization',
         name: 'Plasma Water Africa',
@@ -65,10 +79,10 @@ export default function ProductSchema({ product }: ProductSchemaProps) {
         },
       },
     },
-    aggregateRating: product.rating > 0 ? {
+    aggregateRating: (product.rating || 0) > 0 ? {
       '@type': 'AggregateRating',
-      ratingValue: product.rating,
-      reviewCount: Math.floor(product.rating * 5),
+      ratingValue: product.rating || 0,
+      reviewCount: Math.floor((product.rating || 0) * 5),
     } : undefined,
   };
 
