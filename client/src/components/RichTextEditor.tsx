@@ -1,6 +1,34 @@
 // src/components/RichTextEditor.tsx
 'use client'
 
+/**
+ * Rich Text Editor Component
+ * 
+ * A full-featured WYSIWYG editor built on TipTap with extensive formatting options.
+ * Supports rich text editing, media embedding, tables, code blocks, and more.
+ * 
+ * Features:
+ * - Full formatting toolbar (bold, italic, underline, strikethrough)
+ * - Multiple heading levels (H1-H6)
+ * - Font family and font size selection
+ * - Text color picker with predefined colors
+ * - Bullet, numbered, and task lists
+ * - Blockquotes and horizontal dividers
+ * - Table creation and editing
+ * - Link insertion with custom text
+ * - Image and video embedding (YouTube/Vimeo)
+ * - File uploads with preview
+ * - Code blocks with syntax highlighting
+ * - Find and replace functionality
+ * - Emoji picker (hidden by default, toggled via toolbar button)
+ * - Word and character count
+ * - Auto-save with localStorage
+ * - Fullscreen mode
+ * - Dark mode support
+ * - Export HTML to clipboard
+ * - Read-only mode support
+ */
+
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
@@ -15,7 +43,7 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import Color from '@tiptap/extension-color'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import  { Table } from '@tiptap/extension-table'
+import { Table } from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
@@ -28,10 +56,13 @@ import Superscript from '@tiptap/extension-superscript'
 import { debounce } from 'lodash'
 import EmojiPicker, { Theme } from 'emoji-picker-react'
 
-// Then create the lowlight instance:
+// ----------------------------------------------------------------------------
+// Syntax Highlighting Setup
+// ----------------------------------------------------------------------------
+
 const lowlight = createLowlight()
 
-// Import languages
+// Import and register languages for code highlighting
 import javascript from 'highlight.js/lib/languages/javascript'
 import python from 'highlight.js/lib/languages/python'
 import css from 'highlight.js/lib/languages/css'
@@ -41,7 +72,6 @@ import typescript from 'highlight.js/lib/languages/typescript'
 import bash from 'highlight.js/lib/languages/bash'
 import sql from 'highlight.js/lib/languages/sql'
 
-// Register languages
 lowlight.register('javascript', javascript)
 lowlight.register('python', python)
 lowlight.register('css', css)
@@ -50,6 +80,10 @@ lowlight.register('json', json)
 lowlight.register('typescript', typescript)
 lowlight.register('bash', bash)
 lowlight.register('sql', sql)
+
+// ----------------------------------------------------------------------------
+// Icon Imports
+// ----------------------------------------------------------------------------
 
 import {
   Bold,
@@ -78,6 +112,7 @@ import {
   Table as TableIcon,
   Video,
   Code2,
+  ChevronDown,
   Smile,
   Upload,
   Maximize,
@@ -91,9 +126,14 @@ import {
   X,
   Check,
   Type,
+  Text,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
+
+// ----------------------------------------------------------------------------
+// Type Definitions
+// ----------------------------------------------------------------------------
 
 export interface RichTextEditorHandle {
   getHTML: () => string
@@ -140,6 +180,13 @@ interface ToolbarButtonProps {
   className?: string
 }
 
+// ----------------------------------------------------------------------------
+// Sub-Components
+// ----------------------------------------------------------------------------
+
+/**
+ * Reusable toolbar button with consistent styling
+ */
 const ToolbarButton = ({
   onClick,
   isActive = false,
@@ -163,9 +210,12 @@ const ToolbarButton = ({
   </button>
 )
 
+/**
+ * Font size dropdown with predefined sizes
+ * Uses inline styles to apply font size to selected text
+ */
 const FontSizeDropdown = ({ editor }: { editor: any }) => {
   const [isOpen, setIsOpen] = useState(false)
-  const [currentSize, setCurrentSize] = useState('16px')
 
   const sizes = [
     { label: 'Small', value: '12px' },
@@ -177,9 +227,14 @@ const FontSizeDropdown = ({ editor }: { editor: any }) => {
   ]
 
   const setFontSize = (size: string) => {
-    editor.chain().focus().setFontSize(size).run()
-    setCurrentSize(size)
+    // Apply font size using inline style
+    editor.chain().focus().setMark('textStyle', { fontSize: size }).run()
     setIsOpen(false)
+  }
+
+  const getCurrentSize = () => {
+    const attrs = editor.getAttributes('textStyle')
+    return attrs.fontSize || '16px'
   }
 
   return (
@@ -187,13 +242,14 @@ const FontSizeDropdown = ({ editor }: { editor: any }) => {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="px-2 py-1 text-xs bg-transparent border border-gray-200 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1"
+        className="px-2 py-1 text-xs bg-transparent border border-gray-200 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1 min-w-[60px] justify-between"
       >
         <span className="hidden sm:inline">Size</span>
-        <span className="text-[10px] opacity-50">{currentSize}</span>
+        <span className="text-[10px] opacity-50 truncate">{getCurrentSize()}</span>
+        <ChevronDown className="w-3 h-3 opacity-50" />
       </button>
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 min-w-[120px]">
+        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 min-w-[120px] py-1">
           {sizes.map((size) => (
             <button
               key={size.value}
@@ -211,6 +267,10 @@ const FontSizeDropdown = ({ editor }: { editor: any }) => {
   )
 }
 
+// ----------------------------------------------------------------------------
+// Main Component
+// ----------------------------------------------------------------------------
+
 export default function RichTextEditor({
   initialValue = '',
   placeholder = 'Write a detailed description...',
@@ -227,13 +287,22 @@ export default function RichTextEditor({
   enableMentions = true,
   mentionSuggestions = ['John Doe', 'Jane Smith', 'Admin', 'Team', 'Support'],
 }: RichTextEditorProps) {
+  // --------------------------------------------------------------------------
+  // State Management
+  // --------------------------------------------------------------------------
+
+  /** Modal states for various features */
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [linkText, setLinkText] = useState('')
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
   const [selectedColor, setSelectedColor] = useState('#000000')
+  
+  /** Editor statistics */
   const [wordCount, setWordCount] = useState(0)
   const [charCount, setCharCount] = useState(0)
+  
+  /** UI states */
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showFindReplace, setShowFindReplace] = useState(false)
@@ -245,9 +314,17 @@ export default function RichTextEditor({
   const [showCodeBlock, setShowCodeBlock] = useState(false)
   const [selectedLanguage, setSelectedLanguage] = useState('javascript')
 
+  /** Refs */
   const didInitRef = useRef(false)
   const editorRef = useRef<HTMLDivElement>(null)
 
+  // --------------------------------------------------------------------------
+  // Editor Configuration
+  // --------------------------------------------------------------------------
+
+  /**
+   * Configure TipTap extensions based on props
+   */
   const editorExtensions = useMemo(() => {
     const extensions: any[] = [
       StarterKit.configure({
@@ -320,6 +397,7 @@ export default function RichTextEditor({
       Superscript,
     ]
 
+    // Conditionally add mention extension
     if (enableMentions) {
       extensions.push(
         Mention.configure({
@@ -341,6 +419,9 @@ export default function RichTextEditor({
     return extensions
   }, [placeholder, enableMentions, mentionSuggestions])
 
+  /**
+   * Initialize the TipTap editor instance
+   */
   const editor = useEditor({
     extensions: editorExtensions,
     editable: !readOnly,
@@ -354,10 +435,9 @@ export default function RichTextEditor({
       setWordCount(words)
       setCharCount(chars)
 
-      // Check character limit
+      // Enforce character limit
       if (chars > maxChars) {
         toast.error(`Character limit exceeded (${maxChars})`)
-        // Truncate content
         const truncated = text.slice(0, maxChars)
         editor.commands.setContent(truncated)
         return
@@ -381,7 +461,13 @@ export default function RichTextEditor({
     },
   })
 
-  // Restore auto-saved content
+  // --------------------------------------------------------------------------
+  // Effects
+  // --------------------------------------------------------------------------
+
+  /**
+   * Restore auto-saved content from localStorage
+   */
   useEffect(() => {
     if (!editor || !autoSave || readOnly) return
     
@@ -391,7 +477,9 @@ export default function RichTextEditor({
     }
   }, [editor, autoSave, autoSaveKey, initialValue, readOnly])
 
-  // Initialize editor
+  /**
+   * Initialize editor and notify parent
+   */
   useEffect(() => {
     if (!editor) return
     if (didInitRef.current) return
@@ -416,7 +504,9 @@ export default function RichTextEditor({
     setCharCount(text.length)
   }, [editor, onReady, onChange])
 
-  // Update content when initialValue changes
+  /**
+   * Update content when initialValue changes
+   */
   useEffect(() => {
     if (!editor) return
     if (readOnly) return
@@ -430,7 +520,9 @@ export default function RichTextEditor({
     }
   }, [initialValue, editor, readOnly])
 
-  // Fullscreen mode
+  /**
+   * Handle fullscreen mode
+   */
   useEffect(() => {
     if (!enableFullscreen) return
     
@@ -441,7 +533,9 @@ export default function RichTextEditor({
     }
   }, [isFullscreen, enableFullscreen])
 
-  // Listen for fullscreen changes
+  /**
+   * Listen for fullscreen changes from the browser
+   */
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement)
@@ -449,6 +543,10 @@ export default function RichTextEditor({
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
   }, [])
+
+  // --------------------------------------------------------------------------
+  // Memoized Data
+  // --------------------------------------------------------------------------
 
   const fontFamilies = useMemo(
     () => [
@@ -491,16 +589,13 @@ export default function RichTextEditor({
     'java', 'csharp', 'go', 'ruby', 'rust', 'swift'
   ]
 
-  if (!editor) {
-    return (
-      <div
-        className={`min-h-[200px] bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse flex items-center justify-center ${className}`}
-      >
-        <span className="text-gray-400">Loading editor...</span>
-      </div>
-    )
-  }
+  // --------------------------------------------------------------------------
+  // Editor Actions
+  // --------------------------------------------------------------------------
 
+  /**
+   * Insert or update a link in the editor
+   */
   const setLink = () => {
     if (!linkUrl) return
 
@@ -528,6 +623,9 @@ export default function RichTextEditor({
     setIsLinkModalOpen(false)
   }
 
+  /**
+   * Insert an image from URL
+   */
   const addImage = () => {
     const url = window.prompt('Enter image URL:')
     if (url) {
@@ -535,6 +633,9 @@ export default function RichTextEditor({
     }
   }
 
+  /**
+   * Insert a video from YouTube or Vimeo
+   */
   const addVideo = () => {
     const url = window.prompt('Enter YouTube or Vimeo URL:')
     if (url) {
@@ -542,12 +643,18 @@ export default function RichTextEditor({
     }
   }
 
+  /**
+   * Insert a table with specified dimensions
+   */
   const insertTable = () => {
     if (tableRows < 1 || tableCols < 1) return
     editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: true }).run()
     setShowTableModal(false)
   }
 
+  /**
+   * Insert a code block with language selection
+   */
   const addCodeBlock = () => {
     editor
       .chain()
@@ -557,24 +664,32 @@ export default function RichTextEditor({
     setShowCodeBlock(false)
   }
 
+  /**
+   * Clear all formatting from the selection
+   */
   const handleClearFormatting = () => {
     editor.chain().focus().clearNodes().unsetAllMarks().run()
     toast.success('Formatting cleared')
   }
 
-const handleFindReplace = () => {
-  const content = editor.getText()
-  if (!findText) {
-    toast.error('Please enter text to find')
-    return
+  /**
+   * Find and replace text in the editor
+   */
+  const handleFindReplace = () => {
+    const content = editor.getText()
+    if (!findText) {
+      toast.error('Please enter text to find')
+      return
+    }
+    const newContent = content.replace(new RegExp(findText, 'g'), replaceText)
+    editor.commands.setContent(newContent)
+    setShowFindReplace(false)
+    toast.success(`Replaced all occurrences of "${findText}"`)
   }
-  // Use replace with global flag instead of replaceAll
-  const newContent = content.replace(new RegExp(findText, 'g'), replaceText)
-  editor.commands.setContent(newContent)
-  setShowFindReplace(false)
-  toast.success(`Replaced all occurrences of "${findText}"`)
-}
 
+  /**
+   * Handle file uploads (images and documents)
+   */
   const handleFileUpload = (file: File) => {
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -590,28 +705,63 @@ const handleFindReplace = () => {
     reader.readAsDataURL(file)
   }
 
-  const insertEmoji = (emoji: any) => {
-    editor.chain().focus().insertContent(emoji.native).run()
-    setShowEmojiPicker(false)
-  }
-
+  /**
+   * Export editor content as HTML to clipboard
+   */
   const exportHTML = () => {
     const html = editor.getHTML()
     navigator.clipboard.writeText(html)
     toast.success('HTML copied to clipboard!')
   }
 
+  /**
+   * Toggle emoji picker visibility
+   */
+  const toggleEmojiPicker = () => {
+    setShowEmojiPicker(!showEmojiPicker)
+  }
+
+  /**
+   * Insert emoji at cursor position
+   */
+  const insertEmoji = (emojiData: any) => {
+    editor.chain().focus().insertContent(emojiData.emoji).run()
+    setShowEmojiPicker(false)
+  }
+
+  // --------------------------------------------------------------------------
+  // Render Helpers
+  // --------------------------------------------------------------------------
+
   const isContentEmpty = !editor.getHTML() || editor.getHTML().trim() === '' || editor.getHTML().trim() === '<p></p>'
+
+  // Show loading state while editor initializes
+  if (!editor) {
+    return (
+      <div
+        className={`min-h-[200px] bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse flex items-center justify-center ${className}`}
+      >
+        <span className="text-gray-400">Loading editor...</span>
+      </div>
+    )
+  }
+
+  // --------------------------------------------------------------------------
+  // Main Render
+  // --------------------------------------------------------------------------
 
   return (
     <div
       ref={editorRef}
       className={`rich-text-editor border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900 shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''} ${className}`}
     >
-      {/* Toolbar */}
+      {/* ======================================================================
+        TOOLBAR
+      ====================================================================== */}
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-0.5 p-2 bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 backdrop-blur-sm max-h-[200px] overflow-y-auto">
-          {/* Headings */}
+          
+          {/* Heading Levels */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -657,7 +807,7 @@ const handleFindReplace = () => {
             </ToolbarButton>
           </div>
 
-          {/* Text formatting */}
+          {/* Text Formatting */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBold().run()}
@@ -710,7 +860,7 @@ const handleFindReplace = () => {
             </ToolbarButton>
           </div>
 
-          {/* Font & Color */}
+          {/* Font Family & Size */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <div className="relative">
               <select
@@ -819,7 +969,7 @@ const handleFindReplace = () => {
             </ToolbarButton>
           </div>
 
-          {/* Block elements */}
+          {/* Block Elements */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBlockquote().run()}
@@ -881,7 +1031,7 @@ const handleFindReplace = () => {
             )}
           </div>
 
-          {/* Links, Images, Videos */}
+          {/* Links, Images, Videos, Files */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
               onClick={() => setIsLinkModalOpen(true)}
@@ -984,7 +1134,7 @@ const handleFindReplace = () => {
             </ToolbarButton>
             {enableEmoji && (
               <ToolbarButton
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                onClick={toggleEmojiPicker}
                 isActive={showEmojiPicker}
                 title="Insert Emoji"
               >
@@ -1017,6 +1167,34 @@ const handleFindReplace = () => {
           )}
         </div>
       )}
+
+      {/* ======================================================================
+        EMOJI PICKER (Hidden by default, toggled by toolbar button)
+      ====================================================================== */}
+      {enableEmoji && showEmojiPicker && (
+        <div className="absolute z-30 mt-1" style={{ right: '1rem', top: '3.5rem' }}>
+          <div className="relative">
+            <button
+              onClick={toggleEmojiPicker}
+              className="absolute -top-2 -right-2 p-1 bg-gray-200 dark:bg-gray-700 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors z-10"
+              aria-label="Close emoji picker"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <EmojiPicker
+              onEmojiClick={insertEmoji}
+              theme={document.documentElement.classList.contains('dark') ? Theme.DARK : Theme.LIGHT}
+              width={320}
+              height={400}
+              previewConfig={{ showPreview: false }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================================
+        MODALS
+      ====================================================================== */}
 
       {/* Link Modal */}
       {isLinkModalOpen && (
@@ -1209,30 +1387,24 @@ const handleFindReplace = () => {
         </div>
       )}
 
-
-<EmojiPicker
-  onEmojiClick={(emojiData) => {
-    const emoji = emojiData.emoji
-    editor.chain().focus().insertContent(emoji).run()
-    setShowEmojiPicker(false)
-  }}
-  theme={document.documentElement.classList.contains('dark') ? Theme.DARK : Theme.LIGHT}
-  width={320}
-  height={400}
-  previewConfig={{ showPreview: false }}
-/>
-      {/* Editor Content */}
+      {/* ======================================================================
+        EDITOR CONTENT
+      ====================================================================== */}
       <EditorContent editor={editor} className={readOnly ? 'bg-gray-50/50 dark:bg-gray-800/30' : ''} />
 
-      {/* Word/Character Count */}
+      {/* ======================================================================
+        FOOTER - Word/Character Count
+      ====================================================================== */}
       {showCount && !readOnly && (
         <div className="flex justify-between items-center px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 text-xs text-gray-400 dark:text-gray-500">
           <div className="flex items-center gap-4">
             <span>{wordCount} words</span>
             <span>{charCount} characters</span>
-            {maxChars && <span className={charCount > maxChars * 0.9 ? 'text-yellow-500' : ''}>
-              {charCount}/{maxChars}
-            </span>}
+            {maxChars && (
+              <span className={charCount > maxChars * 0.9 ? 'text-yellow-500' : ''}>
+                {charCount}/{maxChars}
+              </span>
+            )}
           </div>
           {autoSave && (
             <span className="flex items-center gap-1">
@@ -1246,6 +1418,9 @@ const handleFindReplace = () => {
         </div>
       )}
 
+      {/* ======================================================================
+        GLOBAL STYLES
+      ====================================================================== */}
       <style jsx global>{`
         .rich-text-editor .ProseMirror {
           min-height: 200px;
@@ -1516,6 +1691,7 @@ const handleFindReplace = () => {
           margin: 1rem 0;
         }
 
+        /* Mobile Responsive */
         @media (max-width: 640px) {
           .rich-text-editor .flex-wrap {
             gap: 0.25rem;
@@ -1529,6 +1705,18 @@ const handleFindReplace = () => {
             padding: 0.75rem;
             min-height: 150px;
           }
+          .rich-text-editor .absolute.z-30 {
+            right: 0.5rem !important;
+            left: 0.5rem !important;
+          }
+          .rich-text-editor .absolute.z-30 .emoji-picker-react {
+            width: 100% !important;
+          }
+        }
+
+        /* Emoji Picker Responsive */
+        .rich-text-editor .emoji-picker-react {
+          box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important;
         }
       `}</style>
     </div>
