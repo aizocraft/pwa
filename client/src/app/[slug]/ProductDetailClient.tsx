@@ -28,7 +28,8 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
-import { getProduct, getProducts, getProductImageUrl } from '../../lib/api';
+// ✅ Import getProductBySlug instead of getProduct
+import { getProductBySlug, getProducts, getProductImageUrl } from '../../lib/api';
 import { useCartStore } from '../../store/cart';
 import { cn, formatCurrency } from '../../lib/utils';
 import ReviewComponent from '../../components/Review';
@@ -56,9 +57,10 @@ export default function ProductDetailClient({ product: initialProduct }: Product
   const [isImageLoading, setIsImageLoading] = useState<boolean>(true);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
+  // ✅ Use getProductBySlug to fetch product by slug
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', slug],
-    queryFn: () => getProduct(slug),
+    queryFn: () => getProductBySlug(slug),
     enabled: !!slug && !initialProduct,
     staleTime: 5 * 60 * 1000,
     initialData: initialProduct || undefined,

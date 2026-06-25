@@ -404,6 +404,26 @@ export async function getBrands(): Promise<string[]> {
   return response.data;
 }
 
+// src/lib/api.ts - Add this function (place it after getBrands)
+
+/**
+ * Get a single product by its slug (SEO-friendly URL)
+ * 
+ * @param slug - Product slug string (e.g., 'solar-panel-100w')
+ * @returns Product object with all product details
+ * 
+ * @example
+ * const product = await getProductBySlug('solar-panel-100w');
+ */
+export async function getProductBySlug(slug: string): Promise<Product> {
+  try {
+    const response = await api.get(`/products/slug/${slug}`);
+    return response.data;
+  } catch (error: any) {
+    console.error(`Failed to fetch product by slug "${slug}":`, error);
+    throw error;
+  }
+}
 
 export async function getProduct(id: string): Promise<Product> {
   try {
