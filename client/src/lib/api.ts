@@ -404,6 +404,16 @@ export async function getBrands(): Promise<string[]> {
   return response.data;
 }
 
+export async function getProductBySlug(slug: string): Promise<Product> {
+  try {
+    const response = await api.get(`/products/slug/${slug}`);
+    return response.data;
+  } catch (error: any) {
+    console.error(`Failed to fetch product by slug "${slug}":`, error);
+    throw error;
+  }
+}
+
 export async function getProduct(id: string): Promise<Product> {
   try {
     const response = await api.get(`/products/${id}`);

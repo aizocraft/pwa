@@ -1,19 +1,26 @@
 // src/app/[slug]/page.tsx
-import { getProduct } from '../../lib/api';
+
+import { getProductBySlug } from '../../lib/api';
 import ProductDetailClient from './ProductDetailClient';
 import ProductSchema from '@/components/ProductSchema';
 import type { Metadata } from 'next';
 
-// Generate metadata with full SEO optimization
+/**
+ * Generate SEO metadata for the product page
+ * Fetches product by slug and builds optimized meta tags
+ */
 export async function generateMetadata({ 
   params 
 }: { 
-  params: { slug: string } 
+  params: Promise<{ slug: string }> 
 }): Promise<Metadata> {
+  // IMPORTANT: Await params in Next.js 15+
+  const { slug } = await params;
+  
   let product = null;
   
   try {
-    product = await getProduct(params.slug);
+    product = await getProductBySlug(slug);
   } catch (error) {
     console.error('Failed to fetch product for metadata:', error);
     product = null;
@@ -116,7 +123,7 @@ export async function generateMetadata({
       url: canonicalUrl,
       siteName: 'Plasma Water Africa',
       locale: 'en_KE',
-      type: 'website', // ✅ Fixed: changed from 'product' to 'website'
+      type: 'website',
       images: imageUrl ? [
         {
           url: imageUrl,
@@ -149,24 +156,28 @@ export async function generateMetadata({
   };
 }
 
-// Server Component - fetches product and renders client component
+/**
+ * Product Page - Server Component
+ * Fetches product data and renders the client component
+ */
 export default async function ProductPage({ 
   params 
 }: { 
-  params: { slug: string } 
+  params: Promise<{ slug: string }> 
 }) {
+  // IMPORTANT: Await params in Next.js 15+
+  const { slug } = await params;
+  
   let product = null;
   let error = null;
   
   try {
-    product = await getProduct(params.slug);
+    product = await getProductBySlug(slug);
   } catch (err) {
     console.error('Failed to fetch product:', err);
     error = err instanceof Error ? err.message : 'Failed to load product';
   }
 
-  // If product not found, still render the client component with null
-  // The client component will show the "Product not found" UI
   return (
     <>
       {/* Add JSON-LD schema markup if product exists */}
@@ -185,7 +196,7 @@ export default async function ProductPage({
               '@type': 'WebPage',
               name: 'Product Not Found',
               description: 'The requested product is not available.',
-              url: `https://plasmawater.co.ke/${params.slug}`,
+              url: `https://plasmawater.co.ke/${slug}`,
               breadcrumb: {
                 '@type': 'BreadcrumbList',
                 itemListElement: [
