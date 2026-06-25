@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -241,6 +241,8 @@ export default function ProfitsPage() {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'profit' | 'margin' | 'revenue' | 'units'>('profit');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   // ============ DATA STATE ============
   const [summaryData, setSummaryData] = useState({
@@ -371,16 +373,56 @@ export default function ProfitsPage() {
   };
 
   // ============ FILTERING & SORTING ============
-  const filteredProducts = productData
-    .filter(p => !categoryFilter || p.category === categoryFilter)
-    .filter(p => !supplierFilter || p.supplierName === supplierFilter)
-    .sort((a, b) => {
-      const aVal = a.totalProfit || 0;
-      const bVal = b.totalProfit || 0;
-      return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
-    });
+  const filteredProducts = useMemo(() => {
+    return productData
+      .filter(p => !categoryFilter || p.category === categoryFilter)
+      .filter(p => !supplierFilter || p.supplierName === supplierFilter)
+      .sort((a, b) => {
+        let aVal = 0;
+        let bVal = 0;
+        
+        switch (sortBy) {
+          case 'profit':
+            aVal = a.totalProfit || 0;
+            bVal = b.totalProfit || 0;
+            break;
+          case 'margin':
+            aVal = a.averageMargin || a.margin || 0;
+            bVal = b.averageMargin || b.margin || 0;
+            break;
+          case 'revenue':
+            aVal = a.totalRevenue || 0;
+            bVal = b.totalRevenue || 0;
+            break;
+          case 'units':
+            aVal = a.totalUnitsSold || 0;
+            bVal = b.totalUnitsSold || 0;
+            break;
+          default:
+            aVal = a.totalProfit || 0;
+            bVal = b.totalProfit || 0;
+        }
+        
+        return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
+      });
+  }, [productData, categoryFilter, supplierFilter, sortBy, sortOrder]);
 
-  const displayProducts = filteredProducts.slice(0, 20);
+  // Pagination
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [categoryFilter, supplierFilter, sortBy, sortOrder]);
 
   // ============ RENDER ============
   if (loading) {
@@ -543,7 +585,7 @@ export default function ProfitsPage() {
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-                  Margin %
+                  Margin
                 </span>
               </div>
             </div>
@@ -553,10 +595,14 @@ export default function ProfitsPage() {
                 <XAxis dataKey="_id" stroke="#6b7280" className="dark:stroke-gray-400" />
                 <YAxis yAxisId="left" tickFormatter={formatCompact} stroke="#6b7280" className="dark:stroke-gray-400" />
                 <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v}%`} stroke="#6b7280" className="dark:stroke-gray-400" />
-              <Tooltip formatter={(v: any) => typeof v === 'number' ? formatCurrency(v) : v} 
-              contentStyle={{ backgroundColor: 'rgb(255,255,255)', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#111827' }} 
-              labelStyle={{ color: '#6b7280' }}
-               />
+<Tooltip 
+  formatter={(v: any, name: any) => {
+    if (name === 'Margin') return `${v}%`;
+    return formatCurrency(v);
+  }} 
+  contentStyle={{ backgroundColor: 'rgb(255,255,255)', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#111827' }} 
+  labelStyle={{ color: '#6b7280' }}
+/>
                 <Legend />
                 <Area
                   yAxisId="left"
@@ -666,16 +712,19 @@ export default function ProfitsPage() {
 
       {/* ==================== TOP PRODUCTS TABLE ==================== */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <Award className="w-5 h-5 text-amber-500" />
             Top Profit Products
           </h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1 bg-white dark:bg-gray-800"
+              onChange={(e) => {
+                setSortBy(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
             >
               <option value="profit">Sort by Profit</option>
               <option value="margin">Sort by Margin</option>
@@ -683,10 +732,13 @@ export default function ProfitsPage() {
               <option value="units">Sort by Units</option>
             </select>
             <button
-              onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-              className="text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1 bg-white dark:bg-gray-800"
+              onClick={() => {
+                setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+                setCurrentPage(1);
+              }}
+              className="text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             >
-              {sortOrder === 'desc' ? '↓' : '↑'}
+              {sortOrder === 'desc' ? '↓ Descending' : '↑ Ascending'}
             </button>
           </div>
         </div>
@@ -706,14 +758,14 @@ export default function ProfitsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-              {displayProducts.length === 0 ? (
+              {paginatedProducts.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No products found matching filters
                   </td>
                 </tr>
               ) : (
-                displayProducts.map((product: any) => {
+                paginatedProducts.map((product: any) => {
                   const margin = product.averageMargin || product.margin || 0;
                   const isHighMargin = margin >= 30;
                   const isMediumMargin = margin >= 15 && margin < 30;
@@ -721,7 +773,7 @@ export default function ProfitsPage() {
                   const isNegative = margin < 0;
 
                   return (
-                    <tr key={product._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                    <tr key={product._id || product.productId} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900 dark:text-white">{product.productName || product.name}</div>
                       </td>
@@ -760,15 +812,28 @@ export default function ProfitsPage() {
           </table>
         </div>
 
-        {/* Pagination indicator */}
-        {filteredProducts.length > 20 && (
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-            <span>Showing 1-20 of {filteredProducts.length} products</span>
-            <div className="flex gap-2">
-              <button className="px-3 py-1 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50" disabled>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredProducts.length)} of {filteredProducts.length} products
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button className="px-3 py-1 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

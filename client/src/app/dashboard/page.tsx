@@ -36,39 +36,25 @@ import {
   Medal,
   Crown,
   Sparkles,
-  Target
+  Target,
+  CreditCard,
+  ShoppingBag,
+  Receipt,
+  Layers
 } from 'lucide-react'
 import Link from 'next/link'
 import { Order } from '@/types/order'
+import { DashboardSummary, DashboardTopProduct } from '@/lib/dashboard'
 
 // ==================== TYPES ====================
-interface StatCard {
+interface StatCardData {
   name: string
-  value: string
-  change: string
+  value: string | number
+  change?: string
   icon: any
   color: string
-  trend: 'up' | 'down'
-}
-
-interface DashboardProduct {
-  id: string
-  name: string
-  sales: number
-  revenue: number
-  growth: string
-  stock?: number
-  rank?: number
-}
-
-interface DashboardSummary {
-  totalRevenue: number
-  totalOrders: number
-  totalItemsSold: number
-  pendingOrders: number
-  cancelledOrders: number
-  totalProfit?: number
-  activeCustomers?: number
+  trend?: 'up' | 'down'
+  subtitle?: string
 }
 
 // ==================== STATUS HELPERS ====================
@@ -133,24 +119,31 @@ const getPaymentStatusBadge = (order: any) => {
 }
 
 // ==================== STAT CARD ====================
-function StatCard({ stat }: { stat: StatCard }) {
+function StatCard({ stat }: { stat: StatCardData }) {
   const Icon = stat.icon
-  const TrendIcon = stat.trend === 'up' ? TrendingUp : TrendingDown
   const isPositive = stat.trend === 'up'
+  const TrendIcon = stat.trend === 'up' ? TrendingUp : stat.trend === 'down' ? TrendingDown : null
   
   return (
     <div className="bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all duration-300 p-6 hover:-translate-y-0.5">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{stat.name}</p>
-          <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white truncate">{stat.value}</p>
-          <div className="flex items-center gap-1.5 mt-2">
-            <TrendIcon className={`w-4 h-4 ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`} />
-            <span className={`text-sm font-medium ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-              {stat.change}
-            </span>
-            <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">vs last month</span>
-          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white truncate">
+            {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
+          </p>
+          {stat.subtitle && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{stat.subtitle}</p>
+          )}
+          {stat.change && stat.trend && TrendIcon && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <TrendIcon className={`w-4 h-4 ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`} />
+              <span className={`text-sm font-medium ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
+                {stat.change}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">vs last month</span>
+            </div>
+          )}
         </div>
         <div className={`bg-gradient-to-br ${stat.color} p-3 rounded-xl shadow-lg shrink-0 ml-3`}>
           <Icon className="w-5 h-5 text-white" />
@@ -188,7 +181,7 @@ function OrderStatusCard({
 }
 
 // ==================== TOP PRODUCT ITEM ====================
-function TopProductItem({ product, index }: { product: DashboardProduct; index: number }) {
+function TopProductItem({ product, index }: { product: DashboardTopProduct; index: number }) {
   const isPositive = parseFloat(product.growth) >= 0
   const rankColors = [
     'bg-[#0043b3] text-white',
@@ -218,6 +211,12 @@ function TopProductItem({ product, index }: { product: DashboardProduct; index: 
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {product.sales} unit{product.sales !== 1 ? 's' : ''} sold
             </p>
+            {product.margin !== undefined && product.margin > 0 && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-500 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" />
+                {product.margin.toFixed(1)}% margin
+              </p>
+            )}
             {product.stock !== undefined && product.stock <= 5 && product.stock > 0 && (
               <p className="text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" />
@@ -300,7 +299,7 @@ export default function DashboardOverviewPage() {
   const { summary, recentOrders, topProducts, dashboardStats, isLoading, error, refetch } = useDashboardData()
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Auto-refresh every 30 seconds - smooth no re-render
+  // Auto-refresh every 30 seconds
   useEffect(() => {
     let interval: NodeJS.Timeout
     
@@ -318,52 +317,64 @@ export default function DashboardOverviewPage() {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
     await refetch()
-    // Small delay to ensure smooth transition
     setTimeout(() => {
       setIsRefreshing(false)
     }, 500)
   }, [refetch])
 
-  // Calculate derived metrics
-  const paidOrders = summary ? Math.max(0, (summary.totalOrders || 0) - (summary.pendingOrders || 0) - (summary.cancelledOrders || 0)) : 0
-  const activeCustomers = summary ? ((summary as any).activeCustomers || 0) : 0
-  const totalProfit = summary ? ((summary as any).totalProfit || 0) : 0
+  // Calculate accurate metrics from summary
+  const totalRevenue = summary?.totalRevenue || 0
+  const totalOrders = summary?.totalOrders || 0
+  const totalItemsSold = summary?.totalItemsSold || 0
+  const totalProfit = summary?.totalProfit || 0
+  const totalProducts = summary?.totalProducts || 0
+  const totalTransactions = summary?.totalTransactions || 0
+  const pendingOrders = summary?.pendingOrders || 0
+  const cancelledOrders = summary?.cancelledOrders || 0
+  const paidOrders = summary?.paidOrders || Math.max(0, totalOrders - pendingOrders - cancelledOrders)
+  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+  const lowStockProducts = summary?.lowStockProducts || 0
+  const activeCustomers = summary?.activeCustomers || 0
 
-  // Build stats array
-  const stats: StatCard[] = dashboardStats.length > 0 ? dashboardStats : (summary ? [
+  // Build stats array - 4 key metrics with clean design
+  const stats: StatCardData[] = dashboardStats.length > 0 ? dashboardStats : [
     { 
       name: 'Total Revenue', 
-      value: `Ksh ${(summary.totalRevenue || 0).toLocaleString()}`, 
-      change: '+12.5%', 
+      value: `Ksh ${totalRevenue.toLocaleString()}`, 
+      change: summary?.revenueGrowth || '+0%', 
       icon: DollarSign, 
       color: 'from-emerald-500 to-green-500',
-      trend: 'up' as const
+      trend: totalRevenue > 0 ? 'up' : 'down',
+      subtitle: `${totalOrders} orders`
     },
     { 
-      name: 'Paid Orders', 
-      value: paidOrders.toString(), 
+      name: 'Total Profit', 
+      value: `Ksh ${totalProfit.toLocaleString()}`, 
       change: '+8.2%', 
-      icon: ShoppingCart, 
+      icon: TrendingUp, 
       color: 'from-blue-500 to-cyan-500',
-      trend: 'up' as const
+      trend: totalProfit > 0 ? 'up' : 'down',
+      subtitle: `Margin: ${totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0}%`
     },
     { 
-      name: 'Products Sold', 
-      value: (summary.totalItemsSold || 0).toLocaleString(), 
-      change: '+23.1%', 
+      name: 'Total Products', 
+      value: totalProducts.toLocaleString(), 
+      change: '+5.3%', 
       icon: Package, 
       color: 'from-purple-500 to-pink-500',
-      trend: 'up' as const
+      trend: totalProducts > 0 ? 'up' : 'down',
+      subtitle: `${lowStockProducts} low stock`
     },
     { 
-      name: 'Active Customers', 
-      value: activeCustomers.toString(), 
-      change: '+5.3%', 
-      icon: Users, 
+      name: 'Total Transactions', 
+      value: totalTransactions.toLocaleString(), 
+      change: '+15.7%', 
+      icon: CreditCard, 
       color: 'from-orange-500 to-red-500',
-      trend: 'up' as const
+      trend: totalTransactions > 0 ? 'up' : 'down',
+      subtitle: `Avg: Ksh ${totalTransactions > 0 ? (totalRevenue / totalTransactions).toLocaleString() : 0}`
     },
-  ] : [])
+  ]
 
   // Loading state
   if (isLoading) {
@@ -432,7 +443,7 @@ export default function DashboardOverviewPage() {
         </button>
       </div>
 
-      {/* ==================== STATS CARDS ==================== */}
+      {/* ==================== MAIN STATS CARDS ==================== */}
       {stats.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {stats.map((stat, idx) => (
@@ -452,14 +463,14 @@ export default function DashboardOverviewPage() {
         />
         <OrderStatusCard
           title="Pending Orders"
-          count={summary?.pendingOrders || 0}
+          count={pendingOrders}
           icon={Clock}
           color="border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400"
           bgColor="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20"
         />
         <OrderStatusCard
           title="Cancelled Orders"
-          count={summary?.cancelledOrders || 0}
+          count={cancelledOrders}
           icon={XCircle}
           color="border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400"
           bgColor="bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20"
@@ -486,18 +497,10 @@ export default function DashboardOverviewPage() {
           </div>
           <div className="p-4 space-y-1 max-h-[500px] overflow-y-auto">
             {topProducts.length > 0 ? (
-              topProducts.slice(0, 10).map((product: any, idx: number) => (
+              topProducts.slice(0, 10).map((product: DashboardTopProduct, idx: number) => (
                 <TopProductItem 
                   key={product.id || idx} 
-                  product={{ 
-                    id: product.id || product._id || String(idx),
-                    name: product.name,
-                    sales: product.sales || product.quantity || 0,
-                    revenue: product.revenue || product.totalRevenue || 0,
-                    growth: product.growth || '+0%',
-                    stock: product.stock,
-                    rank: idx + 1
-                  }} 
+                  product={product} 
                   index={idx} 
                 />
               ))
@@ -548,23 +551,21 @@ export default function DashboardOverviewPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Orders</p>
-            <p className="text-xl font-bold text-[#000063] dark:text-white mt-1">{summary?.totalOrders || 0}</p>
+            <p className="text-xl font-bold text-[#000063] dark:text-white mt-1">{totalOrders}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Items Sold</p>
-            <p className="text-xl font-bold text-[#000063] dark:text-white mt-1">{summary?.totalItemsSold || 0}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items Sold</p>
+            <p className="text-xl font-bold text-[#000063] dark:text-white mt-1">{totalItemsSold}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Average Order Value</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Avg Order Value</p>
             <p className="text-xl font-bold text-[#000063] dark:text-white mt-1">
-              Ksh {((summary?.totalRevenue || 0) / (summary?.totalOrders || 1)).toLocaleString()}
+              Ksh {averageOrderValue.toLocaleString()}
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Profit</p>
-            <p className="text-xl font-bold text-green-600 dark:text-green-500 mt-1">
-              Ksh {(totalProfit || 0).toLocaleString()}
-            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Paid Orders</p>
+            <p className="text-xl font-bold text-green-600 dark:text-green-500 mt-1">{paidOrders}</p>
           </div>
         </div>
       </div>

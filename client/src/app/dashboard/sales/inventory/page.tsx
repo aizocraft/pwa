@@ -38,9 +38,7 @@ const formatNumber = (num: number) => {
   return new Intl.NumberFormat('en-KE').format(num);
 };
 
-import DashboardProductsPage from '@/app/dashboard/products/page'
-
-type TabType = 'low-stock' | 'valuation' | 'bulk-actions' | 'products' | 'settings';
+type TabType = 'low-stock' | 'valuation' | 'bulk-actions';
 
 export default function InventoryPage() {
   const [summary, setSummary] = useState<any>(null);
@@ -218,7 +216,7 @@ export default function InventoryPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-cyan-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-cyan-600 dark:text-cyan-400" />
       </div>
     );
   }
@@ -233,11 +231,11 @@ export default function InventoryPage() {
             Track stock levels, manage inventory value, and perform bulk operations
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button 
             onClick={() => handleExport('csv')}
             disabled={exporting}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+            className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 flex items-center gap-2 transition-all duration-200 disabled:opacity-50"
           >
             {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <DownloadCloud className="w-4 h-4" />}
             Export CSV
@@ -245,34 +243,37 @@ export default function InventoryPage() {
           <button 
             onClick={() => handleExport('json')}
             disabled={exporting}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+            className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 flex items-center gap-2 transition-all duration-200 disabled:opacity-50"
           >
             <FileJson className="w-4 h-4" />
             Export JSON
           </button>
           <button 
             onClick={() => setShowBulkImportModal(true)}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white rounded-lg flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md"
           >
             <UploadCloud className="w-4 h-4" />
             Bulk Import
           </button>
-          <button onClick={fetchData} className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2">
+          <button 
+            onClick={fetchData} 
+            className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 flex items-center gap-2 transition-all duration-200"
+          >
             <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - Products tab removed */}
       <div className="border-b border-gray-200 dark:border-gray-700">
         <nav className="flex gap-6">
           <button
             onClick={() => setActiveTab('low-stock')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
+            className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
               activeTab === 'low-stock' 
-                ? 'text-cyan-600 border-b-2 border-cyan-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             <AlertTriangle className="w-4 h-4 inline mr-2" />
@@ -280,32 +281,21 @@ export default function InventoryPage() {
           </button>
           <button
             onClick={() => setActiveTab('valuation')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
+            className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
               activeTab === 'valuation' 
-                ? 'text-cyan-600 border-b-2 border-cyan-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             <BarChart3 className="w-4 h-4 inline mr-2" />
             Inventory Valuation
           </button>
           <button
-            onClick={() => setActiveTab('products')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
-              activeTab === 'products' 
-                ? 'text-cyan-600 border-b-2 border-cyan-600' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Package className="w-4 h-4 inline mr-2" />
-            Products
-          </button>
-          <button
             onClick={() => setActiveTab('bulk-actions')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
+            className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
               activeTab === 'bulk-actions' 
-                ? 'text-cyan-600 border-b-2 border-cyan-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             <Settings className="w-4 h-4 inline mr-2" />
@@ -316,28 +306,28 @@ export default function InventoryPage() {
 
       {/* Inventory Summary Cards - Always visible */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-shadow duration-200">
           <div className="flex items-center justify-between">
             <Package className="w-8 h-8 opacity-80" />
             <span className="text-2xl font-bold">{formatNumber(summary?.totalUnits || 0)}</span>
           </div>
           <p className="text-sm opacity-80 mt-2">Total Units in Stock</p>
         </div>
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 text-white">
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-shadow duration-200">
           <div className="flex items-center justify-between">
             <DollarSign className="w-8 h-8 opacity-80" />
             <span className="text-2xl font-bold">{formatCurrency(summary?.totalStockValue || 0)}</span>
           </div>
           <p className="text-sm opacity-80 mt-2">Stock Value (Cost)</p>
         </div>
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 text-white">
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-shadow duration-200">
           <div className="flex items-center justify-between">
             <TrendingUp className="w-8 h-8 opacity-80" />
             <span className="text-2xl font-bold">{formatCurrency(summary?.totalPotentialProfit || 0)}</span>
           </div>
           <p className="text-sm opacity-80 mt-2">Potential Profit</p>
         </div>
-        <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-5 text-white">
+        <div className="bg-gradient-to-br from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-700 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-shadow duration-200">
           <div className="flex items-center justify-between">
             <AlertTriangle className="w-8 h-8 opacity-80" />
             <span className="text-2xl font-bold">{summary?.lowStockItems || 0}</span>
@@ -351,18 +341,18 @@ export default function InventoryPage() {
         <>
           {/* Category Breakdown */}
           {summary?.categoryBreakdown?.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold mb-4">Inventory by Category</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Inventory by Category</h2>
               <div className="space-y-3">
                 {summary.categoryBreakdown.map((cat: any) => (
-                  <div key={cat._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                  <div key={cat._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors duration-200">
                     <div>
-                      <p className="font-medium">{cat._id}</p>
-                      <p className="text-sm text-gray-500">{formatNumber(cat.units)} units</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{cat._id}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{formatNumber(cat.units)} units</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">{formatCurrency(cat.stockValue)}</p>
-                      <p className="text-sm text-gray-500">{formatCurrency(cat.inventoryValue)} (retail)</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(cat.stockValue)}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{formatCurrency(cat.inventoryValue)} (retail)</p>
                     </div>
                   </div>
                 ))}
@@ -371,45 +361,53 @@ export default function InventoryPage() {
           )}
 
           {/* Low Stock Products Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="px-6 py-4 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 dark:text-amber-400" />
                   Low Stock Alert
                 </h2>
                 {selectedProducts.size > 0 && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={() => setShowBulkAdjustModal(true)}
-                      className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
+                      className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-all duration-200"
                     >
                       Adjust Stock ({selectedProducts.size})
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                      className="px-3 py-1 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-all duration-200"
                     >
                       Delete ({selectedProducts.size})
                     </button>
                   </div>
                 )}
               </div>
-              <div className="flex gap-3">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <div className="flex gap-3 flex-wrap">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                   <input
                     type="text"
                     placeholder="Search products..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 border rounded-lg w-64"
+                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-200"
                   />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="px-4 py-2 border rounded-lg"
+                  className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">All Categories</option>
                   {summary?.categoryBreakdown?.map((cat: any) => (
@@ -421,62 +419,65 @@ export default function InventoryPage() {
 
             {filteredProducts.length === 0 ? (
               <div className="text-center py-12">
-                <CheckCircle className="w-12 h-12 mx-auto text-emerald-500 mb-3" />
-                <p className="text-gray-500">No low stock items found</p>
+                <CheckCircle className="w-12 h-12 mx-auto text-emerald-500 dark:text-emerald-400 mb-3" />
+                <p className="text-gray-500 dark:text-gray-400">No low stock items found</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium">
-                        <button onClick={toggleAllProducts} className="flex items-center gap-2">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <button onClick={toggleAllProducts} className="flex items-center gap-2 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
                           {selectedProducts.size === filteredProducts.length ? 
-                            <CheckSquare className="w-4 h-4" /> : 
-                            <Square className="w-4 h-4" />
+                            <CheckSquare className="w-4 h-4 text-cyan-600 dark:text-cyan-400" /> : 
+                            <Square className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           }
                         </button>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium">Product</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium">SKU</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium">Current Stock</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium">Selling Price</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium">Buying Price</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium">Profit Per Unit</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Product</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">SKU</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Current Stock</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Selling Price</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Buying Price</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Profit Per Unit</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {filteredProducts.map((product) => {
                       const profitPerUnit = product.price - (product.buyingPrice || 0);
                       const stockStatus = product.stock === 0 ? 'Out of Stock' : product.stock < 5 ? 'Critical' : 'Low Stock';
-                      const statusColor = product.stock === 0 ? 'text-red-600' : product.stock < 5 ? 'text-orange-600' : 'text-amber-600';
+                      const statusColor = product.stock === 0 ? 'text-red-600 dark:text-red-400' : product.stock < 5 ? 'text-orange-600 dark:text-orange-400' : 'text-amber-600 dark:text-amber-400';
                       
                       return (
-                        <tr key={product._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <tr key={product._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200">
                           <td className="px-6 py-4">
-                            <button onClick={() => toggleProductSelection(product._id)}>
+                            <button 
+                              onClick={() => toggleProductSelection(product._id)}
+                              className="hover:scale-110 transition-transform duration-200"
+                            >
                               {selectedProducts.has(product._id) ? 
-                                <CheckSquare className="w-4 h-4 text-cyan-600" /> : 
-                                <Square className="w-4 h-4 text-gray-400" />
+                                <CheckSquare className="w-4 h-4 text-cyan-600 dark:text-cyan-400" /> : 
+                                <Square className="w-4 h-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" />
                               }
                             </button>
                           </td>
                           <td className="px-6 py-4">
                             <div>
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-xs text-gray-500">{product.category}</p>
+                              <p className="font-medium text-gray-900 dark:text-white">{product.name}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{product.category}</p>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-sm font-mono">{product.sku || 'N/A'}</td>
+                          <td className="px-6 py-4 text-sm font-mono text-gray-600 dark:text-gray-400">{product.sku || 'N/A'}</td>
                           <td className="px-6 py-4 text-right">
                             <span className={`font-semibold ${statusColor}`}>{product.stock}</span>
-                            <p className="text-xs text-gray-500">{stockStatus}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{stockStatus}</p>
                           </td>
-                          <td className="px-6 py-4 text-right">{formatCurrency(product.price)}</td>
-                          <td className="px-6 py-4 text-right text-gray-500">{formatCurrency(product.buyingPrice || 0)}</td>
+                          <td className="px-6 py-4 text-right text-gray-900 dark:text-white">{formatCurrency(product.price)}</td>
+                          <td className="px-6 py-4 text-right text-gray-500 dark:text-gray-400">{formatCurrency(product.buyingPrice || 0)}</td>
                           <td className="px-6 py-4 text-right">
-                            <span className={profitPerUnit >= 0 ? 'text-emerald-600' : 'text-red-600'}>
+                            <span className={profitPerUnit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
                               {formatCurrency(Math.abs(profitPerUnit))}
                               {profitPerUnit >= 0 ? ' profit' : ' loss'}
                             </span>
@@ -490,9 +491,9 @@ export default function InventoryPage() {
                                 setRestockReason('');
                                 setShowRestockModal(true);
                               }}
-                              className="px-3 py-1.5 bg-cyan-600 text-white rounded-lg text-sm hover:bg-cyan-700"
+                              className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-600 text-white rounded-lg text-sm transition-all duration-200 hover:shadow-md flex items-center justify-center gap-1 mx-auto"
                             >
-                              <Plus className="w-4 h-4 inline mr-1" />
+                              <Plus className="w-4 h-4" />
                               Restock
                             </button>
                           </td>
@@ -512,7 +513,7 @@ export default function InventoryPage() {
         <div className="space-y-6">
           {/* Valuation Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white">
+            <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-shadow duration-200">
               <div className="flex items-center justify-between">
                 <DollarSign className="w-8 h-8 opacity-80" />
                 <span className="text-2xl font-bold">{formatCurrency(valuation.summary.totalRetailValue)}</span>
@@ -520,7 +521,7 @@ export default function InventoryPage() {
               <p className="text-sm opacity-80 mt-2">Total Retail Value</p>
               <p className="text-xs opacity-60">Cost: {formatCurrency(valuation.summary.totalCostValue)}</p>
             </div>
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 text-white">
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-shadow duration-200">
               <div className="flex items-center justify-between">
                 <TrendingUp className="w-8 h-8 opacity-80" />
                 <span className="text-2xl font-bold">{formatCurrency(valuation.summary.totalPotentialProfit)}</span>
@@ -528,7 +529,7 @@ export default function InventoryPage() {
               <p className="text-sm opacity-80 mt-2">Total Profit Potential</p>
               <p className="text-xs opacity-60">Margin: {valuation.summary.averageMargin.toFixed(1)}%</p>
             </div>
-            <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-5 text-white">
+            <div className="bg-gradient-to-br from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-700 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-shadow duration-200">
               <div className="flex items-center justify-between">
                 <Box className="w-8 h-8 opacity-80" />
                 <span className="text-2xl font-bold">{formatNumber(valuation.summary.totalStockUnits)}</span>
@@ -540,18 +541,18 @@ export default function InventoryPage() {
 
           {/* Top Products by Value */}
           {valuation.topProductsByValue?.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold mb-4">Top Products by Inventory Value</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Top Products by Inventory Value</h2>
               <div className="space-y-3">
                 {valuation.topProductsByValue.map((product: any, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors duration-200">
                     <div>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-gray-500">SKU: {product.sku} | Stock: {product.stock} units</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{product.name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">SKU: {product.sku} | Stock: {product.stock} units</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-emerald-600">{formatCurrency(product.inventoryValue)}</p>
-                      <p className="text-sm text-gray-500">Profit: {formatCurrency(product.potentialProfit)}</p>
+                      <p className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(product.inventoryValue)}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Profit: {formatCurrency(product.potentialProfit)}</p>
                     </div>
                   </div>
                 ))}
@@ -561,27 +562,27 @@ export default function InventoryPage() {
 
           {/* Category Valuation Breakdown */}
           {valuation.categoryBreakdown?.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold mb-4">Category Valuation Breakdown</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Category Valuation Breakdown</h2>
               <div className="space-y-3">
                 {valuation.categoryBreakdown.map((cat: any) => (
-                  <div key={cat._id} className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                  <div key={cat._id} className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors duration-200">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="font-medium text-lg">{cat._id}</p>
-                      <p className="text-sm font-semibold text-emerald-600">{formatCurrency(cat.totalValue)}</p>
+                      <p className="font-medium text-lg text-gray-900 dark:text-white">{cat._id}</p>
+                      <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(cat.totalValue)}</p>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-sm">
                       <div>
-                        <p className="text-gray-500">Cost</p>
-                        <p className="font-medium">{formatCurrency(cat.totalCost)}</p>
+                        <p className="text-gray-500 dark:text-gray-400">Cost</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{formatCurrency(cat.totalCost)}</p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Profit</p>
-                        <p className="font-medium text-emerald-600">{formatCurrency(cat.totalProfit)}</p>
+                        <p className="text-gray-500 dark:text-gray-400">Profit</p>
+                        <p className="font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(cat.totalProfit)}</p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Margin</p>
-                        <p className="font-medium">{((cat.totalProfit / cat.totalValue) * 100).toFixed(1)}%</p>
+                        <p className="text-gray-500 dark:text-gray-400">Margin</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{((cat.totalProfit / cat.totalValue) * 100).toFixed(1)}%</p>
                       </div>
                     </div>
                   </div>
@@ -592,34 +593,27 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Products Tab */}
-      {activeTab === 'products' && (
-        <div className="">
-          <DashboardProductsPage viewMode="sales" />
-        </div>
-      )}
-
-      {/* Bulk Actions Tab */}
+      {/* Bulk Actions Tab - Optimized with dark mode */}
       {activeTab === 'bulk-actions' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Bulk Stock Adjustment Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow duration-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Settings className="w-5 h-5 text-blue-600" />
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <Settings className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <h2 className="text-lg font-semibold">Bulk Stock Adjustment</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Bulk Stock Adjustment</h2>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Quickly adjust stock levels for multiple products at once
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Operation</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Operation</label>
                 <select 
                   value={bulkAdjustOperation}
                   onChange={(e) => setBulkAdjustOperation(e.target.value as any)}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="add">Add Stock (+)</option>
                   <option value="subtract">Subtract Stock (-)</option>
@@ -627,18 +621,18 @@ export default function InventoryPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Quantity</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
                 <input
                   type="number"
                   min="1"
                   value={bulkAdjustQuantity}
                   onChange={(e) => setBulkAdjustQuantity(parseInt(e.target.value))}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 />
               </div>
               <button
                 onClick={() => setShowBulkAdjustModal(true)}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 Apply to Selected Products
               </button>
@@ -646,46 +640,46 @@ export default function InventoryPage() {
           </div>
 
           {/* Bulk Delete Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow duration-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <Trash2 className="w-5 h-5 text-red-600" />
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />
               </div>
-              <h2 className="text-lg font-semibold">Bulk Delete Products</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Bulk Delete Products</h2>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Permanently delete multiple products from inventory
             </p>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="w-full py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
+              className="w-full py-3 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
             >
               Delete Selected Products
             </button>
           </div>
 
           {/* Import/Export Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow duration-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-emerald-100 rounded-lg">
-                <Upload className="w-5 h-5 text-emerald-600" />
+              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                <Upload className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <h2 className="text-lg font-semibold">Import/Export</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Import/Export</h2>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Bulk import products from CSV or export inventory data
             </p>
             <div className="space-y-3">
               <button
                 onClick={handleDownloadTemplate}
-                className="w-full py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
+                className="w-full py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 flex items-center justify-center gap-2 transition-all duration-200"
               >
                 <FileText className="w-4 h-4" />
                 Download Template
               </button>
               <button
                 onClick={() => setShowBulkImportModal(true)}
-                className="w-full py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center justify-center gap-2"
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white rounded-lg flex items-center justify-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 <UploadCloud className="w-4 h-4" />
                 Bulk Import
@@ -694,19 +688,34 @@ export default function InventoryPage() {
           </div>
 
           {/* Instructions Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow duration-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Shield className="w-5 h-5 text-purple-600" />
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
-              <h2 className="text-lg font-semibold">Instructions</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Instructions</h2>
             </div>
-            <div className="space-y-3 text-sm text-gray-600">
-              <p>✓ Select products using checkboxes in the Low Stock tab</p>
-              <p>✓ Use bulk actions to adjust stock or delete multiple products</p>
-              <p>✓ Download template for correct CSV format before bulk import</p>
-              <p>✓ Export data in CSV or JSON format for reporting</p>
-              <p>✓ Use the Valuation tab for detailed inventory financial analysis</p>
+            <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+              <p className="flex items-start gap-2">
+                <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">✓</span>
+                Select products using checkboxes in the Low Stock tab
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">✓</span>
+                Use bulk actions to adjust stock or delete multiple products
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">✓</span>
+                Download template for correct CSV format before bulk import
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">✓</span>
+                Export data in CSV or JSON format for reporting
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">✓</span>
+                Use the Valuation tab for detailed inventory financial analysis
+              </p>
             </div>
           </div>
         </div>
@@ -714,60 +723,60 @@ export default function InventoryPage() {
 
       {/* Restock Modal */}
       {showRestockModal && selectedProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Restock Product</h2>
-              <button onClick={() => setShowRestockModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <XCircle className="w-5 h-5" />
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Restock Product</h2>
+              <button onClick={() => setShowRestockModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                <XCircle className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </button>
             </div>
             <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <p className="font-medium">{selectedProduct.name}</p>
-              <p className="text-sm text-gray-500">Current Stock: {selectedProduct.stock}</p>
-              <p className="text-sm text-gray-500">Current Buying Price: {formatCurrency(selectedProduct.buyingPrice || 0)}</p>
+              <p className="font-medium text-gray-900 dark:text-white">{selectedProduct.name}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Current Stock: {selectedProduct.stock}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Current Buying Price: {formatCurrency(selectedProduct.buyingPrice || 0)}</p>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Quantity to Add *</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity to Add *</label>
                 <input
                   type="number"
                   min="1"
                   value={restockQuantity}
                   onChange={(e) => setRestockQuantity(parseInt(e.target.value))}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-200"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">New Buying Price (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Buying Price (optional)</label>
                 <input
                   type="number"
                   value={restockPrice || ''}
                   onChange={(e) => setRestockPrice(e.target.value ? parseFloat(e.target.value) : null)}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-200"
                   placeholder="Leave empty to keep current price"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Reason (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reason (optional)</label>
                 <input
                   type="text"
                   value={restockReason}
                   onChange={(e) => setRestockReason(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-200"
                   placeholder="e.g., New shipment received"
                 />
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4 flex-col sm:flex-row">
                 <button
                   onClick={handleRestock}
-                  className="flex-1 py-3 bg-cyan-600 text-white rounded-lg font-medium"
+                  className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-600 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
                 >
                   Confirm Restock
                 </button>
                 <button
                   onClick={() => setShowRestockModal(false)}
-                  className="flex-1 py-3 border rounded-lg"
+                  className="flex-1 py-3 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-all duration-200"
                 >
                   Cancel
                 </button>
@@ -779,18 +788,18 @@ export default function InventoryPage() {
 
       {/* Bulk Import Modal */}
       {showBulkImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Bulk Import Products</h2>
-              <button onClick={() => setShowBulkImportModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <XCircle className="w-5 h-5" />
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Bulk Import Products</h2>
+              <button onClick={() => setShowBulkImportModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                <XCircle className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </button>
             </div>
             <div className="space-y-4">
-              <div className="p-4 bg-blue-50 rounded-lg text-sm">
-                <p className="font-medium mb-2">CSV Format Requirements:</p>
-                <ul className="list-disc list-inside space-y-1 text-gray-600">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm">
+                <p className="font-medium text-gray-900 dark:text-white mb-2">CSV Format Requirements:</p>
+                <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
                   <li>First row must be column headers</li>
                   <li>Required: Product Name, Price (KES)</li>
                   <li>Optional: SKU, Category, Brand, Stock, etc.</li>
@@ -798,26 +807,26 @@ export default function InventoryPage() {
                 </ul>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Select CSV File</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select CSV File</label>
                 <input
                   type="file"
                   accept=".csv"
                   onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                  className="w-full border rounded-lg p-2"
+                  className="w-full border border-gray-200 dark:border-gray-700 rounded-lg p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 dark:file:bg-cyan-900/30 dark:file:text-cyan-400 transition-all duration-200"
                 />
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4 flex-col sm:flex-row">
                 <button
                   onClick={handleBulkImport}
                   disabled={importing || !importFile}
-                  className="flex-1 py-3 bg-emerald-600 text-white rounded-lg font-medium disabled:opacity-50"
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-2"
                 >
-                  {importing ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : <UploadCloud className="w-4 h-4 inline mr-2" />}
+                  {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
                   {importing ? 'Importing...' : 'Import'}
                 </button>
                 <button
                   onClick={() => setShowBulkImportModal(false)}
-                  className="flex-1 py-3 border rounded-lg"
+                  className="flex-1 py-3 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-all duration-200"
                 >
                   Cancel
                 </button>
@@ -829,24 +838,24 @@ export default function InventoryPage() {
 
       {/* Bulk Stock Adjust Modal */}
       {showBulkAdjustModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Bulk Stock Adjustment</h2>
-              <button onClick={() => setShowBulkAdjustModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <XCircle className="w-5 h-5" />
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Bulk Stock Adjustment</h2>
+              <button onClick={() => setShowBulkAdjustModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                <XCircle className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </button>
             </div>
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <p className="font-medium">{selectedProducts.size} products selected</p>
+            <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <p className="font-medium text-gray-900 dark:text-white">{selectedProducts.size} products selected</p>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Operation</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Operation</label>
                 <select 
                   value={bulkAdjustOperation}
                   onChange={(e) => setBulkAdjustOperation(e.target.value as any)}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="add">Add Stock (+)</option>
                   <option value="subtract">Subtract Stock (-)</option>
@@ -854,35 +863,35 @@ export default function InventoryPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Quantity</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
                 <input
                   type="number"
                   min="1"
                   value={bulkAdjustQuantity}
                   onChange={(e) => setBulkAdjustQuantity(parseInt(e.target.value))}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Reason</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reason</label>
                 <input
                   type="text"
                   value={bulkAdjustReason}
                   onChange={(e) => setBulkAdjustReason(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                   placeholder="e.g., Physical inventory count"
                 />
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4 flex-col sm:flex-row">
                 <button
                   onClick={handleBulkStockAdjust}
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium"
+                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
                 >
                   Apply Adjustment
                 </button>
                 <button
                   onClick={() => setShowBulkAdjustModal(false)}
-                  className="flex-1 py-3 border rounded-lg"
+                  className="flex-1 py-3 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-all duration-200"
                 >
                   Cancel
                 </button>
@@ -894,27 +903,27 @@ export default function InventoryPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-red-100 rounded-full">
-                <AlertOctagon className="w-6 h-6 text-red-600" />
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <AlertOctagon className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
-              <h2 className="text-xl font-bold">Confirm Deletion</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Confirm Deletion</h2>
             </div>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               Are you sure you want to delete {selectedProducts.size} product(s)? This action cannot be undone.
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-col sm:flex-row">
               <button
                 onClick={handleBulkDelete}
-                className="flex-1 py-3 bg-red-600 text-white rounded-lg font-medium"
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 Yes, Delete
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-3 border rounded-lg"
+                className="flex-1 py-3 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-all duration-200"
               >
                 Cancel
               </button>

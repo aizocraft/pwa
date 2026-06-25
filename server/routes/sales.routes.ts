@@ -1731,4 +1731,440 @@ router.post('/invoices/:id/create-order', authMiddleware, requireSalesRole, asyn
   }
 });
 
+// ==================== ENHANCED SALES CUSTOMER ENDPOINTS ====================
+
+// GET /api/sales/customers/:id - Get single customer
+router.get('/customers/:id', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid customer ID' });
+    }
+
+    const customer = await SalesCustomerModel.findById(id).lean();
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    if (req.user!.role === 'sales' && customer.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get customer statistics
+    const [orders, quotations, invoices] = await Promise.all([
+      OrderModel.find({ salesCustomerId: customer._id }).sort({ createdAt: -1 }).limit(5).lean(),
+      QuotationModel.find({ customerId: customer._id }).sort({ createdAt: -1 }).limit(5).lean(),
+      InvoiceModel.find({ customerId: customer._id }).sort({ createdAt: -1 }).limit(5).lean()
+    ]);
+
+    const orderCount = await OrderModel.countDocuments({ salesCustomerId: customer._id });
+    const quotationCount = await QuotationModel.countDocuments({ customerId: customer._id });
+    const invoiceCount = await InvoiceModel.countDocuments({ customerId: customer._id });
+    const totalRevenue = await OrderModel.aggregate([
+      { $match: { salesCustomerId: customer._id, paymentStatus: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]);
+
+    res.json({ 
+      success: true, 
+      customer: {
+        ...customer,
+        stats: {
+          orderCount,
+          quotationCount,
+          invoiceCount,
+          totalRevenue: totalRevenue[0]?.total || 0,
+          recentOrders: orders,
+          recentQuotations: quotations,
+          recentInvoices: invoices
+        }
+      }
+    });
+  } catch (error: any) {
+    console.error('Fetch customer error:', error);
+    res.status(500).json({ error: 'Failed to fetch customer' });
+  }
+});
+
+// GET /api/sales/customers/:id/orders - Get customer orders
+router.get('/customers/:id/orders', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid customer ID' });
+    }
+
+    const customer = await SalesCustomerModel.findById(id);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    if (req.user!.role === 'sales' && customer.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { page = '1', limit = '10', status } = req.query;
+    const p = Number(page);
+    const l = Number(limit);
+    const skip = (p - 1) * l;
+
+    const query: any = { salesCustomerId: customer._id };
+    if (status) query.status = status;
+
+    const [orders, total] = await Promise.all([
+      OrderModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(l)
+        .lean(),
+      OrderModel.countDocuments(query)
+    ]);
+
+    res.json({
+      success: true,
+      customer: { _id: customer._id, name: customer.name },
+      orders,
+      pagination: { current: p, limit: l, total, pages: Math.ceil(total / l) }
+    });
+  } catch (error: any) {
+    console.error('Fetch customer orders error:', error);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// GET /api/sales/customers/:id/quotations - Get customer quotations
+router.get('/customers/:id/quotations', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid customer ID' });
+    }
+
+    const customer = await SalesCustomerModel.findById(id);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    if (req.user!.role === 'sales' && customer.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { page = '1', limit = '10', status } = req.query;
+    const p = Number(page);
+    const l = Number(limit);
+    const skip = (p - 1) * l;
+
+    const query: any = { customerId: customer._id };
+    if (status) query.status = status;
+
+    const [quotations, total] = await Promise.all([
+      QuotationModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(l)
+        .lean(),
+      QuotationModel.countDocuments(query)
+    ]);
+
+    res.json({
+      success: true,
+      customer: { _id: customer._id, name: customer.name },
+      quotations,
+      pagination: { current: p, limit: l, total, pages: Math.ceil(total / l) }
+    });
+  } catch (error: any) {
+    console.error('Fetch customer quotations error:', error);
+    res.status(500).json({ error: 'Failed to fetch quotations' });
+  }
+});
+
+// GET /api/sales/customers/:id/invoices - Get customer invoices
+router.get('/customers/:id/invoices', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid customer ID' });
+    }
+
+    const customer = await SalesCustomerModel.findById(id);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    if (req.user!.role === 'sales' && customer.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { page = '1', limit = '10', status, paymentStatus } = req.query;
+    const p = Number(page);
+    const l = Number(limit);
+    const skip = (p - 1) * l;
+
+    const query: any = { customerId: customer._id };
+    if (status) query.status = status;
+    if (paymentStatus) query.paymentStatus = paymentStatus;
+
+    const [invoices, total] = await Promise.all([
+      InvoiceModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(l)
+        .lean(),
+      InvoiceModel.countDocuments(query)
+    ]);
+
+    res.json({
+      success: true,
+      customer: { _id: customer._id, name: customer.name },
+      invoices,
+      pagination: { current: p, limit: l, total, pages: Math.ceil(total / l) }
+    });
+  } catch (error: any) {
+    console.error('Fetch customer invoices error:', error);
+    res.status(500).json({ error: 'Failed to fetch invoices' });
+  }
+});
+
+// GET /api/sales/customers/active - Get active customers
+router.get('/customers/active', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { limit = '20', search } = req.query;
+    const query: any = { status: 'active' };
+    
+    if (req.user!.role === 'sales') {
+      query.createdBy = req.user!.userId;
+    }
+
+    if (search && typeof search === 'string') {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const customers = await SalesCustomerModel.find(query)
+      .sort({ totalSpent: -1 })
+      .limit(parseInt(limit as string))
+      .lean();
+
+    res.json({ 
+      success: true, 
+      customers, 
+      count: customers.length 
+    });
+  } catch (error: any) {
+    console.error('Fetch active customers error:', error);
+    res.status(500).json({ error: 'Failed to fetch active customers' });
+  }
+});
+
+// GET /api/sales/customers/top - Get top customers by spending
+router.get('/customers/top', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { limit = '10' } = req.query;
+    
+    const query: any = {};
+    if (req.user!.role === 'sales') {
+      query.createdBy = req.user!.userId;
+    }
+
+    const customers = await SalesCustomerModel.find(query)
+      .sort({ totalSpent: -1 })
+      .limit(parseInt(limit as string))
+      .lean();
+
+    res.json({ 
+      success: true, 
+      customers, 
+      count: customers.length 
+    });
+  } catch (error: any) {
+    console.error('Fetch top customers error:', error);
+    res.status(500).json({ error: 'Failed to fetch top customers' });
+  }
+});
+
+// GET /api/sales/customers/stats/overview - Customer statistics
+router.get('/customers/stats/overview', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const query: any = {};
+    if (req.user!.role === 'sales') {
+      query.createdBy = req.user!.userId;
+    }
+
+    const [
+      totalCustomers,
+      activeCustomers,
+      totalRevenue,
+      avgCustomerValue,
+      newCustomersThisMonth
+    ] = await Promise.all([
+      SalesCustomerModel.countDocuments(query),
+      SalesCustomerModel.countDocuments({ ...query, status: 'active' }),
+      SalesCustomerModel.aggregate([
+        { $match: query },
+        { $group: { _id: null, total: { $sum: '$totalSpent' } } }
+      ]),
+      SalesCustomerModel.aggregate([
+        { $match: query },
+        { $group: { _id: null, avg: { $avg: '$totalSpent' } } }
+      ]),
+      SalesCustomerModel.countDocuments({
+        ...query,
+        createdAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
+      })
+    ]);
+
+    // Customer growth over last 12 months
+    const growthData = await SalesCustomerModel.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+      { $limit: 12 }
+    ]);
+
+    res.json({
+      success: true,
+      stats: {
+        totalCustomers,
+        activeCustomers,
+        inactiveCustomers: totalCustomers - activeCustomers,
+        totalRevenue: totalRevenue[0]?.total || 0,
+        avgCustomerValue: avgCustomerValue[0]?.avg || 0,
+        newCustomersThisMonth,
+        growthData: growthData.map(item => ({
+          month: `${item._id.year}-${String(item._id.month).padStart(2, '0')}`,
+          count: item.count
+        }))
+      }
+    });
+  } catch (error: any) {
+    console.error('Fetch customer stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch customer stats' });
+  }
+});
+
+// PATCH /api/sales/customers/:id/status - Toggle customer status
+router.patch('/customers/:id/status', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid customer ID' });
+    }
+
+    const customer = await SalesCustomerModel.findById(id);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    if (req.user!.role === 'sales' && customer.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    const oldStatus = customer.status;
+    customer.status = status;
+    await customer.save();
+
+    await createAuditLog(req as any, {
+      action: 'update_status',
+      resource: 'customer',
+      resourceId: customer._id.toString(),
+      details: `Customer status changed from ${oldStatus} to ${status}`,
+      skipIfNoUser: false
+    });
+
+    // ✅ NOTIFICATION: Customer status changed
+    await notifyAdmins(
+      `${status === 'active' ? '✅' : '⛔'} Customer Status Changed`,
+      `${req.user.email || req.user.name} changed customer "${customer.name}" status from ${oldStatus} to ${status}`,
+      `/dashboard/sales/customers/${customer._id}`,
+      {
+        action: 'change_customer_status',
+        changedBy: req.user.email || req.user.name,
+        customerId: customer._id,
+        customerName: customer.name,
+        oldStatus,
+        newStatus: status
+      }
+    );
+
+    res.json({ success: true, customer });
+  } catch (error: any) {
+    console.error('Update customer status error:', error);
+    res.status(500).json({ error: 'Failed to update customer status' });
+  }
+});
+
+// DELETE /api/sales/customers/:id - Delete customer (soft delete)
+router.delete('/customers/:id', authMiddleware, requireSalesRole, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid customer ID' });
+    }
+
+    const customer = await SalesCustomerModel.findById(id);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    if (req.user!.role === 'sales' && customer.createdBy.toString() !== req.user!.userId) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    // Check if customer has orders
+    const orderCount = await OrderModel.countDocuments({ salesCustomerId: customer._id });
+    if (orderCount > 0) {
+      return res.status(400).json({ 
+        error: `Cannot delete customer with ${orderCount} linked orders. Archive or reassign orders first.`,
+        orderCount
+      });
+    }
+
+    const customerName = customer.name;
+    await SalesCustomerModel.findByIdAndDelete(id);
+
+    await createAuditLog(req as any, {
+      action: 'delete',
+      resource: 'customer',
+      resourceId: customer._id.toString(),
+      details: `Customer deleted: ${customerName}`,
+      skipIfNoUser: false
+    });
+
+    // ✅ NOTIFICATION: Customer deleted
+    await notifyAdmins(
+      '🗑️ Customer Deleted',
+      `${req.user.email || req.user.name} deleted customer "${customerName}"`,
+      '/dashboard/sales/customers',
+      {
+        action: 'delete_customer',
+        deletedBy: req.user.email || req.user.name,
+        customerId: id,
+        customerName
+      }
+    );
+
+    res.json({ success: true, message: 'Customer deleted successfully' });
+  } catch (error: any) {
+    console.error('Delete customer error:', error);
+    res.status(500).json({ error: 'Failed to delete customer' });
+  }
+});
+
 export default router;

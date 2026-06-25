@@ -1,3 +1,4 @@
+// src/routes/paymentRoutes.ts (Updated)
 import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import TransactionModel from '../models/Transaction';
@@ -7,30 +8,24 @@ import { createAuditLog } from '../middleware/auditMiddleware';
 
 const router = Router();
 
-// Helper function to calculate payment summary (FIXED - with absolute safety)
-async function getOrderPaymentSummary(orderId: string) {
-  // Get all completed transactions
+// Helper function to calculate payment summary
+async function getOrderPaymentSummary(orderId: string | mongoose.Types.ObjectId) {
+  const objectId = typeof orderId === 'string' ? new mongoose.Types.ObjectId(orderId) : orderId;
+  
   const transactions = await TransactionModel.find({
-    orderId: new mongoose.Types.ObjectId(orderId),
+    orderId: objectId,
     status: 'completed'
   }).sort({ createdAt: -1 }).lean();
   
-  // Calculate total paid from transactions
   const totalPaid = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  const order = await OrderModel.findById(objectId).select('total amountPaid balanceDue orderNumber');
   
-  // Get order with explicit total field
-  const order = await OrderModel.findById(orderId).select('total amountPaid balanceDue');
-  
-  // Ensure order total is a valid positive number
   let orderTotal = 0;
   if (order && typeof order.total === 'number' && !isNaN(order.total)) {
     orderTotal = order.total;
   }
   
-  // Calculate balance due - ensure it's never negative
   const calculatedBalance = Math.max(0, orderTotal - totalPaid);
-  
-  console.log(`Payment summary for ${orderId}: Total=${orderTotal}, Paid=${totalPaid}, Balance=${calculatedBalance}`);
   
   return {
     transactions,
@@ -38,7 +33,8 @@ async function getOrderPaymentSummary(orderId: string) {
     balanceDue: calculatedBalance,
     orderTotal,
     paymentCount: transactions.length,
-    lastPayment: transactions[0] || null
+    lastPayment: transactions[0] || null,
+    orderNumber: order?.orderNumber || 'N/A'
   };
 }
 
@@ -50,26 +46,22 @@ function calculatePaymentStatus(totalPaid: number, orderTotal: number) {
   return 'overpaid';
 }
 
-// Helper to update order payment summary (FIXED)
-async function updateOrderPaymentSummary(orderId: string) {
-  const summary = await getOrderPaymentSummary(orderId);
-  const order = await OrderModel.findById(orderId);
+// Helper to update order payment summary
+async function updateOrderPaymentSummary(orderId: string | mongoose.Types.ObjectId) {
+  const objectId = typeof orderId === 'string' ? new mongoose.Types.ObjectId(orderId) : orderId;
+  const summary = await getOrderPaymentSummary(objectId);
+  const order = await OrderModel.findById(objectId);
   if (!order) return null;
   
-  // Ensure order.total is set correctly
   if (!order.total || order.total <= 0) {
     console.error(`Order ${orderId} has invalid total: ${order.total}`);
     return null;
   }
   
-  // Use the calculated values from summary
   order.amountPaid = summary.totalPaid;
   order.balanceDue = Math.max(0, summary.balanceDue);
   order.paymentStatus = calculatePaymentStatus(summary.totalPaid, order.total);
   
-  console.log(`Updated order ${orderId}: AmountPaid=${order.amountPaid}, BalanceDue=${order.balanceDue}, Status=${order.paymentStatus}`);
-  
-  // Update paymentDetails with latest transaction
   if (summary.transactions.length > 0) {
     const latest = summary.transactions[0];
     order.paymentDetails = {
@@ -78,7 +70,7 @@ async function updateOrderPaymentSummary(orderId: string) {
       cardLast4: latest.cardLast4,
       cardBrand: latest.cardBrand,
       paidAt: latest.paidAt,
-      phoneNumber: undefined
+      phoneNumber: latest.phoneNumber
     };
   }
   
@@ -91,16 +83,21 @@ router.get('/orders/:orderId', authMiddleware, async (req: Request & { user?: an
   try {
     const { orderId } = req.params;
     
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return res.status(400).json({ error: 'Invalid order ID' });
+    let orderQuery: any = {};
+    
+    // Check if orderId is a MongoDB ObjectId or order number
+    if (mongoose.Types.ObjectId.isValid(orderId)) {
+      orderQuery = { _id: new mongoose.Types.ObjectId(orderId) };
+    } else {
+      // Try to find by order number
+      orderQuery = { orderNumber: orderId };
     }
     
-    const order = await OrderModel.findById(orderId);
+    const order = await OrderModel.findOne(orderQuery);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
     
-    // Check permissions
     const isAdmin = req.user?.role === 'admin';
     const isSales = req.user?.role === 'sales';
     const isOwner = order.userId?.toString() === req.user?.userId;
@@ -109,9 +106,8 @@ router.get('/orders/:orderId', authMiddleware, async (req: Request & { user?: an
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    const summary = await getOrderPaymentSummary(orderId);
+    const summary = await getOrderPaymentSummary(order._id);
     
-    // Ensure order total is valid
     const validTotal = order.total && !isNaN(order.total) ? order.total : 0;
     const validAmountPaid = summary.totalPaid || 0;
     const validBalanceDue = Math.max(0, validTotal - validAmountPaid);
@@ -135,25 +131,28 @@ router.get('/orders/:orderId', authMiddleware, async (req: Request & { user?: an
   }
 });
 
-// POST /api/payments/record - Record a manual payment (FIXED)
+// POST /api/payments/record - Record a manual payment
 router.post('/record', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    const { orderId, amount, paymentMethod, reference, notes } = req.body;
+    const { orderId, amount, paymentMethod, reference, notes, phoneNumber } = req.body;
     
     if (!orderId || !amount || !paymentMethod) {
       return res.status(400).json({ error: 'orderId, amount, and paymentMethod are required' });
     }
     
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return res.status(400).json({ error: 'Invalid order ID' });
+    // Find order by ID or order number
+    let orderQuery: any = {};
+    if (mongoose.Types.ObjectId.isValid(orderId)) {
+      orderQuery = { _id: new mongoose.Types.ObjectId(orderId) };
+    } else {
+      orderQuery = { orderNumber: orderId };
     }
     
-    const order = await OrderModel.findById(orderId);
+    const order = await OrderModel.findOne(orderQuery);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
     
-    // Check permissions
     const isAdmin = req.user?.role === 'admin';
     const isSales = req.user?.role === 'sales';
     
@@ -166,34 +165,31 @@ router.post('/record', authMiddleware, async (req: Request & { user?: any }, res
       return res.status(400).json({ error: 'Amount must be a positive number' });
     }
     
-    // Get current summary with fresh calculation
-    const currentSummary = await getOrderPaymentSummary(orderId);
-    
-    // Ensure order total is valid
+    const currentSummary = await getOrderPaymentSummary(order._id);
     const orderTotal = order.total && !isNaN(order.total) ? order.total : 0;
     const safeBalanceDue = Math.max(0, orderTotal - currentSummary.totalPaid);
     
-    console.log(`Recording payment: OrderTotal=${orderTotal}, TotalPaid=${currentSummary.totalPaid}, BalanceDue=${safeBalanceDue}, AttemptAmount=${numAmount}`);
-    
-    // Validate amount doesn't exceed balance due
     if (numAmount > safeBalanceDue && safeBalanceDue > 0) {
       return res.status(400).json({ error: `Amount cannot exceed balance due of KES ${safeBalanceDue.toLocaleString()}` });
     }
     
-    // If balanceDue is 0, prevent overpayment
     if (safeBalanceDue === 0) {
       return res.status(400).json({ error: 'Order is already fully paid. Cannot record additional payment.' });
     }
     
-    // Create transaction
+    // Generate transaction ID
+    const transactionId = TransactionModel.generateTransactionId('MAN', 'manual');
+    
+    // Create transaction with order number
     const transaction = await TransactionModel.create({
       orderId: order._id,
+      orderNumber: order.orderNumber,
       invoiceNumber: order.invoiceNumber,
       quotationNumber: order.quotationNumber,
       amount: numAmount,
       paymentMethod,
       status: 'completed',
-      transactionId: `MAN-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`,
+      transactionId,
       reference: reference || null,
       notes: notes || null,
       recordedBy: req.user?.userId ? new mongoose.Types.ObjectId(req.user.userId) : undefined,
@@ -204,28 +200,28 @@ router.post('/record', authMiddleware, async (req: Request & { user?: any }, res
       customerName: order.shippingAddress?.fullName || order.guestInfo?.name || 'Customer',
       guestEmail: order.guestInfo?.email,
       guestPhone: order.guestInfo?.phone,
-      userId: order.userId
+      userId: order.userId,
+      phoneNumber: phoneNumber || order.guestInfo?.phone
     });
     
-    // Update order payment summary
-    const updatedOrder = await updateOrderPaymentSummary(orderId);
+    const updatedOrder = await updateOrderPaymentSummary(order._id);
     
     await createAuditLog(req as any, {
       action: 'record_payment',
       resource: 'order',
-      resourceId: orderId,
+      resourceId: order._id.toString(),
       details: `Manual payment of ${numAmount} recorded for order ${order.orderNumber}`,
       skipIfNoUser: false
     });
     
-    // Get final updated summary
-    const finalSummary = await getOrderPaymentSummary(orderId);
+    const finalSummary = await getOrderPaymentSummary(order._id);
     
     res.json({
       success: true,
       message: 'Payment recorded successfully',
       transaction,
       order: {
+        orderId: order._id,
         orderNumber: order.orderNumber,
         paymentStatus: updatedOrder?.paymentStatus || 'paid',
         amountPaid: finalSummary.totalPaid,
@@ -238,14 +234,17 @@ router.post('/record', authMiddleware, async (req: Request & { user?: any }, res
   }
 });
 
-// GET /api/payments/transactions - List all transactions (admin only)
+// GET /api/payments/transactions - List all transactions
 router.get('/transactions', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (req.user?.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
+    const isAdmin = req.user?.role === 'admin';
+    const isSales = req.user?.role === 'sales';
+    
+    if (!isAdmin && !isSales) {
+      return res.status(403).json({ error: 'Admin or Sales access required' });
     }
     
-    const { page = '1', limit = '20', status, paymentMethod, source, search } = req.query;
+    const { page = '1', limit = '20', status, paymentMethod, source, search, orderNumber } = req.query;
     const p = Number(page);
     const l = Number(limit);
     const skip = (p - 1) * l;
@@ -255,12 +254,24 @@ router.get('/transactions', authMiddleware, async (req: Request & { user?: any }
     if (paymentMethod) query.paymentMethod = paymentMethod;
     if (source) query.source = source;
     
+    // Filter by order number
+    if (orderNumber) {
+      query.orderNumber = orderNumber;
+    }
+    
     if (search) {
       query.$or = [
         { transactionId: { $regex: search, $options: 'i' } },
         { customerName: { $regex: search, $options: 'i' } },
-        { invoiceNumber: { $regex: search, $options: 'i' } }
+        { invoiceNumber: { $regex: search, $options: 'i' } },
+        { orderNumber: { $regex: search, $options: 'i' } },
+        { mpesaReceipt: { $regex: search, $options: 'i' } }
       ];
+    }
+    
+    // Sales users can only see their recorded transactions
+    if (isSales && !isAdmin) {
+      query.recordedBy = req.user.userId;
     }
     
     const [transactions, total] = await Promise.all([
@@ -287,31 +298,71 @@ router.get('/transactions', authMiddleware, async (req: Request & { user?: any }
   }
 });
 
+// GET /api/payments/transactions/:id - Get single transaction
+router.get('/transactions/:id', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const isAdmin = req.user?.role === 'admin';
+    const isSales = req.user?.role === 'sales';
+    
+    if (!isAdmin && !isSales) {
+      return res.status(403).json({ error: 'Admin or Sales access required' });
+    }
+    
+    const transaction = await TransactionModel.findById(req.params.id)
+      .populate('orderId', 'orderNumber total status')
+      .populate('recordedBy', 'name email');
+    
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // Sales users can only view their own transactions
+    if (isSales && !isAdmin && transaction.recordedBy?._id?.toString() !== req.user?.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    res.json(transaction);
+  } catch (error: any) {
+    console.error('Get transaction error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/payments/stats - Payment statistics
 router.get('/stats', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (req.user?.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
+    const isAdmin = req.user?.role === 'admin';
+    const isSales = req.user?.role === 'sales';
+    
+    if (!isAdmin && !isSales) {
+      return res.status(403).json({ error: 'Admin or Sales access required' });
+    }
+    
+    const matchStage: any = { 
+      status: 'completed', 
+      amount: { $gt: 0 } 
+    };
+    
+    // Sales users only see their transactions
+    if (isSales && !isAdmin) {
+      matchStage.recordedBy = new mongoose.Types.ObjectId(req.user.userId);
     }
     
     const stats = await TransactionModel.aggregate([
-      {
-        $match: { status: 'completed', amount: { $gt: 0 } }
-      },
+      { $match: matchStage },
       {
         $group: {
           _id: null,
           totalVolume: { $sum: '$amount' },
           totalTransactions: { $sum: 1 },
-          avgTransaction: { $avg: '$amount' }
+          avgTransaction: { $avg: '$amount' },
+          totalRefunds: { $sum: '$refundedAmount' }
         }
       }
     ]);
     
     const sourceBreakdown = await TransactionModel.aggregate([
-      {
-        $match: { status: 'completed', amount: { $gt: 0 } }
-      },
+      { $match: matchStage },
       {
         $group: {
           _id: '$source',
@@ -321,12 +372,98 @@ router.get('/stats', authMiddleware, async (req: Request & { user?: any }, res: 
       }
     ]);
     
+    const methodBreakdown = await TransactionModel.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: '$paymentMethod',
+          count: { $sum: 1 },
+          volume: { $sum: '$amount' }
+        }
+      }
+    ]);
+    
     res.json({
-      summary: stats[0] || { totalVolume: 0, totalTransactions: 0, avgTransaction: 0 },
-      sourceBreakdown
+      summary: stats[0] || { totalVolume: 0, totalTransactions: 0, avgTransaction: 0, totalRefunds: 0 },
+      sourceBreakdown,
+      methodBreakdown
     });
   } catch (error: any) {
     console.error('Payment stats error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/payments/refund - Process a refund
+router.post('/refund', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const { transactionId, reason, amount } = req.body;
+    
+    if (!transactionId) {
+      return res.status(400).json({ error: 'Transaction ID is required' });
+    }
+    
+    const isAdmin = req.user?.role === 'admin';
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Only admin can process refunds' });
+    }
+    
+    const originalTransaction = await TransactionModel.findOne({ transactionId });
+    if (!originalTransaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    if (originalTransaction.status === 'refunded') {
+      return res.status(400).json({ error: 'Transaction already refunded' });
+    }
+    
+    const refundAmount = amount || originalTransaction.amount;
+    
+    // Create refund transaction
+    const refundTransaction = await TransactionModel.create({
+      orderId: originalTransaction.orderId,
+      orderNumber: originalTransaction.orderNumber,
+      invoiceNumber: originalTransaction.invoiceNumber,
+      customerName: originalTransaction.customerName,
+      userId: originalTransaction.userId,
+      amount: -refundAmount, // Negative amount for refund
+      currency: originalTransaction.currency,
+      paymentMethod: originalTransaction.paymentMethod,
+      status: 'refunded',
+      transactionId: TransactionModel.generateTransactionId('REF', 'admin'),
+      reference: `Refund for ${originalTransaction.transactionId}`,
+      notes: reason || `Refund processed for transaction ${originalTransaction.transactionId}`,
+      recordedBy: req.user?.userId ? new mongoose.Types.ObjectId(req.user.userId) : undefined,
+      recordedByName: req.user?.name || req.user?.email,
+      source: 'admin',
+      isPartialPayment: false,
+      paidAt: new Date(),
+      parentTransactionId: originalTransaction.transactionId,
+      refundedAmount: refundAmount,
+      refundedAt: new Date(),
+      refundReason: reason || 'No reason provided'
+    });
+    
+    // Update original transaction
+    originalTransaction.status = 'refunded';
+    originalTransaction.refundedAmount = refundAmount;
+    originalTransaction.refundedAt = new Date();
+    originalTransaction.refundReason = reason || 'No reason provided';
+    await originalTransaction.save();
+    
+    // Update order payment summary
+    if (originalTransaction.orderId) {
+      await updateOrderPaymentSummary(originalTransaction.orderId);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Refund processed successfully',
+      originalTransaction: originalTransaction.transactionId,
+      refundTransaction
+    });
+  } catch (error: any) {
+    console.error('Refund error:', error);
     res.status(500).json({ error: error.message });
   }
 });

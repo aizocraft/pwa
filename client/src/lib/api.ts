@@ -31,6 +31,7 @@ import type { SendOrderEmailRequest, SendContactEmailRequest, SendStatusUpdateRe
 } from '@/types/email';
 import type { ShippingArea, CreateShippingAreaRequest, UpdateShippingAreaRequest } from '@/types/order';
 import type { PromoCode } from '@/types/order';
+import type { PeriodInfo, SalesCustomer, Supplier } from './sales';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -710,6 +711,186 @@ export async function deleteShippingArea(id: string): Promise<void> {
   }
 }
 
+// ========== ENHANCED ANALYTICS API ==========
+
+/**
+ * Get comprehensive profit analytics
+ */
+export async function getProfitAnalytics(params?: {
+  period?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  success: boolean;
+  data: {
+    period: PeriodInfo;
+    summary: {
+      totalRevenue: number;
+      totalCost: number;
+      totalProfit: number;
+      profitMargin: number;
+      avgOrderProfit: number;
+      maxOrderProfit: number;
+      minOrderProfit: number;
+      totalOrders: number;
+      totalItems: number;
+      revenueGrowth: string;
+      profitGrowth: string;
+    };
+    products: Array<{
+      id: string;
+      name: string;
+      revenue: number;
+      cost: number;
+      profit: number;
+      margin: number;
+      units: number;
+      orders: number;
+    }>;
+    categories: Array<{
+      category: string;
+      revenue: number;
+      cost: number;
+      profit: number;
+      margin: number;
+      units: number;
+    }>;
+    trends: Array<{
+      date: string;
+      revenue: number;
+      cost: number;
+      profit: number;
+      orders: number;
+      margin: number;
+    }>;
+    topProducts: Array<{
+      id: string;
+      name: string;
+      sku: string;
+      revenue: number;
+      profit: number;
+      margin: number;
+      units: number;
+      orders: number;
+    }>;
+  };
+}> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/analytics/profit/overview${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch profit analytics:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get inventory valuation with profit potential
+ */
+export async function getInventoryValuationAnalytics(): Promise<{
+  success: boolean;
+  data: {
+    summary: {
+      totalCostValue: number;
+      totalRetailValue: number;
+      totalPotentialProfit: number;
+      averageMargin: number;
+      totalUnits: number;
+      productsWithStock: number;
+      totalProducts: number;
+    };
+    topItems: Array<{
+      name: string;
+      sku: string;
+      category: string;
+      stock: number;
+      costValue: number;
+      retailValue: number;
+      potentialProfit: number;
+      margin: number;
+    }>;
+    categoryBreakdown: Array<{
+      _id: string;
+      totalCost: number;
+      totalRetail: number;
+      totalProfit: number;
+      margin: number;
+      totalUnits: number;
+      productCount: number;
+    }>;
+    generatedAt: string;
+  };
+}> {
+  try {
+    const response = await api.get('/analytics/inventory/valuation');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch inventory valuation:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get sales team performance metrics
+ */
+export async function getSalesTeamPerformance(params?: {
+  period?: string;
+}): Promise<{
+  success: boolean;
+  data: {
+    period: string;
+    salesRepPerformance: Array<{
+      id: string;
+      name: string;
+      email: string;
+      avatar?: string;
+      rank: number;
+      metrics: {
+        quotations: {
+          total: number;
+          converted: number;
+          accepted: number;
+          conversionRate: number;
+          acceptanceRate: number;
+          totalValue: number;
+        };
+        orders: {
+          total: number;
+          revenue: number;
+          profit: number;
+          margin: number;
+          paid: number;
+          averageValue: number;
+        };
+        customers: {
+          total: number;
+          active: number;
+          totalValue: number;
+          avgValue: number;
+        };
+      };
+    }>;
+    teamSummary: {
+      totalRevenue: number;
+      totalProfit: number;
+      totalOrders: number;
+      totalQuotes: number;
+      totalCustomers: number;
+      avgConversionRate: number;
+      topPerformer: any | null;
+    };
+  };
+}> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/analytics/sales/performance${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch sales team performance:', error);
+    throw error;
+  }
+}
 // ========== PROMO CODES API ==========
 export async function getPromoCodes(params?: { page?: number; limit?: number; search?: string }): Promise<{ promos: PromoCode[]; pagination: any }> {
   try {
@@ -1247,9 +1428,77 @@ export async function exportTransactionsToCSV(params?: {
     throw error;
   }
 }
+// ========== ANALYTICS API ==========
+export async function getAdminAnalyticsOverview(period?: string): Promise<any> {
+  try {
+    const response = await api.get(`/analytics/admin/overview?period=${period || 'month'}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch admin analytics:', error);
+    throw error;
+  }
+}
 
+export async function getSalesAnalyticsOverview(period?: string): Promise<any> {
+  try {
+    const response = await api.get(`/analytics/sales/overview?period=${period || 'month'}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch sales analytics:', error);
+    throw error;
+  }
+}
+
+export async function getPerformanceMetrics(period?: string): Promise<any> {
+  try {
+    const response = await api.get(`/analytics/performance?period=${period || 'month'}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch performance metrics:', error);
+    throw error;
+  }
+}
+
+export async function exportAnalytics(period?: string, type?: string): Promise<any> {
+  try {
+    const response = await api.get(`/analytics/export?period=${period || 'month'}&type=${type || 'all'}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to export analytics:', error);
+    throw error;
+  }
+}
+
+export async function getQuotationProfitMetrics(params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<any> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/analytics/sales/quotation-profit${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch quotation profit metrics:', error);
+    throw error;
+  }
+}
+
+export async function getInvoiceProfitMetrics(params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<any> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/analytics/sales/invoice-profit${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch invoice profit metrics:', error);
+    throw error;
+  }
+}
 // ========== PAYMENT API ==========
-export async function getOrderPaymentSummary(orderId: string): Promise<{
+
+export async function getOrderPaymentSummary(orderIdOrNumber: string): Promise<{
   success: boolean;
   orderId: string;
   orderNumber: string;
@@ -1263,7 +1512,7 @@ export async function getOrderPaymentSummary(orderId: string): Promise<{
   transactions: any[];
 }> {
   try {
-    const response = await api.get(`/payments/orders/${orderId}`);
+    const response = await api.get(`/payments/orders/${encodeURIComponent(orderIdOrNumber)}`);
     return response.data;
   } catch (error: any) {
     console.error('Failed to fetch payment summary:', error);
@@ -1277,6 +1526,7 @@ export async function recordManualPayment(data: {
   paymentMethod: 'mpesa' | 'card' | 'cash' | 'bank_transfer' | 'cheque';
   reference?: string;
   notes?: string;
+  phoneNumber?: string;
 }): Promise<{
   success: boolean;
   message: string;
@@ -1293,14 +1543,18 @@ export async function recordManualPayment(data: {
   }
 }
 
-export async function refundTransaction(transactionId: string, reason?: string): Promise<{
+export async function refundTransaction(data: {
+  transactionId: string;
+  reason?: string;
+  amount?: number;
+}): Promise<{
   success: boolean;
   message: string;
   refund: any;
   originalTransaction: any;
 }> {
   try {
-    const response = await api.post(`/payments/refund/${transactionId}`, { reason });
+    const response = await api.post('/payments/refund', data);
     toast.success('Refund processed successfully');
     return response.data;
   } catch (error: any) {
@@ -1316,6 +1570,7 @@ export async function listPayments(params?: {
   paymentMethod?: string;
   source?: string;
   search?: string;
+  orderNumber?: string;
 }): Promise<{ transactions: any[]; pagination: any }> {
   const query = buildQueryString(params);
   try {
@@ -1328,8 +1583,9 @@ export async function listPayments(params?: {
 }
 
 export async function getPaymentStats(): Promise<{
-  summary: { totalVolume: number; totalTransactions: number; avgTransaction: number };
+  summary: { totalVolume: number; totalTransactions: number; avgTransaction: number; totalRefunds?: number };
   sourceBreakdown: Array<{ _id: string; count: number; volume: number }>;
+  methodBreakdown?: Array<{ _id: string; count: number; volume: number }>;
 }> {
   try {
     const response = await api.get('/payments/stats');
@@ -1630,12 +1886,23 @@ export async function deleteSupplier(id: string): Promise<{ success: boolean; me
   }
 }
 
+// ========== SUPPLIER STATS API ==========
+
 export async function getSupplierStats(): Promise<{
-  summary: { totalSuppliers: number; activeSuppliers: number; totalPurchaseVolume: number };
+  summary: { 
+    totalSuppliers: number; 
+    activeSuppliers: number; 
+    inactiveSuppliers: number;
+    suspendedSuppliers: number;
+    totalPurchaseVolume: number;
+  };
   supplierProducts: any[];
+  recentSuppliers: number;
+  generatedAt: string;
 }> {
   try {
     const response = await api.get('/suppliers/stats/summary');
+    
     return response.data;
   } catch (error: any) {
     console.error('Failed to fetch supplier stats:', error);
@@ -2026,6 +2293,218 @@ export async function getOrderPaymentStatus(orderId: string): Promise<{
     const response = await api.get(`/mpesa/payment-status/${orderId}`);
     return response.data;
   } catch (error: any) {
+    throw error;
+  }
+}
+
+// ========== ENHANCED SUPPLIER API ==========
+
+export async function getActiveSuppliers(params?: { 
+  search?: string; 
+  limit?: number 
+}): Promise<{ suppliers: Supplier[]; count: number }> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/suppliers/active${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch active suppliers:', error);
+    throw error;
+  }
+}
+
+export async function getTopSuppliers(params?: { 
+  limit?: number 
+}): Promise<{ suppliers: Supplier[]; totalPurchaseVolume: number; count: number }> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/suppliers/top${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch top suppliers:', error);
+    throw error;
+  }
+}
+
+export async function getSupplierPurchaseHistory(supplierId: string): Promise<{
+  supplier: { _id: string; name: string; totalPurchases: number; lastPurchaseDate?: string };
+  history: any[];
+  totalRecords: number;
+}> {
+  try {
+    const response = await api.get(`/suppliers/${supplierId}/purchase-history`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch purchase history:', error);
+    throw error;
+  }
+}
+
+export async function getSupplierAnalytics(supplierId: string): Promise<{
+  supplier: { _id: string; name: string; totalPurchases: number; lastPurchaseDate?: string; status: string };
+  analytics: {
+    productCount: number;
+    totalStockValue: number;
+    totalRetailValue: number;
+    potentialProfit: number;
+    avgProfitMargin: string;
+    products: any[];
+  };
+}> {
+  try {
+    const response = await api.get(`/suppliers/${supplierId}/analytics`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch supplier analytics:', error);
+    throw error;
+  }
+}
+
+export async function bulkCreateSuppliers(suppliers: any[]): Promise<{
+  success: boolean;
+  created: number;
+  errors: number;
+  suppliers: any[];
+  errorDetails: any[];
+}> {
+  try {
+    const response = await api.post('/suppliers/bulk', { suppliers });
+    toast.success(`${response.data.created} suppliers created successfully`);
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to create suppliers');
+    throw error;
+  }
+}
+
+export async function bulkUpdateSupplierStatus(supplierIds: string[], status: string): Promise<{
+  success: boolean;
+  message: string;
+  modifiedCount: number;
+}> {
+  try {
+    const response = await api.patch('/suppliers/bulk/status', { supplierIds, status });
+    toast.success(response.data.message);
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to update supplier status');
+    throw error;
+  }
+}
+
+// ========== ENHANCED SALES CUSTOMER API ==========
+
+export async function getSalesCustomer(id: string): Promise<any> {
+  try {
+    const response = await api.get(`/sales/customers/${id}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch sales customer:', error);
+    throw error;
+  }
+}
+
+export async function getSalesCustomerOrders(customerId: string, params?: { 
+  page?: number; 
+  limit?: number; 
+  status?: string 
+}): Promise<any> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/sales/customers/${customerId}/orders${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch customer orders:', error);
+    throw error;
+  }
+}
+
+export async function getSalesCustomerQuotations(customerId: string, params?: { 
+  page?: number; 
+  limit?: number; 
+  status?: string 
+}): Promise<any> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/sales/customers/${customerId}/quotations${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch customer quotations:', error);
+    throw error;
+  }
+}
+
+export async function getSalesCustomerInvoices(customerId: string, params?: { 
+  page?: number; 
+  limit?: number; 
+  status?: string;
+  paymentStatus?: string;
+}): Promise<any> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/sales/customers/${customerId}/invoices${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch customer invoices:', error);
+    throw error;
+  }
+}
+
+export async function getActiveSalesCustomers(params?: { 
+  limit?: number; 
+  search?: string 
+}): Promise<{ customers: SalesCustomer[]; count: number }> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/sales/customers/active${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch active customers:', error);
+    throw error;
+  }
+}
+
+export async function getTopSalesCustomers(params?: { 
+  limit?: number 
+}): Promise<{ customers: SalesCustomer[]; count: number }> {
+  const query = buildQueryString(params);
+  try {
+    const response = await api.get(`/sales/customers/top${query}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch top customers:', error);
+    throw error;
+  }
+}
+
+export async function getSalesCustomerStats(): Promise<any> {
+  try {
+    const response = await api.get('/sales/customers/stats/overview');
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch customer stats:', error);
+    throw error;
+  }
+}
+
+export async function toggleSalesCustomerStatus(customerId: string, status: 'active' | 'inactive'): Promise<any> {
+  try {
+    const response = await api.patch(`/sales/customers/${customerId}/status`, { status });
+    toast.success(`Customer ${status === 'active' ? 'activated' : 'deactivated'}`);
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to update customer status');
+    throw error;
+  }
+}
+
+export async function deleteSalesCustomer(id: string): Promise<any> {
+  try {
+    const response = await api.delete(`/sales/customers/${id}`);
+    toast.success('Customer deleted successfully');
+    return response.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to delete customer');
     throw error;
   }
 }

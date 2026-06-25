@@ -4,6 +4,7 @@ import api from './api';
 import type { ApiResponse } from '@/types/api';
 import type { Order } from '@/types/order';
 
+
 // ==================== TYPES ====================
 export interface SalesCustomer {
   _id: string;
@@ -18,6 +19,218 @@ export interface SalesCustomer {
   lastQuotationDate?: string;
   createdAt: string;
   updatedAt: string;
+}
+// lib/sales.ts - Add these types after the existing interfaces
+
+// ==================== SUPPLIER TYPES ====================
+
+export interface Supplier {
+  _id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    zipCode?: string;
+  };
+  taxId?: string;
+  paymentTerms?: string;
+  leadTime?: number;
+  notes?: string;
+  status: 'active' | 'inactive' | 'suspended';
+  productsSupplied?: string[];
+  totalPurchases: number;
+  lastPurchaseDate?: string;
+  purchaseHistory?: Array<{
+    date: string;
+    amount: number;
+    orderNumber: string;
+    items?: any[];
+  }>;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupplierStats {
+  summary: {
+    totalSuppliers: number;
+    activeSuppliers: number;
+    inactiveSuppliers: number;
+    suspendedSuppliers: number;
+    totalPurchaseVolume: number;
+  };
+  supplierProducts: Array<{
+    supplierId: string;
+    supplierName: string;
+    productCount: number;
+    totalStockValue: number;
+    totalInventoryValue: number;
+    avgBuyingPrice: number;
+    avgSellingPrice: number;
+    profitMargin: number;
+  }>;
+  recentSuppliers: number;
+  generatedAt: string;
+}
+
+export interface SupplierProduct {
+  productId: string;
+  productName: string;
+  sku: string;
+  price: number;
+  buyingPrice: number;
+  stock: number;
+  status: string;
+}
+
+// ==================== SUPPLIER API FUNCTIONS ====================
+
+export async function getSuppliers(params?: {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{
+  suppliers: Supplier[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+}> {
+  const res = await api.get('/suppliers', { params });
+  return res.data;
+}
+
+export async function getSupplier(id: string): Promise<{
+  supplier: Supplier;
+  products: any[];
+  productCount: number;
+}> {
+  const res = await api.get(`/suppliers/${id}`);
+  return res.data;
+}
+
+export async function createSupplier(data: Partial<Supplier>): Promise<{ success: boolean; supplier: Supplier }> {
+  const res = await api.post('/suppliers', data);
+  return res.data;
+}
+
+export async function updateSupplier(id: string, data: Partial<Supplier>): Promise<{ success: boolean; supplier: Supplier }> {
+  const res = await api.put(`/suppliers/${id}`, data);
+  return res.data;
+}
+
+export async function deleteSupplier(id: string): Promise<{ success: boolean; message: string }> {
+  const res = await api.delete(`/suppliers/${id}`);
+  return res.data;
+}
+
+export async function getSupplierStats(): Promise<SupplierStats> {
+  const res = await api.get('/suppliers/stats/summary');
+  return res.data;
+}
+
+export async function getActiveSuppliers(params?: { 
+  search?: string; 
+  limit?: number 
+}): Promise<{ suppliers: Supplier[]; count: number }> {
+  const query = new URLSearchParams();
+  if (params?.search) query.append('search', params.search);
+  if (params?.limit) query.append('limit', String(params.limit));
+  const res = await api.get(`/suppliers/active?${query.toString()}`);
+  return res.data;
+}
+
+export async function getTopSuppliers(params?: { 
+  limit?: number 
+}): Promise<{ suppliers: Supplier[]; totalPurchaseVolume: number; count: number }> {
+  const query = new URLSearchParams();
+  if (params?.limit) query.append('limit', String(params.limit));
+  const res = await api.get(`/suppliers/top?${query.toString()}`);
+  return res.data;
+}
+
+export async function getSupplierPurchaseHistory(supplierId: string): Promise<{
+  supplier: { _id: string; name: string; totalPurchases: number; lastPurchaseDate?: string };
+  history: any[];
+  totalRecords: number;
+}> {
+  const res = await api.get(`/suppliers/${supplierId}/purchase-history`);
+  return res.data;
+}
+
+export async function getSupplierAnalytics(supplierId: string): Promise<{
+  supplier: { _id: string; name: string; totalPurchases: number; lastPurchaseDate?: string; status: string };
+  analytics: {
+    productCount: number;
+    totalStockValue: number;
+    totalRetailValue: number;
+    potentialProfit: number;
+    avgProfitMargin: string;
+    products: any[];
+  };
+}> {
+  const res = await api.get(`/suppliers/${supplierId}/analytics`);
+  return res.data;
+}
+
+export async function getSupplierProducts(supplierId: string, params?: {
+  page?: number;
+  limit?: number;
+  sort?: string;
+}): Promise<{
+  supplier: { _id: string; name: string };
+  products: any[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+  totalValue: number;
+}> {
+  const query = new URLSearchParams();
+  if (params?.page) query.append('page', String(params.page));
+  if (params?.limit) query.append('limit', String(params.limit));
+  if (params?.sort) query.append('sort', params.sort);
+  const res = await api.get(`/suppliers/${supplierId}/products?${query.toString()}`);
+  return res.data;
+}
+
+export async function recordSupplierPurchase(supplierId: string, data: {
+  amount: number;
+  orderNumber?: string;
+  items?: any[];
+}): Promise<{
+  success: boolean;
+  supplier: { _id: string; name: string; totalPurchases: number; lastPurchaseDate?: string };
+}> {
+  const res = await api.post(`/suppliers/${supplierId}/record-purchase`, data);
+  return res.data;
+}
+
+export async function bulkCreateSuppliers(suppliers: Partial<Supplier>[]): Promise<{
+  success: boolean;
+  created: number;
+  errors: number;
+  suppliers: Supplier[];
+  errorDetails: any[];
+}> {
+  const res = await api.post('/suppliers/bulk', { suppliers });
+  return res.data;
+}
+
+export async function bulkUpdateSupplierStatus(supplierIds: string[], status: string): Promise<{
+  success: boolean;
+  message: string;
+  modifiedCount: number;
+}> {
+  const res = await api.patch('/suppliers/bulk/status', { supplierIds, status });
+  return res.data;
+}
+
+export async function toggleSupplierStatus(id: string, status: 'active' | 'inactive' | 'suspended'): Promise<{
+  success: boolean;
+  supplier: Supplier;
+}> {
+  const res = await api.patch(`/suppliers/${id}/status`, { status });
+  return res.data;
 }
 
 // UPDATED: QuotationItem with profit tracking
@@ -152,7 +365,10 @@ export interface Transaction {
   _id: string;
   transactionId: string;
   orderId?: string;
+  orderNumber?: string; 
   invoiceId?: string;
+  invoiceNumber?: string;
+  quotationNumber?: string;
   userId?: string;
   guestEmail?: string;
   guestPhone?: string;
@@ -165,14 +381,17 @@ export interface Transaction {
   cardLast4?: string;
   cardBrand?: string;
   reference?: string;
+  phoneNumber?: string; 
   notes?: string;
-  source: 'checkout' | 'quotation' | 'admin' | 'manual' | 'invoice';
+  source: 'checkout' | 'quotation' | 'admin' | 'manual' | 'invoice' | 'order' | 'pos'; 
   isPartialPayment: boolean;
   recordedBy?: string;
   recordedByName?: string;
   paidAt?: string;
-  invoiceNumber?: string;
-  quotationNumber?: string;
+  refundedAmount?: number;
+  refundedAt?: string;
+  refundReason?: string;
+  parentTransactionId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -718,6 +937,7 @@ export async function createOrderFromInvoice(
     amountPaid: number;
     balanceDue: number;
     status: string;
+     paymentMethod: string;
   };
   invoice: {
     _id: string;

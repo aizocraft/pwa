@@ -588,4 +588,245 @@ router.post('/:id/record-purchase', authMiddleware, async (req: Request & { user
   }
 });
 
+// ==================== NEW SUPPLIER ENDPOINTS ====================
+
+// GET /api/suppliers/active - Get all active suppliers
+router.get('/active', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { search, limit = '50' } = req.query;
+    const query: any = { status: 'active' };
+    
+    if (search && typeof search === 'string') {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const suppliers = await SupplierModel.find(query)
+      .sort({ name: 1 })
+      .limit(parseInt(limit as string))
+      .select('name email phone address paymentTerms leadTime')
+      .lean();
+
+    res.json({ suppliers, count: suppliers.length });
+  } catch (error: any) {
+    console.error('Fetch active suppliers error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/suppliers/top - Get top suppliers by purchase volume
+router.get('/top', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { limit = '10' } = req.query;
+
+    const suppliers = await SupplierModel.find({ status: 'active' })
+      .sort({ totalPurchases: -1 })
+      .limit(parseInt(limit as string))
+      .select('name totalPurchases lastPurchaseDate email phone')
+      .lean();
+
+    const totalPurchaseVolume = await SupplierModel.aggregate([
+      { $group: { _id: null, total: { $sum: '$totalPurchases' } } }
+    ]);
+
+    res.json({
+      suppliers,
+      totalPurchaseVolume: totalPurchaseVolume[0]?.total || 0,
+      count: suppliers.length
+    });
+  } catch (error: any) {
+    console.error('Fetch top suppliers error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/suppliers/:id/purchase-history - Get supplier purchase history
+router.get('/:id/purchase-history', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const supplier = await SupplierModel.findById(req.params.id)
+      .select('name purchaseHistory totalPurchases lastPurchaseDate')
+      .lean();
+
+    if (!supplier) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    const history = (supplier as any).purchaseHistory || [];
+    
+    res.json({
+      supplier: {
+        _id: supplier._id,
+        name: supplier.name,
+        totalPurchases: supplier.totalPurchases,
+        lastPurchaseDate: supplier.lastPurchaseDate
+      },
+      history,
+      totalRecords: history.length
+    });
+  } catch (error: any) {
+    console.error('Fetch purchase history error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/suppliers/:id/analytics - Get supplier analytics
+router.get('/:id/analytics', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const supplier = await SupplierModel.findById(req.params.id);
+    if (!supplier) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    // Get products from this supplier with profit metrics
+    const products = await ProductModel.find({ supplier: supplier._id })
+      .select('name sku price buyingPrice stock profitMargin')
+      .lean();
+
+    const productCount = products.length;
+    const totalStockValue = products.reduce((sum, p) => sum + ((p.buyingPrice || 0) * (p.stock || 0)), 0);
+    const totalRetailValue = products.reduce((sum, p) => sum + ((p.price || 0) * (p.stock || 0)), 0);
+    const avgProfitMargin = productCount > 0 
+      ? products.reduce((sum, p) => sum + (p.profitMargin || 0), 0) / productCount 
+      : 0;
+
+    res.json({
+      supplier: {
+        _id: supplier._id,
+        name: supplier.name,
+        totalPurchases: supplier.totalPurchases,
+        lastPurchaseDate: supplier.lastPurchaseDate,
+        status: supplier.status
+      },
+      analytics: {
+        productCount,
+        totalStockValue,
+        totalRetailValue,
+        potentialProfit: totalRetailValue - totalStockValue,
+        avgProfitMargin: avgProfitMargin.toFixed(2),
+        products
+      }
+    });
+  } catch (error: any) {
+    console.error('Fetch supplier analytics error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/suppliers/bulk - Bulk create suppliers
+router.post('/bulk', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { suppliers } = req.body;
+    if (!suppliers || !Array.isArray(suppliers) || suppliers.length === 0) {
+      return res.status(400).json({ error: 'Suppliers array is required' });
+    }
+
+    const createdSuppliers = [];
+    const errors = [];
+
+    for (const supplierData of suppliers) {
+      try {
+        const supplier = new SupplierModel({
+          ...supplierData,
+          createdBy: req.user.userId
+        });
+        await supplier.save();
+        createdSuppliers.push(supplier);
+      } catch (err: any) {
+        errors.push({ data: supplierData, error: err.message });
+      }
+    }
+
+    // Notify admins about bulk creation
+    if (createdSuppliers.length > 0) {
+      await notifyAdmins(
+        '📦 Bulk Suppliers Created',
+        `${req.user.email || req.user.name} created ${createdSuppliers.length} suppliers via bulk import`,
+        '/dashboard/suppliers',
+        {
+          action: 'bulk_create_suppliers',
+          createdBy: req.user.email || req.user.name,
+          count: createdSuppliers.length,
+          supplierNames: createdSuppliers.map(s => s.name).join(', ')
+        }
+      );
+    }
+
+    res.json({
+      success: true,
+      created: createdSuppliers.length,
+      errors: errors.length,
+      suppliers: createdSuppliers,
+      errorDetails: errors
+    });
+  } catch (error: any) {
+    console.error('Bulk create suppliers error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH /api/suppliers/bulk/status - Bulk update supplier status
+router.patch('/bulk/status', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { supplierIds, status } = req.body;
+    if (!supplierIds || !Array.isArray(supplierIds) || supplierIds.length === 0) {
+      return res.status(400).json({ error: 'Supplier IDs array is required' });
+    }
+    if (!status || !['active', 'inactive', 'suspended'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const result = await SupplierModel.updateMany(
+      { _id: { $in: supplierIds } },
+      { status }
+    );
+
+    await notifyAdmins(
+      `🔄 Bulk Supplier Status Updated to ${status}`,
+      `${req.user.email || req.user.name} updated ${result.modifiedCount} suppliers to ${status}`,
+      '/dashboard/suppliers',
+      {
+        action: 'bulk_update_supplier_status',
+        updatedBy: req.user.email || req.user.name,
+        count: result.modifiedCount,
+        status
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} suppliers updated to ${status}`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error: any) {
+    console.error('Bulk update supplier status error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

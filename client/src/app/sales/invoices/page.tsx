@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Search,
   Eye,
@@ -37,6 +37,9 @@ import { generateInvoicePDF } from './components/InvoicePDF';
 import { RecordPaymentModal } from '../../../components/RecordPaymentModal';
 import api from '@/lib/api';
 import type { Invoice } from '@/lib/sales';
+import { debounce } from 'lodash';
+
+type DateFilterPeriod = 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'year' | 'custom';
 
 export default function InvoicesPage() {
   const { user } = useAuth();
@@ -48,7 +51,7 @@ export default function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('');
-  const [invoiceDateFilterPeriod, setInvoiceDateFilterPeriod] = useState<'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'year' | 'custom'>('all');
+  const [invoiceDateFilterPeriod, setInvoiceDateFilterPeriod] = useState<DateFilterPeriod>('all');
   const [invoiceStartDate, setInvoiceStartDate] = useState('');
   const [invoiceEndDate, setInvoiceEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -76,7 +79,20 @@ export default function InvoicesPage() {
   const [exportLoading, setExportLoading] = useState(false);
   
   const itemsPerPage = 10;
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced search
+  const debouncedSearch = useMemo(
+    () => debounce((value: string) => {
+      setSearchTerm(value);
+      setCurrentPage(1);
+    }, 400),
+    []
+  );
+
+  // Clean up debounce on unmount
+  useEffect(() => {
+    return () => debouncedSearch.cancel();
+  }, [debouncedSearch]);
 
   const getDateString = (date: Date) => date.toISOString().split('T')[0];
 
@@ -95,14 +111,129 @@ export default function InvoicesPage() {
     return `"KES ${amount.toLocaleString()}"`;
   };
 
-  // Advanced export for invoices
+  // ==================== DATE FILTER FUNCTIONS ====================
+  
+  const isDateFilterActive = (period: DateFilterPeriod): boolean => {
+    if (period === 'all') return !invoiceStartDate && !invoiceEndDate;
+    
+    const now = new Date();
+    const today = getDateString(now);
+    
+    switch(period) {
+      case 'today':
+        return invoiceStartDate === today && invoiceEndDate === today;
+      case 'yesterday': {
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        const yStr = getDateString(yesterday);
+        return invoiceStartDate === yStr && invoiceEndDate === yStr;
+      }
+      case '7d': {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(now.getDate() - 6);
+        return invoiceStartDate === getDateString(weekAgo) && invoiceEndDate === today;
+      }
+      case '30d': {
+        const monthAgo = new Date(now);
+        monthAgo.setDate(now.getDate() - 29);
+        return invoiceStartDate === getDateString(monthAgo) && invoiceEndDate === today;
+      }
+      case 'month': {
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        return invoiceStartDate === getDateString(monthStart) && invoiceEndDate === today;
+      }
+      case 'year': {
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        return invoiceStartDate === getDateString(yearStart) && invoiceEndDate === today;
+      }
+      default:
+        return false;
+    }
+  };
+
+  const applyInvoiceDateFilter = (period: DateFilterPeriod) => {
+    const now = new Date();
+    let start = '';
+    let end = '';
+
+    switch (period) {
+      case 'today':
+        start = getDateString(now);
+        end = getDateString(now);
+        break;
+      case 'yesterday': {
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        start = getDateString(yesterday);
+        end = getDateString(yesterday);
+        break;
+      }
+      case '7d': {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(now.getDate() - 6);
+        start = getDateString(weekAgo);
+        end = getDateString(now);
+        break;
+      }
+      case '30d': {
+        const monthAgo = new Date(now);
+        monthAgo.setDate(now.getDate() - 29);
+        start = getDateString(monthAgo);
+        end = getDateString(now);
+        break;
+      }
+      case 'month': {
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        start = getDateString(monthStart);
+        end = getDateString(now);
+        break;
+      }
+      case 'year': {
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        start = getDateString(yearStart);
+        end = getDateString(now);
+        break;
+      }
+      default:
+        start = '';
+        end = '';
+    }
+
+    setInvoiceDateFilterPeriod(period);
+    setInvoiceStartDate(start);
+    setInvoiceEndDate(end);
+    setCurrentPage(1);
+  };
+
+  const clearInvoiceDateFilters = () => {
+    setInvoiceDateFilterPeriod('all');
+    setInvoiceStartDate('');
+    setInvoiceEndDate('');
+    setCurrentPage(1);
+  };
+
+  const handleCustomDateChange = (type: 'start' | 'end', value: string) => {
+    if (type === 'start') {
+      setInvoiceStartDate(value);
+    } else {
+      setInvoiceEndDate(value);
+    }
+    setInvoiceDateFilterPeriod('custom');
+    // Only fetch if both dates are set
+    if ((type === 'start' && value && invoiceEndDate) || (type === 'end' && value && invoiceStartDate)) {
+      setCurrentPage(1);
+    } else if (type === 'start' && !value) {
+      clearInvoiceDateFilters();
+    }
+  };
+
+  // ==================== EXPORT ====================
   const handleExportInvoices = async () => {
     setExportLoading(true);
     try {
       let invoicesToExport: Invoice[] = [];
       
       if (exportType === 'all') {
-        // Fetch all invoices with pagination
         let allInvoices: Invoice[] = [];
         let page = 1;
         let hasMore = true;
@@ -130,7 +261,6 @@ export default function InvoicesPage() {
         }
         invoicesToExport = allInvoices;
       } else if (exportType === 'dateRange') {
-        // Fetch for custom date range
         const response = await api.get('/sales/invoices', {
           params: {
             limit: 1000,
@@ -143,7 +273,6 @@ export default function InvoicesPage() {
         });
         invoicesToExport = response.data.invoices || [];
       } else {
-        // Filtered (current view)
         invoicesToExport = invoices;
       }
 
@@ -152,7 +281,6 @@ export default function InvoicesPage() {
         return;
       }
 
-      // Build CSV headers with detailed fields
       const headers = [
         'Invoice Number',
         'Quotation Number',
@@ -179,7 +307,6 @@ export default function InvoicesPage() {
         'Created By'
       ];
 
-      // Build CSV rows
       const rows = invoicesToExport.map((inv) => {
         const daysOverdue = inv.dueDate && new Date(inv.dueDate) < new Date() && inv.paymentStatus !== 'paid'
           ? Math.floor((new Date().getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24))
@@ -249,53 +376,7 @@ export default function InvoicesPage() {
     }
   };
 
-  const applyInvoiceDateFilter = (period: 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'year' | 'custom') => {
-    const now = new Date();
-    let start = '';
-    let end = '';
-
-    if (period === 'today') {
-      start = getDateString(now);
-      end = getDateString(now);
-    } else if (period === 'yesterday') {
-      const yesterday = new Date(now);
-      yesterday.setDate(now.getDate() - 1);
-      start = getDateString(yesterday);
-      end = getDateString(yesterday);
-    } else if (period === '7d') {
-      const weekAgo = new Date(now);
-      weekAgo.setDate(now.getDate() - 6);
-      start = getDateString(weekAgo);
-      end = getDateString(now);
-    } else if (period === '30d') {
-      const monthAgo = new Date(now);
-      monthAgo.setDate(now.getDate() - 29);
-      start = getDateString(monthAgo);
-      end = getDateString(now);
-    } else if (period === 'month') {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      start = getDateString(monthStart);
-      end = getDateString(now);
-    } else if (period === 'year') {
-      const yearStart = new Date(now.getFullYear(), 0, 1);
-      start = getDateString(yearStart);
-      end = getDateString(now);
-    }
-
-    setInvoiceDateFilterPeriod(period);
-    setInvoiceStartDate(start);
-    setInvoiceEndDate(end);
-    setCurrentPage(1);
-  };
-
-  const clearInvoiceDateFilters = () => {
-    setInvoiceDateFilterPeriod('all');
-    setInvoiceStartDate('');
-    setInvoiceEndDate('');
-    setCurrentPage(1);
-  };
-
-  // Fetch invoices with debounce
+  // ==================== FETCH INVOICES ====================
   const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
@@ -321,20 +402,14 @@ export default function InvoicesPage() {
     }
   }, [searchTerm, statusFilter, paymentStatusFilter, invoiceStartDate, invoiceEndDate, currentPage]);
 
-  // Debounced search
+  // Fetch on filter changes
   useEffect(() => {
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => {
-      fetchInvoices();
-    }, 500);
-    return () => {
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    };
+    fetchInvoices();
   }, [fetchInvoices]);
 
+  // ==================== HANDLERS ====================
   const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    setCurrentPage(1);
+    debouncedSearch(value);
   };
 
   const handleStatusFilterChange = (value: string) => {
@@ -352,6 +427,7 @@ export default function InvoicesPage() {
     try {
       await api.post(`/sales/invoices/${id}/send`);
       toast.success('Invoice sent successfully');
+      fetchInvoices();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to send invoice');
     } finally {
@@ -410,22 +486,22 @@ export default function InvoicesPage() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      draft: 'bg-gray-100 text-gray-700',
-      sent: 'bg-blue-100 text-blue-700',
-      paid: 'bg-green-100 text-green-700',
-      partially_paid: 'bg-yellow-100 text-yellow-700',
-      overdue: 'bg-red-100 text-red-700',
-      cancelled: 'bg-gray-100 text-gray-700',
+      draft: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+      sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      paid: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      partially_paid: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      overdue: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      cancelled: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
     };
     return colors[status] || 'bg-gray-100 text-gray-700';
   };
 
   const getPaymentStatusBadge = (status: string) => {
     const config: Record<string, { color: string; icon: JSX.Element; text: string }> = {
-      paid: { color: 'bg-green-100 text-green-700', icon: <CheckCircle className="w-3 h-3" />, text: 'Paid' },
-      unpaid: { color: 'bg-red-100 text-red-700', icon: <XCircle className="w-3 h-3" />, text: 'Unpaid' },
-      partially_paid: { color: 'bg-yellow-100 text-yellow-700', icon: <Clock className="w-3 h-3" />, text: 'Partially Paid' },
-      overpaid: { color: 'bg-orange-100 text-orange-700', icon: <TrendingUp className="w-3 h-3" />, text: 'Overpaid' },
+      paid: { color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: <CheckCircle className="w-3 h-3" />, text: 'Paid' },
+      unpaid: { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: <XCircle className="w-3 h-3" />, text: 'Unpaid' },
+      partially_paid: { color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400', icon: <Clock className="w-3 h-3" />, text: 'Partially Paid' },
+      overpaid: { color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', icon: <TrendingUp className="w-3 h-3" />, text: 'Overpaid' },
     };
     return config[status] || config.unpaid;
   };
@@ -441,7 +517,7 @@ export default function InvoicesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
       <div className="space-y-6 p-6">
-        {/* Header */}
+        {/* ==================== HEADER ==================== */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Invoices</h1>
@@ -468,15 +544,16 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* ==================== FILTERS ==================== */}
         <div className="space-y-4 w-full">
+          {/* Row 1: Search and Status */}
           <div className="flex flex-wrap gap-4">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search by invoice #, customer..."
-                value={searchTerm}
+                defaultValue={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
               />
@@ -484,7 +561,7 @@ export default function InvoicesPage() {
             <select
               value={statusFilter}
               onChange={(e) => handleStatusFilterChange(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
             >
               <option value="">All Status</option>
               <option value="draft">Draft</option>
@@ -497,7 +574,7 @@ export default function InvoicesPage() {
             <select
               value={paymentStatusFilter}
               onChange={(e) => handlePaymentStatusFilterChange(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
             >
               <option value="">All Payment Status</option>
               <option value="unpaid">Unpaid</option>
@@ -507,61 +584,74 @@ export default function InvoicesPage() {
             </select>
           </div>
 
-          {/* Date Filter Buttons */}
-          <div className="flex flex-wrap gap-2 items-center">
-            <Calendar className="w-4 h-4 text-gray-400 mr-1" />
-            {['all', 'today', 'yesterday', '7d', '30d', 'month', 'year'].map((period) => (
+          {/* Row 2: Date Filters - Same Line */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-1 flex-shrink-0" />
+            
+            {(['all', 'today', 'yesterday', '7d', '30d', 'month', 'year'] as const).map((period) => (
               <button
                 key={period}
                 type="button"
-                onClick={() => applyInvoiceDateFilter(period as any)}
-                className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${invoiceDateFilterPeriod === period ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                onClick={() => applyInvoiceDateFilter(period)}
+                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition whitespace-nowrap ${
+                  isDateFilterActive(period)
+                    ? 'bg-cyan-600 text-white border-cyan-600 shadow-lg shadow-cyan-600/20 dark:shadow-cyan-800/30' 
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
               >
-                {period === 'all' ? 'All' : period === '7d' ? 'Last 7d' : period === '30d' ? 'Last 30d' : period === 'month' ? 'This Month' : period === 'year' ? 'This Year' : period.charAt(0).toUpperCase() + period.slice(1)}
+                {period === 'all' ? 'All' : 
+                 period === '7d' ? '7 Days' : 
+                 period === '30d' ? '30 Days' : 
+                 period === 'month' ? 'This Month' : 
+                 period === 'year' ? 'This Year' : 
+                 period.charAt(0).toUpperCase() + period.slice(1)}
               </button>
             ))}
+
             <button
               type="button"
               onClick={() => applyInvoiceDateFilter('custom')}
-              className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${invoiceDateFilterPeriod === 'custom' ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition whitespace-nowrap ${
+                invoiceDateFilterPeriod === 'custom' && (invoiceStartDate || invoiceEndDate)
+                  ? 'bg-cyan-600 text-white border-cyan-600 shadow-lg shadow-cyan-600/20 dark:shadow-cyan-800/30' 
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
             >
-              Custom Range
+              Custom
             </button>
-            <button
-              type="button"
-              onClick={clearInvoiceDateFilters}
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
 
-          {/* Custom Date Range */}
-          {invoiceDateFilterPeriod === 'custom' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
-                <input
-                  type="date"
-                  value={invoiceStartDate}
-                  onChange={(e) => { setInvoiceStartDate(e.target.value); setInvoiceDateFilterPeriod('custom'); setCurrentPage(1); }}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">End Date</label>
-                <input
-                  type="date"
-                  value={invoiceEndDate}
-                  onChange={(e) => { setInvoiceEndDate(e.target.value); setInvoiceDateFilterPeriod('custom'); setCurrentPage(1); }}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                />
-              </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={invoiceStartDate}
+                onChange={(e) => handleCustomDateChange('start', e.target.value)}
+                className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 w-36"
+                aria-label="Start date"
+              />
+              <span className="text-gray-400 text-sm">to</span>
+              <input
+                type="date"
+                value={invoiceEndDate}
+                onChange={(e) => handleCustomDateChange('end', e.target.value)}
+                className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 w-36"
+                aria-label="End date"
+              />
             </div>
-          )}
+
+            {(invoiceStartDate || invoiceEndDate) && (
+              <button
+                type="button"
+                onClick={clearInvoiceDateFilters}
+                className="p-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Clear date filters"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Invoices Table */}
+        {/* ==================== INVOICES TABLE ==================== */}
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -605,12 +695,12 @@ export default function InvoicesPage() {
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">KES {invoice.total?.toLocaleString() || 0}</td>
                       <td className="px-6 py-4">
                         {profit > 0 ? (
-                          <span className="text-sm text-green-600 font-medium">
+                          <span className="text-sm text-green-600 dark:text-green-400 font-medium">
                             KES {profit.toLocaleString()}
-                            <span className="text-xs text-gray-500 ml-1">({profitMargin.toFixed(1)}%)</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">({profitMargin.toFixed(1)}%)</span>
                           </span>
                         ) : (
-                          <span className="text-sm text-gray-400">-</span>
+                          <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4">
@@ -620,7 +710,7 @@ export default function InvoicesPage() {
                             {paymentBadge.text}
                           </div>
                           {isOverdue && (
-                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
                               <AlertCircle className="w-3 h-3" />
                               OVERDUE
                             </div>
@@ -743,15 +833,122 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      {/* View Invoice Modal - Keep existing code */}
+      {/* ==================== VIEW INVOICE MODAL ==================== */}
       {showViewModal && viewingInvoice && (
-        // ... existing view modal code ...
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-          {/* View modal content - keep your existing implementation */}
+          <div className="bg-white dark:bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl dark:shadow-gray-950/50">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Invoice Details</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{viewingInvoice.invoiceNumber}</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => handlePrintPDF(viewingInvoice)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors text-gray-500 dark:text-gray-400">
+                  <Printer className="w-5 h-5" />
+                </button>
+                <button onClick={() => handleSendEmail(viewingInvoice._id)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors text-gray-500 dark:text-gray-400">
+                  <Send className="w-5 h-5" />
+                </button>
+                <button onClick={() => setShowViewModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors text-gray-500 dark:text-gray-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                  <h3 className="font-semibold flex items-center gap-2 mb-3 text-gray-900 dark:text-white">
+                    <User className="w-4 h-4" /> Customer
+                  </h3>
+                  <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                    <p><strong>Name:</strong> {viewingInvoice.customerName}</p>
+                    {viewingInvoice.customerEmail && <p><strong>Email:</strong> {viewingInvoice.customerEmail}</p>}
+                    {viewingInvoice.customerPhone && <p><strong>Phone:</strong> {viewingInvoice.customerPhone}</p>}
+                  </div>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                  <h3 className="font-semibold flex items-center gap-2 mb-3 text-gray-900 dark:text-white">
+                    <Calendar className="w-4 h-4" /> Information
+                  </h3>
+                  <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                    <p><strong>Status:</strong> {viewingInvoice.status}</p>
+                    <p><strong>Payment:</strong> {viewingInvoice.paymentStatus}</p>
+                    <p><strong>Issue Date:</strong> {new Date(viewingInvoice.issueDate).toLocaleDateString()}</p>
+                    <p><strong>Due Date:</strong> {new Date(viewingInvoice.dueDate).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-3 text-gray-900 dark:text-white">Items</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-800/50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-gray-600 dark:text-gray-400">Item</th>
+                        <th className="px-4 py-2 text-center text-gray-600 dark:text-gray-400">Qty</th>
+                        <th className="px-4 py-2 text-right text-gray-600 dark:text-gray-400">Unit Price</th>
+                        <th className="px-4 py-2 text-right text-gray-600 dark:text-gray-400">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewingInvoice.items.map((item, idx) => (
+                        <tr key={idx} className="border-t border-gray-200 dark:border-gray-800">
+                          <td className="px-4 py-2 text-gray-900 dark:text-white">{item.name}</td>
+                          <td className="px-4 py-2 text-center text-gray-700 dark:text-gray-300">{item.qty}</td>
+                          <td className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">KES {item.price.toLocaleString()}</td>
+                          <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-white">KES {(item.price * item.qty).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="space-y-2 text-right max-w-md ml-auto text-gray-700 dark:text-gray-300">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>KES {viewingInvoice.subtotal?.toLocaleString() || 0}</span>
+                  </div>
+                  {(viewingInvoice as any).transportCost > 0 && (
+                    <div className="flex justify-between">
+                      <span>Transport:</span>
+                      <span>KES {(viewingInvoice as any).transportCost.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Tax (16%):</span>
+                    <span>KES {viewingInvoice.tax?.toLocaleString() || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-green-600 dark:text-green-400">
+                    <span>Discount:</span>
+                    <span>-KES {viewingInvoice.discount?.toLocaleString() || 0}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t-2 border-gray-200 dark:border-gray-700">
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">Total:</span>
+                    <span className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">KES {viewingInvoice.total?.toLocaleString() || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+                    <span>Amount Paid:</span>
+                    <span>KES {viewingInvoice.amountPaid?.toLocaleString() || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-medium text-amber-600 dark:text-amber-400">
+                    <span>Balance Due:</span>
+                    <span>KES {viewingInvoice.balanceDue?.toLocaleString() || 0}</span>
+                  </div>
+                </div>
+              </div>
+              {viewingInvoice.notes && (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-1">Notes</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{viewingInvoice.notes}</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Payment Modal - Keep existing code */}
+      {/* ==================== PAYMENT MODAL ==================== */}
       {showPaymentModal && selectedInvoiceForPayment && (
         <RecordPaymentModal
           isOpen={showPaymentModal}
@@ -770,16 +967,16 @@ export default function InvoicesPage() {
         />
       )}
 
-      {/* Export Modal - UPDATED with advanced options */}
+      {/* ==================== EXPORT MODAL ==================== */}
       {showExportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="p-6 border-b dark:border-gray-800 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-900">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl dark:shadow-gray-950/50">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-900">
               <div>
-                <h2 className="text-xl font-bold">Export Invoices Report</h2>
-                <p className="text-sm text-gray-500">Download detailed invoices data as CSV</p>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Export Invoices Report</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Download detailed invoices data as CSV</p>
               </div>
-              <button onClick={() => setShowExportModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+              <button onClick={() => setShowExportModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors text-gray-500 dark:text-gray-400">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -840,7 +1037,7 @@ export default function InvoicesPage() {
                       type="date"
                       value={exportStartDate}
                       onChange={(e) => setExportStartDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
                     />
                   </div>
                   <div>
@@ -849,7 +1046,7 @@ export default function InvoicesPage() {
                       type="date"
                       value={exportEndDate}
                       onChange={(e) => setExportEndDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
                     />
                   </div>
                 </div>
@@ -862,7 +1059,7 @@ export default function InvoicesPage() {
                   <select
                     value={exportStatus}
                     onChange={(e) => setExportStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
                   >
                     <option value="">All Status</option>
                     <option value="draft">Draft</option>
@@ -878,7 +1075,7 @@ export default function InvoicesPage() {
                   <select
                     value={exportPaymentStatus}
                     onChange={(e) => setExportPaymentStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
                   >
                     <option value="">All Payment Status</option>
                     <option value="unpaid">Unpaid</option>

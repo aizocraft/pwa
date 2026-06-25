@@ -74,6 +74,7 @@ import { getLogoUrl, getTaxRate } from '@/lib/company';
 import { toast } from 'react-hot-toast';
 import { generateQuotationPDF } from './components/QuotationPDF';
 import api from '@/lib/api';
+import { debounce } from 'lodash';
 
 // Types
 interface Category {
@@ -104,6 +105,8 @@ interface QuotationItemWithTax {
   taxable: boolean;
   name: string;
 }
+
+type DateFilterPeriod = 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'year' | 'custom';
 
 // ==================== CREATE PRODUCT MODAL ====================
 function CreateProductModal({ isOpen, onClose, onProductCreated, categories }: any) {
@@ -454,7 +457,7 @@ export default function QuotationsPage() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportStartDate, setReportStartDate] = useState('');
   const [reportEndDate, setReportEndDate] = useState('');
-  const [quoteDateFilterPeriod, setQuoteDateFilterPeriod] = useState<'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'year' | 'custom'>('all');
+  const [quoteDateFilterPeriod, setQuoteDateFilterPeriod] = useState<DateFilterPeriod>('all');
   const [quoteStartDate, setQuoteStartDate] = useState('');
   const [quoteEndDate, setQuoteEndDate] = useState('');
   const [isExporting, setIsExporting] = useState(false);
@@ -469,6 +472,15 @@ export default function QuotationsPage() {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const productSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isSearchingRef = useRef(false);
+
+  // Debounced search
+  const debouncedSearch = useMemo(
+    () => debounce((value: string) => {
+      setSearchTerm(value);
+      setCurrentPage(1);
+    }, 400),
+    []
+  );
 
   // State for form
   const [productSearchTerm, setProductSearchTerm] = useState('');
@@ -502,6 +514,11 @@ export default function QuotationsPage() {
     name: '',
   });
 
+  // Clean up debounce on unmount
+  useEffect(() => {
+    return () => debouncedSearch.cancel();
+  }, [debouncedSearch]);
+
   // ==================== HELPERS ====================
   const escapeCSV = (value: any) => {
     if (value === null || value === undefined) return '""';
@@ -517,6 +534,122 @@ export default function QuotationsPage() {
   };
 
   const getDateString = (date: Date) => date.toISOString().split('T')[0];
+
+  // ==================== DATE FILTER FUNCTIONS ====================
+  
+  const isDateFilterActive = (period: DateFilterPeriod): boolean => {
+    if (period === 'all') return !quoteStartDate && !quoteEndDate;
+    
+    const now = new Date();
+    const today = getDateString(now);
+    
+    switch(period) {
+      case 'today':
+        return quoteStartDate === today && quoteEndDate === today;
+      case 'yesterday': {
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        const yStr = getDateString(yesterday);
+        return quoteStartDate === yStr && quoteEndDate === yStr;
+      }
+      case '7d': {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(now.getDate() - 6);
+        return quoteStartDate === getDateString(weekAgo) && quoteEndDate === today;
+      }
+      case '30d': {
+        const monthAgo = new Date(now);
+        monthAgo.setDate(now.getDate() - 29);
+        return quoteStartDate === getDateString(monthAgo) && quoteEndDate === today;
+      }
+      case 'month': {
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        return quoteStartDate === getDateString(monthStart) && quoteEndDate === today;
+      }
+      case 'year': {
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        return quoteStartDate === getDateString(yearStart) && quoteEndDate === today;
+      }
+      default:
+        return false;
+    }
+  };
+
+  const applyQuoteDateFilter = (period: DateFilterPeriod) => {
+    const now = new Date();
+    let start = '';
+    let end = '';
+
+    switch (period) {
+      case 'today':
+        start = getDateString(now);
+        end = getDateString(now);
+        break;
+      case 'yesterday': {
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        start = getDateString(yesterday);
+        end = getDateString(yesterday);
+        break;
+      }
+      case '7d': {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(now.getDate() - 6);
+        start = getDateString(weekAgo);
+        end = getDateString(now);
+        break;
+      }
+      case '30d': {
+        const monthAgo = new Date(now);
+        monthAgo.setDate(now.getDate() - 29);
+        start = getDateString(monthAgo);
+        end = getDateString(now);
+        break;
+      }
+      case 'month': {
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        start = getDateString(monthStart);
+        end = getDateString(now);
+        break;
+      }
+      case 'year': {
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        start = getDateString(yearStart);
+        end = getDateString(now);
+        break;
+      }
+      default:
+        start = '';
+        end = '';
+    }
+
+    setQuoteDateFilterPeriod(period);
+    setQuoteStartDate(start);
+    setQuoteEndDate(end);
+    setCurrentPage(1);
+  };
+
+  const clearQuoteDateFilters = () => {
+    setQuoteDateFilterPeriod('all');
+    setQuoteStartDate('');
+    setQuoteEndDate('');
+    setCurrentPage(1);
+  };
+
+  const handleCustomDateChange = (type: 'start' | 'end', value: string) => {
+    if (type === 'start') {
+      setQuoteStartDate(value);
+    } else {
+      setQuoteEndDate(value);
+    }
+    setQuoteDateFilterPeriod('custom');
+    // Only fetch if both dates are set
+    if ((type === 'start' && value && quoteEndDate) || (type === 'end' && value && quoteStartDate)) {
+      setCurrentPage(1);
+    } else if (type === 'start' && !value) {
+      clearQuoteDateFilters();
+    }
+  };
 
   // ==================== EXPORT ====================
   const handleExportQuotations = async () => {
@@ -634,53 +767,6 @@ export default function QuotationsPage() {
     }
   };
 
-  // ==================== DATE FILTERS ====================
-  const applyQuoteDateFilter = (period: 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'year' | 'custom') => {
-    const now = new Date();
-    let start = '';
-    let end = '';
-
-    if (period === 'today') {
-      start = getDateString(now);
-      end = getDateString(now);
-    } else if (period === 'yesterday') {
-      const yesterday = new Date(now);
-      yesterday.setDate(now.getDate() - 1);
-      start = getDateString(yesterday);
-      end = getDateString(yesterday);
-    } else if (period === '7d') {
-      const weekAgo = new Date(now);
-      weekAgo.setDate(now.getDate() - 6);
-      start = getDateString(weekAgo);
-      end = getDateString(now);
-    } else if (period === '30d') {
-      const monthAgo = new Date(now);
-      monthAgo.setDate(now.getDate() - 29);
-      start = getDateString(monthAgo);
-      end = getDateString(now);
-    } else if (period === 'month') {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      start = getDateString(monthStart);
-      end = getDateString(now);
-    } else if (period === 'year') {
-      const yearStart = new Date(now.getFullYear(), 0, 1);
-      start = getDateString(yearStart);
-      end = getDateString(now);
-    }
-
-    setQuoteDateFilterPeriod(period);
-    setQuoteStartDate(start);
-    setQuoteEndDate(end);
-    setCurrentPage(1);
-  };
-
-  const clearQuoteDateFilters = () => {
-    setQuoteDateFilterPeriod('all');
-    setQuoteStartDate('');
-    setQuoteEndDate('');
-    setCurrentPage(1);
-  };
-
   // ==================== DATA FETCHING ====================
   const fetchData = useCallback(async () => {
     if (isSearchingRef.current) return;
@@ -779,12 +865,7 @@ export default function QuotationsPage() {
 
   // ==================== HANDLERS ====================
   const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    setCurrentPage(1);
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => {
-      if (!isSearchingRef.current) fetchData();
-    }, 500);
+    debouncedSearch(value);
   };
 
   const handleProductSearchChange = (value: string) => {
@@ -1140,7 +1221,7 @@ export default function QuotationsPage() {
               <input 
                 type="text" 
                 placeholder="Search by quote # or customer..." 
-                value={searchTerm} 
+                defaultValue={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)} 
                 className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
               />
@@ -1173,66 +1254,71 @@ export default function QuotationsPage() {
             </button>
           </div>
 
-          {/* Date Filter Buttons */}
-          <div className="flex flex-wrap gap-2 items-center">
-            <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-1" />
-            {['all', 'today', 'yesterday', '7d', '30d', 'month', 'year'].map((period) => (
+          {/* Date Filter Buttons - Same Line */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-1 flex-shrink-0" />
+            
+            {(['all', 'today', 'yesterday', '7d', '30d', 'month', 'year'] as const).map((period) => (
               <button
                 key={period}
                 type="button"
-                onClick={() => applyQuoteDateFilter(period as any)}
-                className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
-                  quoteDateFilterPeriod === period 
+                onClick={() => applyQuoteDateFilter(period)}
+                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition whitespace-nowrap ${
+                  isDateFilterActive(period)
                     ? 'bg-cyan-600 text-white border-cyan-600 shadow-lg shadow-cyan-600/20 dark:shadow-cyan-800/30' 
                     : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
-                {period === 'all' ? 'All' : period === '7d' ? 'Last 7d' : period === '30d' ? 'Last 30d' : period === 'month' ? 'This Month' : period === 'year' ? 'This Year' : period.charAt(0).toUpperCase() + period.slice(1)}
+                {period === 'all' ? 'All' : 
+                 period === '7d' ? '7 Days' : 
+                 period === '30d' ? '30 Days' : 
+                 period === 'month' ? 'This Month' : 
+                 period === 'year' ? 'This Year' : 
+                 period.charAt(0).toUpperCase() + period.slice(1)}
               </button>
             ))}
+
             <button
               type="button"
               onClick={() => applyQuoteDateFilter('custom')}
-              className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
-                quoteDateFilterPeriod === 'custom' 
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition whitespace-nowrap ${
+                quoteDateFilterPeriod === 'custom' && (quoteStartDate || quoteEndDate)
                   ? 'bg-cyan-600 text-white border-cyan-600 shadow-lg shadow-cyan-600/20 dark:shadow-cyan-800/30' 
                   : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
-              Custom Range
+              Custom
             </button>
-            <button
-              type="button"
-              onClick={clearQuoteDateFilters}
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
 
-          {/* Custom Date Range */}
-          {quoteDateFilterPeriod === 'custom' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
-                <input
-                  type="date"
-                  value={quoteStartDate}
-                  onChange={(e) => { setQuoteStartDate(e.target.value); setQuoteDateFilterPeriod('custom'); setCurrentPage(1); }}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">End Date</label>
-                <input
-                  type="date"
-                  value={quoteEndDate}
-                  onChange={(e) => { setQuoteEndDate(e.target.value); setQuoteDateFilterPeriod('custom'); setCurrentPage(1); }}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-                />
-              </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={quoteStartDate}
+                onChange={(e) => handleCustomDateChange('start', e.target.value)}
+                className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 w-36"
+                aria-label="Start date"
+              />
+              <span className="text-gray-400 text-sm">to</span>
+              <input
+                type="date"
+                value={quoteEndDate}
+                onChange={(e) => handleCustomDateChange('end', e.target.value)}
+                className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 w-36"
+                aria-label="End date"
+              />
             </div>
-          )}
+
+            {(quoteStartDate || quoteEndDate) && (
+              <button
+                type="button"
+                onClick={clearQuoteDateFilters}
+                className="p-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Clear date filters"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ==================== TABLE ==================== */}

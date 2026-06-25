@@ -62,6 +62,7 @@ import {
   Area,
   ComposedChart,
 } from 'recharts';
+import { debounce } from 'lodash';
 
 // ==================== TYPES ====================
 interface Transaction {
@@ -106,6 +107,8 @@ interface TransactionStats {
   bySource: Array<{ _id: string; count: number; volume: number }>;
   byMethod: Array<{ _id: string; count: number; volume: number }>;
 }
+
+type DateFilterPeriod = 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'year' | 'custom';
 
 // ==================== HELPERS ====================
 const formatCurrency = (amount: number) => {
@@ -155,6 +158,47 @@ const getPaymentIcon = (method: string) => {
 };
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
+
+// ==================== DATE FILTER HELPERS ====================
+const getDateString = (date: Date) => date.toISOString().split('T')[0];
+
+const isDateFilterActive = (period: DateFilterPeriod, startDate: string, endDate: string): boolean => {
+  if (period === 'all') return !startDate && !endDate;
+  
+  const now = new Date();
+  const today = getDateString(now);
+  
+  switch(period) {
+    case 'today':
+      return startDate === today && endDate === today;
+    case 'yesterday': {
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      const yStr = getDateString(yesterday);
+      return startDate === yStr && endDate === yStr;
+    }
+    case '7d': {
+      const weekAgo = new Date(now);
+      weekAgo.setDate(now.getDate() - 6);
+      return startDate === getDateString(weekAgo) && endDate === today;
+    }
+    case '30d': {
+      const monthAgo = new Date(now);
+      monthAgo.setDate(now.getDate() - 29);
+      return startDate === getDateString(monthAgo) && endDate === today;
+    }
+    case 'month': {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      return startDate === getDateString(monthStart) && endDate === today;
+    }
+    case 'year': {
+      const yearStart = new Date(now.getFullYear(), 0, 1);
+      return startDate === getDateString(yearStart) && endDate === today;
+    }
+    default:
+      return false;
+  }
+};
 
 // ==================== EXPORT MODAL ====================
 function ExportModal({ isOpen, onClose, onExport, exporting }: any) {
@@ -297,7 +341,7 @@ export default function SalesTransactionsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [methodFilter, setMethodFilter] = useState<string>('');
   const [sourceFilter, setSourceFilter] = useState<string>('');
-  const [dateFilterPeriod, setDateFilterPeriod] = useState<'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'year' | 'custom'>('all');
+  const [dateFilterPeriod, setDateFilterPeriod] = useState<DateFilterPeriod>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -307,6 +351,20 @@ export default function SalesTransactionsPage() {
   const [exporting, setExporting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const itemsPerPage = 10;
+
+  // Debounced search
+  const debouncedSearch = useMemo(
+    () => debounce((value: string) => {
+      setSearchTerm(value);
+      setCurrentPage(1);
+    }, 400),
+    []
+  );
+
+  // Clean up debounce on unmount
+  useEffect(() => {
+    return () => debouncedSearch.cancel();
+  }, [debouncedSearch]);
 
   // ==================== AUTH CHECK ====================
   useEffect(() => {
@@ -355,40 +413,53 @@ export default function SalesTransactionsPage() {
     }
   }, []);
 
-  // ==================== DATE FILTERS ====================
-  const getDateString = (date: Date) => date.toISOString().split('T')[0];
-
-  const applyDateFilter = (period: 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'year' | 'custom') => {
+  // ==================== DATE FILTER FUNCTIONS ====================
+  const applyDateFilter = (period: DateFilterPeriod) => {
     const now = new Date();
     let start = '';
     let end = '';
 
-    if (period === 'today') {
-      start = getDateString(now);
-      end = getDateString(now);
-    } else if (period === 'yesterday') {
-      const yesterday = new Date(now);
-      yesterday.setDate(now.getDate() - 1);
-      start = getDateString(yesterday);
-      end = getDateString(yesterday);
-    } else if (period === '7d') {
-      const weekAgo = new Date(now);
-      weekAgo.setDate(now.getDate() - 6);
-      start = getDateString(weekAgo);
-      end = getDateString(now);
-    } else if (period === '30d') {
-      const monthAgo = new Date(now);
-      monthAgo.setDate(now.getDate() - 29);
-      start = getDateString(monthAgo);
-      end = getDateString(now);
-    } else if (period === 'month') {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      start = getDateString(monthStart);
-      end = getDateString(now);
-    } else if (period === 'year') {
-      const yearStart = new Date(now.getFullYear(), 0, 1);
-      start = getDateString(yearStart);
-      end = getDateString(now);
+    switch (period) {
+      case 'today':
+        start = getDateString(now);
+        end = getDateString(now);
+        break;
+      case 'yesterday': {
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        start = getDateString(yesterday);
+        end = getDateString(yesterday);
+        break;
+      }
+      case '7d': {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(now.getDate() - 6);
+        start = getDateString(weekAgo);
+        end = getDateString(now);
+        break;
+      }
+      case '30d': {
+        const monthAgo = new Date(now);
+        monthAgo.setDate(now.getDate() - 29);
+        start = getDateString(monthAgo);
+        end = getDateString(now);
+        break;
+      }
+      case 'month': {
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        start = getDateString(monthStart);
+        end = getDateString(now);
+        break;
+      }
+      case 'year': {
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        start = getDateString(yearStart);
+        end = getDateString(now);
+        break;
+      }
+      default:
+        start = '';
+        end = '';
     }
 
     setDateFilterPeriod(period);
@@ -402,6 +473,21 @@ export default function SalesTransactionsPage() {
     setStartDate('');
     setEndDate('');
     setCurrentPage(1);
+  };
+
+  const handleCustomDateChange = (type: 'start' | 'end', value: string) => {
+    if (type === 'start') {
+      setStartDate(value);
+    } else {
+      setEndDate(value);
+    }
+    setDateFilterPeriod('custom');
+    // Only fetch if both dates are set
+    if ((type === 'start' && value && endDate) || (type === 'end' && value && startDate)) {
+      setCurrentPage(1);
+    } else if (type === 'start' && !value) {
+      clearDateFilters();
+    }
   };
 
   // ==================== EXPORT ====================
@@ -574,14 +660,33 @@ export default function SalesTransactionsPage() {
         <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Status Breakdown</h2>
           <ResponsiveContainer width="100%" height={250}>
-          <RePieChart>
-            <Pie data={stats?.byStatus || []} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`} outerRadius={80} fill="#8884d8" dataKey="count" nameKey="_id">
-              {(stats?.byStatus || []).map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip formatter={(v: any) => `${v} transactions`} />
-          </RePieChart>
+            <RePieChart>
+              <Pie 
+                data={stats?.byStatus || []} 
+                cx="50%" 
+                cy="50%" 
+                labelLine={false} 
+                label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`} 
+                outerRadius={80} 
+                fill="#8884d8" 
+                dataKey="count" 
+                nameKey="_id"
+              >
+                {(stats?.byStatus || []).map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip 
+                formatter={(v: any) => `${v} transactions`}
+                contentStyle={{
+                  backgroundColor: 'rgb(255,255,255)',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  color: '#111827',
+                }}
+                labelStyle={{ color: '#6b7280' }}
+              />
+            </RePieChart>
           </ResponsiveContainer>
         </div>
 
@@ -611,14 +716,15 @@ export default function SalesTransactionsPage() {
 
       {/* ==================== FILTERS ==================== */}
       <div className="space-y-4">
+        {/* Row 1: Search and main filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
               placeholder="Search by customer, transaction ID, invoice #..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              defaultValue={searchTerm}
+              onChange={(e) => debouncedSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
             />
           </div>
@@ -659,66 +765,71 @@ export default function SalesTransactionsPage() {
           </select>
         </div>
 
-        {/* Date Filter Buttons */}
-        <div className="flex flex-wrap gap-2 items-center">
-          <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-1" />
-          {['all', 'today', 'yesterday', '7d', '30d', 'month', 'year'].map((period) => (
+        {/* Row 2: Date Filters - Same Line */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-1 flex-shrink-0" />
+          
+          {(['all', 'today', 'yesterday', '7d', '30d', 'month', 'year'] as const).map((period) => (
             <button
               key={period}
               type="button"
-              onClick={() => applyDateFilter(period as any)}
-              className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
-                dateFilterPeriod === period
+              onClick={() => applyDateFilter(period)}
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition whitespace-nowrap ${
+                isDateFilterActive(period, startDate, endDate)
                   ? 'bg-cyan-600 text-white border-cyan-600 shadow-lg shadow-cyan-600/20 dark:shadow-cyan-800/30'
                   : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
-              {period === 'all' ? 'All' : period === '7d' ? 'Last 7d' : period === '30d' ? 'Last 30d' : period === 'month' ? 'This Month' : period === 'year' ? 'This Year' : period.charAt(0).toUpperCase() + period.slice(1)}
+              {period === 'all' ? 'All' : 
+               period === '7d' ? '7 Days' : 
+               period === '30d' ? '30 Days' : 
+               period === 'month' ? 'This Month' : 
+               period === 'year' ? 'This Year' : 
+               period.charAt(0).toUpperCase() + period.slice(1)}
             </button>
           ))}
+
           <button
             type="button"
             onClick={() => applyDateFilter('custom')}
-            className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
-              dateFilterPeriod === 'custom'
+            className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition whitespace-nowrap ${
+              dateFilterPeriod === 'custom' && (startDate || endDate)
                 ? 'bg-cyan-600 text-white border-cyan-600 shadow-lg shadow-cyan-600/20 dark:shadow-cyan-800/30'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
-            Custom Range
+            Custom
           </button>
-          <button
-            type="button"
-            onClick={clearDateFilters}
-            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
 
-        {/* Custom Date Range */}
-        {dateFilterPeriod === 'custom' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setDateFilterPeriod('custom'); setCurrentPage(1); }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">End Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setDateFilterPeriod('custom'); setCurrentPage(1); }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => handleCustomDateChange('start', e.target.value)}
+              className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 w-36"
+              aria-label="Start date"
+            />
+            <span className="text-gray-400 text-sm">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => handleCustomDateChange('end', e.target.value)}
+              className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 w-36"
+              aria-label="End date"
+            />
           </div>
-        )}
+
+          {(startDate || endDate) && (
+            <button
+              type="button"
+              onClick={clearDateFilters}
+              className="p-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title="Clear date filters"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ==================== TRANSACTIONS LIST ==================== */}
