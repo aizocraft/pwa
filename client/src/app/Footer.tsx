@@ -14,7 +14,6 @@ import {
   Github,
   Send,
   ArrowUpRight,
-  Sparkles,
   ChevronUp
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
@@ -71,9 +70,8 @@ export default function Footer() {
   return (
     <>
       <footer className="relative bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 mt-auto w-full">
-        {/* Modern gradient accent bar */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
-
+        {/* Divider */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-primary-500 dark:bg-primary-400" />
         {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03] pointer-events-none">
           <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, gray 1px, transparent 0)', backgroundSize: '40px 40px' }} />
@@ -108,7 +106,6 @@ export default function Footer() {
                   {company?.slogan && (
                     <div className="text-blue-600 dark:text-blue-400 text-[11px] md:text-xs font-medium tracking-wide mt-0.5 flex items-center gap-1">
                       {company.slogan}
-                      <Sparkles className="w-3 h-3" />
                     </div>
                   )}
                 </div>
