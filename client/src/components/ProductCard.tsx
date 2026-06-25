@@ -164,7 +164,7 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
 
             {/* Description (list view only) - Now using RichTextRenderer */}
             {isList && product.description && (
-              <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-h-24 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+              <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-h-28 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
                 <RichTextRenderer 
                   content={product.description} 
                   className="prose prose-sm max-w-none 
