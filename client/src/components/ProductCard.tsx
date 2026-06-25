@@ -9,6 +9,7 @@ import { useCartStore } from '../store/cart';
 import { cn, formatCurrency } from '../lib/utils';
 import { useState } from 'react';
 import { getImageUrl } from '../lib/api';
+import RichTextRenderer from '@/components/RichTextRenderer';
 
 interface ProductCardProps {
   product: Product;
@@ -161,11 +162,25 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
               {product.name}
             </h3>
 
-            {/* Description (list view only) */}
+            {/* Description (list view only) - Now using RichTextRenderer */}
             {isList && product.description && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mt-2 leading-relaxed">
-                {product.description}
-              </p>
+              <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-h-24 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+                <RichTextRenderer 
+                  content={product.description} 
+                  className="prose prose-sm max-w-none 
+                    [&>p]:mb-1.5 [&>p:last-child]:mb-0 
+                    [&>ul]:my-1 [&>ul>li]:my-0.5 
+                    [&>ol]:my-1 [&>ol>li]:my-0.5 
+                    [&>h1]:text-base [&>h1]:font-semibold 
+                    [&>h2]:text-sm [&>h2]:font-semibold 
+                    [&>h3]:text-sm [&>h3]:font-medium 
+                    [&>h4]:text-xs [&>h4]:font-medium
+                    [&>blockquote]:text-xs [&>blockquote]:py-0.5 [&>blockquote]:my-1
+                    [&>pre]:text-xs [&>pre]:p-2 [&>pre]:my-1
+                    [&>img]:my-1 [&>img]:max-h-24 [&>img]:w-auto
+                    [&>a]:text-blue-600 [&>a]:hover:text-blue-700 [&>a]:underline"
+                />
+              </div>
             )}
 
             {/* Price Section - Larger numbers with prominent strike-through */}
@@ -191,8 +206,6 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
                   </span>
                 )}
               </div>
-              
-
             </div>
 
             {/* Action Buttons - Larger touch targets */}
@@ -215,33 +228,33 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
               <span className={isList ? 'text-sm' : 'text-xs'}>View</span>
             </button>
 
-               {/* Add to Cart Button */}
-<button
-  onClick={handleAddToCart}
-  disabled={product.stock === 0}
-  className={cn(
-    'flex items-center justify-center gap-2 transition-all duration-300 font-medium',
-    isList
-      ? 'flex-1 px-5 py-3 text-sm rounded-xl'
-      : 'flex-1 px-4 py-2.5 text-xs rounded-lg',
-    product.stock > 0
-      ? 'bg-[#000063] hover:bg-[#0043b3] text-white shadow-md hover:shadow-lg active:scale-[0.98]'
-      : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
-  )}
->
-  {showAddedFeedback ? (
-    <span className="flex items-center gap-2">
-      <span>Added!</span>
-    </span>
-  ) : (
-    <>
-      <ShoppingCart className={cn('transition-all', isList ? 'w-4 h-4' : 'w-3.5 h-3.5')} />
-      <span className={isList ? 'text-sm' : 'text-xs'}>
-        {itemQty > 0 ? `Add More (${itemQty})` : 'Add to Cart'}
-      </span>
-    </>
-  )}
-</button>
+            {/* Add to Cart Button */}
+            <button
+              onClick={handleAddToCart}
+              disabled={product.stock === 0}
+              className={cn(
+                'flex items-center justify-center gap-2 transition-all duration-300 font-medium',
+                isList
+                  ? 'flex-1 px-5 py-3 text-sm rounded-xl'
+                  : 'flex-1 px-4 py-2.5 text-xs rounded-lg',
+                product.stock > 0
+                  ? 'bg-[#000063] hover:bg-[#0043b3] text-white shadow-md hover:shadow-lg active:scale-[0.98]'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              )}
+            >
+              {showAddedFeedback ? (
+                <span className="flex items-center gap-2">
+                  <span>Added!</span>
+                </span>
+              ) : (
+                <>
+                  <ShoppingCart className={cn('transition-all', isList ? 'w-4 h-4' : 'w-3.5 h-3.5')} />
+                  <span className={isList ? 'text-sm' : 'text-xs'}>
+                    {itemQty > 0 ? `Add More (${itemQty})` : 'Add to Cart'}
+                  </span>
+                </>
+              )}
+            </button>
                 
             </div>
           </div>

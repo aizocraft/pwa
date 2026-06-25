@@ -45,7 +45,8 @@ import { Product } from '@/types/product';
 import ProductCard from '@/components/ProductCard';
 import { useCartStore } from '@/store/cart';
 import { getProducts, getBrands } from '@/lib/api';
-import RichTextRenderer from '@/components/RichTextRenderer';
+// RichTextRenderer is no longer needed here since ProductCard handles it internally
+// import RichTextRenderer from '@/components/RichTextRenderer';
 
 // ============================================================================
 // CONSTANTS
@@ -809,21 +810,10 @@ export default function ProductsClient() {
             ))}
           </div>
         ) : (
-          // List View - Full width product cards with Rich Text Description
+          // List View - ProductCard handles description internally with RichTextRenderer
           <div className="space-y-4">
             {filteredProducts.map((product) => (
-              <div key={product._id}>
-                <ProductCard product={product} variant="list" />
-                {/* Rich Text Description - Shows below the card in list view only */}
-                {product.description && (
-                  <div className="mt-1 px-4 text-sm text-gray-600 dark:text-gray-400">
-                    <RichTextRenderer 
-                      content={product.description} 
-                      className="prose prose-sm max-w-none [&>p]:mb-1"
-                    />
-                  </div>
-                )}
-              </div>
+              <ProductCard key={product._id} product={product} variant="list" />
             ))}
           </div>
         )}
