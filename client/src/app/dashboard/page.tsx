@@ -40,7 +40,10 @@ import {
   CreditCard,
   ShoppingBag,
   Receipt,
-  Layers
+  Layers,
+  Gem,
+  Diamond,
+  Trophy
 } from 'lucide-react'
 import Link from 'next/link'
 import { Order } from '@/types/order'
@@ -55,6 +58,7 @@ interface StatCardData {
   color: string
   trend?: 'up' | 'down'
   subtitle?: string
+  valueColor?: string
 }
 
 // ==================== STATUS HELPERS ====================
@@ -118,35 +122,43 @@ const getPaymentStatusBadge = (order: any) => {
   }
 }
 
-// ==================== STAT CARD ====================
-function StatCard({ stat }: { stat: StatCardData }) {
+// ==================== PREMIUM STAT CARD ====================
+function PremiumStatCard({ stat }: { stat: StatCardData }) {
   const Icon = stat.icon
   const isPositive = stat.trend === 'up'
   const TrendIcon = stat.trend === 'up' ? TrendingUp : stat.trend === 'down' ? TrendingDown : null
   
   return (
-    <div className="bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all duration-300 p-6 hover:-translate-y-0.5">
-      <div className="flex items-start justify-between">
+    <div className="relative bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-xl transition-all duration-300 p-6 hover:-translate-y-1 overflow-hidden group">
+      {/* Gradient Background */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+      
+      {/* Decorative Ring */}
+      <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full bg-gradient-to-br ${stat.color} opacity-10 group-hover:opacity-20 transition-opacity duration-300`} />
+      
+      <div className="relative flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{stat.name}</p>
-          <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white truncate">
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+            {stat.name}
+          </p>
+          <p className={`text-3xl sm:text-4xl font-bold ${stat.valueColor || 'text-gray-900 dark:text-white'} truncate`}>
             {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
           </p>
           {stat.subtitle && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{stat.subtitle}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 font-medium">{stat.subtitle}</p>
           )}
           {stat.change && stat.trend && TrendIcon && (
             <div className="flex items-center gap-1.5 mt-2">
               <TrendIcon className={`w-4 h-4 ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`} />
-              <span className={`text-sm font-medium ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
+              <span className={`text-sm font-semibold ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
                 {stat.change}
               </span>
               <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">vs last month</span>
             </div>
           )}
         </div>
-        <div className={`bg-gradient-to-br ${stat.color} p-3 rounded-xl shadow-lg shrink-0 ml-3`}>
-          <Icon className="w-5 h-5 text-white" />
+        <div className={`bg-gradient-to-br ${stat.color} p-3.5 rounded-2xl shadow-lg shrink-0 ml-3 group-hover:scale-110 transition-transform duration-300`}>
+          <Icon className="w-6 h-6 text-white" />
         </div>
       </div>
     </div>
@@ -168,10 +180,10 @@ function OrderStatusCard({
   bgColor: string
 }) {
   return (
-    <div className={`${bgColor} rounded-2xl p-5 border ${color} shadow-sm`}>
+    <div className={`${bgColor} rounded-2xl p-5 border ${color} shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5`}>
       <div className="flex items-center justify-between">
         <div>
-          <p className={`text-sm ${color} font-medium`}>{title}</p>
+          <p className={`text-sm font-medium ${color}`}>{title}</p>
           <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{count}</p>
         </div>
         <Icon className={`w-12 h-12 ${color} opacity-50`} />
@@ -184,27 +196,27 @@ function OrderStatusCard({
 function TopProductItem({ product, index }: { product: DashboardTopProduct; index: number }) {
   const isPositive = parseFloat(product.growth) >= 0
   const rankColors = [
-    'bg-[#0043b3] text-white',
-    'bg-gray-600 text-white',
-    'bg-amber-700 text-white',
+    'bg-gradient-to-r from-yellow-400 to-yellow-600 text-white shadow-md',
+    'bg-gradient-to-r from-gray-400 to-gray-600 text-white shadow-md',
+    'bg-gradient-to-r from-amber-600 to-amber-800 text-white shadow-md',
   ]
   
   const rankIcons = [
-    <Crown key="crown" className="w-4 h-4" />,
+    <Trophy key="trophy" className="w-4 h-4" />,
     <Medal key="medal" className="w-4 h-4" />,
     <Award key="award" className="w-4 h-4" />,
   ]
   
   return (
-    <div className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all group">
+    <div className="flex items-center justify-between p-3.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all group border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
       <div className="flex items-center gap-4 flex-1 min-w-0">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-semibold text-sm shrink-0 ${
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
           index < 3 ? rankColors[index] : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
         }`}>
           {index < 3 ? rankIcons[index] : index + 1}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate">
+          <p className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base truncate">
             {product.name}
           </p>
           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
@@ -212,13 +224,13 @@ function TopProductItem({ product, index }: { product: DashboardTopProduct; inde
               {product.sales} unit{product.sales !== 1 ? 's' : ''} sold
             </p>
             {product.margin !== undefined && product.margin > 0 && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-500 flex items-center gap-1">
+              <p className="text-xs text-emerald-600 dark:text-emerald-500 flex items-center gap-1 font-medium">
                 <TrendingUp className="w-3 h-3" />
                 {product.margin.toFixed(1)}% margin
               </p>
             )}
             {product.stock !== undefined && product.stock <= 5 && product.stock > 0 && (
-              <p className="text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
+              <p className="text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1 font-medium">
                 <AlertCircle className="w-3 h-3" />
                 Low stock: {product.stock} left
               </p>
@@ -227,10 +239,10 @@ function TopProductItem({ product, index }: { product: DashboardTopProduct; inde
         </div>
       </div>
       <div className="text-right shrink-0 ml-4">
-        <p className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
-          Ksh {product.revenue.toLocaleString()}
+        <p className="font-bold text-[#0043b3] dark:text-[#009dff] text-sm sm:text-base">
+          KSh {typeof product.revenue === 'number' ? product.revenue.toLocaleString() : 0}
         </p>
-        <p className={`text-xs flex items-center gap-1 justify-end ${
+        <p className={`text-xs flex items-center gap-1 justify-end font-medium ${
           isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
         }`}>
           {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -250,8 +262,10 @@ function RecentOrderItem({ order }: { order: Order }) {
                order.paymentStatus === ('paid' as any) || 
                order.status === 'paid' || 
                order.status === 'delivered'
-  const itemCount = order.items?.length || 0
+  // ✅ Fix: Count actual items in the order
+  const itemCount = Array.isArray(order.items) ? order.items.length : 0
   const orderNumber = order.orderNumber || `#${order._id?.slice(-8).toUpperCase()}`
+  const totalAmount = typeof order.total === 'number' ? order.total : parseFloat(order.total || '0')
   
   return (
     <Link 
@@ -269,22 +283,20 @@ function RecentOrderItem({ order }: { order: Order }) {
               {paymentBadge.text}
             </div>
           </div>
-          <p className="text-sm text-gray-900 dark:text-white mt-1">
+          <p className="text-sm text-gray-900 dark:text-white mt-1 font-medium">
             {itemCount} item{itemCount !== 1 ? 's' : ''}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap">
             <span className="truncate">{customerName}</span>
-            <span className="hidden sm:inline">•</span>
-            <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+            <span className="hidden sm:inline text-gray-300 dark:text-gray-600">•</span>
+            <span>{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</span>
           </p>
         </div>
         <div className="flex items-center gap-4 shrink-0">
-          <p className={`text-base font-semibold ${
+          <p className={`text-base font-bold ${
             isPaid ? 'text-green-600 dark:text-green-500' : 'text-gray-900 dark:text-white'
           }`}>
-            Ksh {typeof order.total === 'number' 
-              ? order.total.toLocaleString() 
-              : parseFloat(order.total || 0).toLocaleString()}
+            KSh {totalAmount.toLocaleString()}
           </p>
           <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
         </div>
@@ -322,57 +334,62 @@ export default function DashboardOverviewPage() {
     }, 500)
   }, [refetch])
 
-  // Calculate accurate metrics from summary
-  const totalRevenue = summary?.totalRevenue || 0
-  const totalOrders = summary?.totalOrders || 0
-  const totalItemsSold = summary?.totalItemsSold || 0
-  const totalProfit = summary?.totalProfit || 0
-  const totalProducts = summary?.totalProducts || 0
-  const totalTransactions = summary?.totalTransactions || 0
-  const pendingOrders = summary?.pendingOrders || 0
-  const cancelledOrders = summary?.cancelledOrders || 0
-  const paidOrders = summary?.paidOrders || Math.max(0, totalOrders - pendingOrders - cancelledOrders)
+  // ✅ Calculate accurate metrics from summary with proper fallbacks
+  const totalRevenue = Number(summary?.totalRevenue) || 0
+  const totalOrders = Number(summary?.totalOrders) || 0
+  const totalItemsSold = Number(summary?.totalItemsSold) || 0
+  const totalProfit = Number(summary?.totalProfit) || 0
+  const totalProducts = Number(summary?.totalProducts) || 0
+  const totalTransactions = Number(summary?.totalTransactions) || 0
+  const pendingOrders = Number(summary?.pendingOrders) || 0
+  const cancelledOrders = Number(summary?.cancelledOrders) || 0
+  const paidOrders = Number(summary?.paidOrders) || Math.max(0, totalOrders - pendingOrders - cancelledOrders)
   const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
-  const lowStockProducts = summary?.lowStockProducts || 0
-  const activeCustomers = summary?.activeCustomers || 0
+  const lowStockProducts = Number(summary?.lowStockProducts) || 0
+  const activeCustomers = Number(summary?.activeCustomers) || 0
+  const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0
 
-  // Build stats array - 4 key metrics with clean design
+  // ✅ Build stats array with properly formatted values
   const stats: StatCardData[] = dashboardStats.length > 0 ? dashboardStats : [
     { 
       name: 'Total Revenue', 
-      value: `Ksh ${totalRevenue.toLocaleString()}`, 
+      value: totalRevenue, 
       change: summary?.revenueGrowth || '+0%', 
       icon: DollarSign, 
-      color: 'from-emerald-500 to-green-500',
+      color: 'from-emerald-500 to-green-600',
       trend: totalRevenue > 0 ? 'up' : 'down',
-      subtitle: `${totalOrders} orders`
+      subtitle: `${totalOrders} orders`,
+      valueColor: 'text-emerald-600 dark:text-emerald-400'
     },
     { 
       name: 'Total Profit', 
-      value: `Ksh ${totalProfit.toLocaleString()}`, 
-      change: '+8.2%', 
+      value: totalProfit, 
+      change: summary?.profitGrowth || '+0%', 
       icon: TrendingUp, 
-      color: 'from-blue-500 to-cyan-500',
+      color: 'from-blue-500 to-cyan-600',
       trend: totalProfit > 0 ? 'up' : 'down',
-      subtitle: `Margin: ${totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0}%`
+      subtitle: `Margin: ${profitMargin.toFixed(1)}%`,
+      valueColor: 'text-blue-600 dark:text-blue-400'
     },
     { 
       name: 'Total Products', 
-      value: totalProducts.toLocaleString(), 
+      value: totalProducts, 
       change: '+5.3%', 
       icon: Package, 
-      color: 'from-purple-500 to-pink-500',
+      color: 'from-purple-500 to-pink-600',
       trend: totalProducts > 0 ? 'up' : 'down',
-      subtitle: `${lowStockProducts} low stock`
+      subtitle: `${lowStockProducts} low stock`,
+      valueColor: 'text-purple-600 dark:text-purple-400'
     },
     { 
       name: 'Total Transactions', 
-      value: totalTransactions.toLocaleString(), 
+      value: totalTransactions, 
       change: '+15.7%', 
       icon: CreditCard, 
-      color: 'from-orange-500 to-red-500',
+      color: 'from-orange-500 to-red-600',
       trend: totalTransactions > 0 ? 'up' : 'down',
-      subtitle: `Avg: Ksh ${totalTransactions > 0 ? (totalRevenue / totalTransactions).toLocaleString() : 0}`
+      subtitle: `Avg: KSh ${totalTransactions > 0 ? (totalRevenue / totalTransactions).toLocaleString() : 0}`,
+      valueColor: 'text-orange-600 dark:text-orange-400'
     },
   ]
 
@@ -443,11 +460,11 @@ export default function DashboardOverviewPage() {
         </button>
       </div>
 
-      {/* ==================== MAIN STATS CARDS ==================== */}
+      {/* ==================== PREMIUM STATS CARDS ==================== */}
       {stats.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {stats.map((stat, idx) => (
-            <StatCard key={idx} stat={stat} />
+            <PremiumStatCard key={idx} stat={stat} />
           ))}
         </div>
       )}
@@ -480,7 +497,7 @@ export default function DashboardOverviewPage() {
       {/* ==================== MAIN CHARTS SECTION ==================== */}
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Top Products */}
-        <div className="bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all overflow-hidden">
           <div className="p-6 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-[#000063] dark:text-white flex items-center gap-2">
@@ -489,18 +506,23 @@ export default function DashboardOverviewPage() {
               </h3>
               <Link 
                 href="/dashboard/products" 
-                className="text-sm text-[#0043b3] hover:text-[#000063] dark:text-[#009dff] dark:hover:text-[#0043b3] flex items-center gap-1 transition-colors"
+                className="text-sm text-[#0043b3] hover:text-[#000063] dark:text-[#009dff] dark:hover:text-[#0043b3] flex items-center gap-1 transition-colors font-medium"
               >
                 View all <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
           <div className="p-4 space-y-1 max-h-[500px] overflow-y-auto">
-            {topProducts.length > 0 ? (
+            {topProducts && topProducts.length > 0 ? (
               topProducts.slice(0, 10).map((product: DashboardTopProduct, idx: number) => (
                 <TopProductItem 
                   key={product.id || idx} 
-                  product={product} 
+                  product={{
+                    ...product,
+                    revenue: Number(product.revenue) || 0,
+                    sales: Number(product.sales) || 0,
+                    margin: Number(product.margin) || 0
+                  }} 
                   index={idx} 
                 />
               ))
@@ -515,7 +537,7 @@ export default function DashboardOverviewPage() {
         </div>
 
         {/* Recent Orders */}
-        <div className="bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden flex flex-col">
+        <div className="bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col">
           <div className="p-6 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-[#000063] dark:text-white flex items-center gap-2">
@@ -524,14 +546,14 @@ export default function DashboardOverviewPage() {
               </h3>
               <Link 
                 href="/dashboard/orders" 
-                className="text-sm text-[#0043b3] hover:text-[#000063] dark:text-[#009dff] dark:hover:text-[#0043b3] flex items-center gap-1 transition-colors"
+                className="text-sm text-[#0043b3] hover:text-[#000063] dark:text-[#009dff] dark:hover:text-[#0043b3] flex items-center gap-1 transition-colors font-medium"
               >
                 View all <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
           <div className="flex-1 divide-y divide-gray-200 dark:divide-gray-800 max-h-[500px] overflow-y-auto">
-            {recentOrders.length > 0 ? (
+            {recentOrders && recentOrders.length > 0 ? (
               recentOrders.map((order: Order) => (
                 <RecentOrderItem key={order._id} order={order} />
               ))
@@ -547,25 +569,25 @@ export default function DashboardOverviewPage() {
       </div>
 
       {/* ==================== QUICK STATS BANNER ==================== */}
-      <div className="bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-6">
+      <div className="bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all p-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Orders</p>
-            <p className="text-xl font-bold text-[#000063] dark:text-white mt-1">{totalOrders}</p>
+          <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Orders</p>
+            <p className="text-2xl font-bold text-[#000063] dark:text-white mt-1">{totalOrders.toLocaleString()}</p>
           </div>
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items Sold</p>
-            <p className="text-xl font-bold text-[#000063] dark:text-white mt-1">{totalItemsSold}</p>
+          <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items Sold</p>
+            <p className="text-2xl font-bold text-[#000063] dark:text-white mt-1">{totalItemsSold.toLocaleString()}</p>
           </div>
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Avg Order Value</p>
-            <p className="text-xl font-bold text-[#000063] dark:text-white mt-1">
-              Ksh {averageOrderValue.toLocaleString()}
+          <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Avg Order Value</p>
+            <p className="text-2xl font-bold text-[#0043b3] dark:text-[#009dff] mt-1">
+              KSh {averageOrderValue.toLocaleString()}
             </p>
           </div>
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Paid Orders</p>
-            <p className="text-xl font-bold text-green-600 dark:text-green-500 mt-1">{paidOrders}</p>
+          <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Paid Orders</p>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-500 mt-1">{paidOrders.toLocaleString()}</p>
           </div>
         </div>
       </div>
