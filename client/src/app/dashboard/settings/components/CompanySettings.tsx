@@ -44,7 +44,21 @@ export default function CompanySettings() {
         footerText: company.footerText || '',
         taxRate: company.taxRate || 0.16,
         taxExemptCategories: company.taxExemptCategories || ['Solar Panels', 'Solar Lights', 'Inverters'],
-        socialLinks: company.socialLinks || []
+        socialLinks: company.socialLinks || [],
+        themeColors: company.themeColors || {
+          light: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          },
+          dark: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          }
+        }
       })
     }
   }, [company])
@@ -73,7 +87,8 @@ export default function CompanySettings() {
         footerText: formData.footerText || undefined,
         taxRate: formData.taxRate !== undefined ? formData.taxRate : undefined,
         taxExemptCategories: filteredTaxExemptCategories.length > 0 ? filteredTaxExemptCategories : undefined,
-        socialLinks: filteredSocialLinks.length > 0 ? filteredSocialLinks : undefined
+        socialLinks: filteredSocialLinks.length > 0 ? filteredSocialLinks : undefined,
+        themeColors: formData.themeColors || undefined
       }
       
       await update.mutateAsync(data)
@@ -478,6 +493,8 @@ export default function CompanySettings() {
             <BrandingTab
               company={company}
               editing={editing}
+              formData={formData}
+              setFormData={setFormData}
               uploadLogo={uploadLogoMutation.mutateAsync}
               updateLogoUrl={updateLogoUrl.mutateAsync}
               deleteLogo={deleteLogoMutation.mutateAsync}
@@ -514,7 +531,21 @@ export default function CompanySettings() {
                     footerText: company.footerText || '',
                     taxRate: company.taxRate || 0.16,
                     taxExemptCategories: company.taxExemptCategories || ['Solar Panels', 'Solar Lights', 'Inverters'],
-                    socialLinks: company.socialLinks || []
+                    socialLinks: company.socialLinks || [],
+                    themeColors: company.themeColors || {
+                      light: {
+                        primary: '#000063',
+                        primaryForeground: '#ffffff',
+                        primaryMid: '#0043b3',
+                        primaryLight: '#009dff'
+                      },
+                      dark: {
+                        primary: '#000063',
+                        primaryForeground: '#ffffff',
+                        primaryMid: '#0043b3',
+                        primaryLight: '#009dff'
+                      }
+                    }
                   })
                 }
               }}

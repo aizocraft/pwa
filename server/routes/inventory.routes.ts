@@ -161,8 +161,8 @@ const checkLowStockAndNotify = async (product: any, oldStock: number, newStock: 
 // GET /api/inventory/summary - Inventory value summary
 router.get('/summary', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    if (!isAdminOrSales(req)) {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
 
     const products = await ProductModel.find({}).lean();
@@ -227,8 +227,8 @@ router.get('/summary', authMiddleware, async (req: Request & { user?: any }, res
 // GET /api/inventory/low-stock - Get low stock products (with optional notification)
 router.get('/low-stock', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    if (!isAdminOrSales(req)) {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
 
     const { threshold = '10', category, supplier, notify = 'false' } = req.query;
@@ -853,8 +853,8 @@ router.put('/bulk-update', authMiddleware, async (req: Request & { user?: any },
 
 router.delete('/bulk-delete', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    if (!isAdminOrSales(req)) {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
     
     const { productIds } = req.body;
@@ -930,8 +930,8 @@ router.delete('/bulk-delete', authMiddleware, async (req: Request & { user?: any
 
 router.post('/bulk-adjust-stock', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    if (!isAdminOrSales(req)) {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
     
     const { adjustments, reason } = req.body;
@@ -1077,8 +1077,8 @@ router.post('/bulk-adjust-stock', authMiddleware, async (req: Request & { user?:
 
 router.get('/valuation', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    if (!isAdminOrSales(req)) {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
     
     const products = await ProductModel.find({})

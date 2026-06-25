@@ -35,6 +35,20 @@ export interface ICompanySettings extends Document {
   }>;
   taxRate: number;
   taxExemptCategories: string[];
+  themeColors: {
+    light: {
+      primary: string;
+      primaryForeground: string;
+      primaryMid: string;
+      primaryLight: string;
+    };
+    dark: {
+      primary: string;
+      primaryForeground: string;
+      primaryMid: string;
+      primaryLight: string;
+    };
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -115,6 +129,20 @@ const companySettingsSchema = new Schema<ICompanySettings>(
     favicon: {
       type: FaviconSchema,
       default: null
+    },
+    themeColors: {
+      light: {
+        primary: { type: String, default: '#000063' },
+        primaryForeground: { type: String, default: '#ffffff' },
+        primaryMid: { type: String, default: '#0043b3' },
+        primaryLight: { type: String, default: '#009dff' }
+      },
+      dark: {
+        primary: { type: String, default: '#000063' },
+        primaryForeground: { type: String, default: '#ffffff' },
+        primaryMid: { type: String, default: '#0043b3' },
+        primaryLight: { type: String, default: '#009dff' }
+      }
     }
   },
   { 

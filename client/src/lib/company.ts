@@ -108,6 +108,11 @@ export function getLogoUrl(settings: any): string | null {
   return null;
 }
 
+// Get theme colors from settings
+export function getCompanyThemeColors(settings: CompanySettings | null | undefined) {
+  return settings?.themeColors ?? null;
+}
+
 // Helper to get favicon URL
 export function getFaviconUrl(settings: any): string | null {
   if (!settings?.favicon) return null;

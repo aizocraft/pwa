@@ -62,6 +62,17 @@ api.interceptors.response.use(
   }
 );
 
+const buildQueryString = (params?: Record<string, any>) => {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  });
+  const queryString = query.toString();
+  return queryString ? `?${queryString}` : '';
+};
+
 // ========== AUTH API ==========
 export async function loginUser(credentials: { email: string; password: string }) {
   try {
@@ -1145,14 +1156,9 @@ export async function getTransactions(params?: {
   transactions: any[];
   pagination: { current: number; pages: number; total: number; limit: number };
 }> {
-  const query = new URLSearchParams();
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      query.append(key, String(value));
-    }
-  });
+  const query = buildQueryString(params);
   try {
-    const response = await api.get(`/transactions?${query.toString()}`);
+    const response = await api.get(`/transactions${query}`);
     return response.data;
   } catch (error: any) {
     console.error('Failed to fetch transactions:', error);
@@ -1203,14 +1209,9 @@ export async function exportTransactionsToCSV(params?: {
   startDate?: string;
   endDate?: string;
 }): Promise<Blob> {
-  const query = new URLSearchParams();
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      query.append(key, String(value));
-    }
-  });
+  const query = buildQueryString(params);
   try {
-    const response = await api.get(`/transactions/export/csv?${query.toString()}`, { responseType: 'blob' });
+    const response = await api.get(`/transactions/export/csv${query}`, { responseType: 'blob' });
     return response.data;
   } catch (error: any) {
     console.error('Failed to export transactions:', error);
@@ -1288,14 +1289,9 @@ export async function listPayments(params?: {
   source?: string;
   search?: string;
 }): Promise<{ transactions: any[]; pagination: any }> {
-  const query = new URLSearchParams();
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      query.append(key, String(value));
-    }
-  });
+  const query = buildQueryString(params);
   try {
-    const response = await api.get(`/payments/transactions?${query.toString()}`);
+    const response = await api.get(`/payments/transactions${query}`);
     return response.data;
   } catch (error: any) {
     console.error('Failed to fetch payments:', error);
@@ -1919,12 +1915,9 @@ export async function getLowStockProducts(threshold?: number, category?: string,
   count: number;
   threshold: number;
 }> {
-  const query = new URLSearchParams();
-  if (threshold) query.append('threshold', String(threshold));
-  if (category) query.append('category', category);
-  if (supplier) query.append('supplier', supplier);
+  const query = buildQueryString({ threshold, category, supplier });
   try {
-    const response = await api.get(`/inventory/low-stock?${query.toString()}`);
+    const response = await api.get(`/inventory/low-stock${query}`);
     return response.data;
   } catch (error: any) {
     console.error('Failed to fetch low stock products:', error);

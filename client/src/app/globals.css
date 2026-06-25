@@ -15,10 +15,10 @@
     --popover-foreground: 222.2 84% 4.9%;
     
     /* Brand colors - Light mode */
-    --primary: 224 100% 19%; /* #000063 */
-    --primary-foreground: 0 0% 100%;
-    --primary-mid: 218 100% 36%; /* #0043b3 */
-    --primary-light: 204 100% 50%; /* #009dff */
+    --primary: #000063;
+    --primary-foreground: #ffffff;
+    --primary-mid: #0043b3;
+    --primary-light: #009dff;
     
     /* Secondary colors */
     --secondary: 210 40% 96%;
@@ -46,11 +46,11 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
     
-    /* Brand colors - Dark mode (adjusted for visibility) */
-    --primary: 224 71% 22%; /* Adjusted #000063 for dark */
-    --primary-foreground: 210 40% 98%;
-    --primary-mid: 218 65% 45%; /* Adjusted #0043b3 for dark */
-    --primary-light: 204 100% 55%; /* Brighter #009dff for dark */
+    /* Brand colors - Dark mode */
+    --primary: #000063;
+    --primary-foreground: #ffffff;
+    --primary-mid: #0043b3;
+    --primary-light: #009dff;
     
     /* Secondary colors */
     --secondary: 217.2 32.6% 17.5%;
@@ -188,16 +188,16 @@ body {
   --track-height: 6px;
   --thumb-size: 20px;
   --track-bg: theme('colors.gray.200/50');
-  --track-fill: #009dff; /* Brand light color */
-  --thumb-bg: #0043b3; /* Brand mid color */
-  --tooltip-bg: #000063; /* Brand deep color */
+  --track-fill: var(--primary-light);
+  --thumb-bg: var(--primary-mid);
+  --tooltip-bg: var(--primary);
 }
 
 .dark .price-slider-container {
   --track-bg: theme('colors.gray.700/50');
-  --track-fill: #009dff; /* Brand light */
-  --thumb-bg: #0043b3; /* Brand mid */
-  --tooltip-bg: #000063; /* Brand deep */
+  --track-fill: var(--primary-light);
+  --thumb-bg: var(--primary-mid);
+  --tooltip-bg: var(--primary);
 }
 
 .price-slider-wrapper {

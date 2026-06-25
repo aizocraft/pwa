@@ -76,7 +76,21 @@ router.get('/', async (req: Request, res: Response) => {
           type: 'url',
           url: DEFAULT_LOGO_URL
         },
-        favicon: null
+        favicon: null,
+        themeColors: {
+          light: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          },
+          dark: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          }
+        }
       });
     }
     res.json(settings);
@@ -210,6 +224,20 @@ router.post('/upload-logo', authMiddleware, upload.single('logo'), async (req: R
           fileId: uploadStream.id, 
           filename, 
           mimeType: req.file.mimetype 
+        },
+        themeColors: {
+          light: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          },
+          dark: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          }
         }
       });
     } else {
@@ -290,6 +318,20 @@ router.post('/upload-favicon', authMiddleware, upload.single('favicon'), async (
           fileId: uploadStream.id, 
           filename, 
           mimeType: req.file.mimetype
+        },
+        themeColors: {
+          light: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          },
+          dark: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          }
         }
       });
     } else {
@@ -376,7 +418,21 @@ router.post('/logo-url', authMiddleware, async (req: Request, res: Response) => 
         footerText: '',
         socialLinks: [],
         logo: logoData,
-        favicon: null
+        favicon: null,
+        themeColors: {
+          light: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          },
+          dark: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          }
+        }
       });
     } else {
       settings.logo = logoData;
@@ -574,6 +630,20 @@ router.delete('/logo', authMiddleware, async (req: Request, res: Response) => {
         logo: {
           type: 'url',
           url: DEFAULT_LOGO_URL
+        },
+        themeColors: {
+          light: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          },
+          dark: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          }
         }
       });
     } else {
@@ -623,7 +693,21 @@ router.delete('/favicon', authMiddleware, async (req: Request, res: Response) =>
     if (!settings) {
       settings = await CompanySettings.create({
         companyName: 'My Company',
-        favicon: null
+        favicon: null,
+        themeColors: {
+          light: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          },
+          dark: {
+            primary: '#000063',
+            primaryForeground: '#ffffff',
+            primaryMid: '#0043b3',
+            primaryLight: '#009dff'
+          }
+        }
       });
     } else {
       settings.favicon = null;
@@ -680,10 +764,24 @@ router.post('/reset', authMiddleware, async (req: Request, res: Response) => {
             type: 'url',
             url: DEFAULT_LOGO_URL
           },
-          favicon: null
+          favicon: null,
+          themeColors: {
+            light: {
+              primary: '#000063',
+              primaryForeground: '#ffffff',
+              primaryMid: '#0043b3',
+              primaryLight: '#009dff'
+            },
+            dark: {
+              primary: '#000063',
+              primaryForeground: '#ffffff',
+              primaryMid: '#0043b3',
+              primaryLight: '#009dff'
+            }
+          }
         }
       }, 
-      { new: true, upsert: true }
+      { new: true, upsert: true, setDefaultsOnInsert: true }
     ) as ICompanySettings;
 
     // ✅ NOTIFICATION: All settings reset

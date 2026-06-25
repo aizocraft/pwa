@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Dispatch, SetStateAction } from 'react'
 import { Image as ImageIcon, Loader2, ImagePlus, UploadCloud, Trash, CheckCircle2, X, ExternalLink } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getLogoUrl, getFaviconUrl } from '@/lib/company'
@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface BrandingTabProps {
   company: any
   editing: boolean
+  formData: any
+  setFormData: Dispatch<SetStateAction<any>>
   uploadLogo: (file: File) => Promise<any>
   updateLogoUrl: (url: string) => Promise<any>
   deleteLogo: () => Promise<any>
@@ -20,6 +22,8 @@ interface BrandingTabProps {
 export default function BrandingTab({
   company,
   editing,
+  formData,
+  setFormData,
   uploadLogo,
   updateLogoUrl,
   deleteLogo,
@@ -184,6 +188,23 @@ export default function BrandingTab({
     } finally {
       setFaviconLoading(false)
     }
+  }
+
+  const updateThemeColor = (
+    theme: 'light' | 'dark',
+    key: 'primary' | 'primaryForeground' | 'primaryMid' | 'primaryLight',
+    value: string
+  ) => {
+    setFormData({
+      ...formData,
+      themeColors: {
+        ...formData.themeColors,
+        [theme]: {
+          ...formData.themeColors?.[theme],
+          [key]: value
+        }
+      }
+    })
   }
 
   const handleDragOver = (e: React.DragEvent, type: 'logo' | 'favicon') => {
@@ -419,6 +440,70 @@ export default function BrandingTab({
             )}
           </div>
         )}
+      </section>
+
+      {/* Theme Colors Section */}
+      <section className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+          <div>
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-blue-600" />
+              Theme Colors
+            </h4>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Set your brand palette for light and dark mode.
+            </p>
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Use the color pickers or enter hex values directly.
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          {['light', 'dark'].map((theme) => {
+            const themeLabel = theme === 'light' ? 'Light Mode' : 'Dark Mode'
+            const themeValues = formData.themeColors?.[theme] || {}
+            return (
+              <div key={theme} className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-950">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{themeLabel}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Brand colors for {themeLabel.toLowerCase()}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  {[
+                    { key: 'primary', label: 'Primary' },
+                    { key: 'primaryForeground', label: 'Primary text' },
+                    { key: 'primaryMid', label: 'Primary mid' },
+                    { key: 'primaryLight', label: 'Primary light' }
+                  ].map(({ key, label }) => (
+                    <label key={key} className="block text-sm text-gray-700 dark:text-gray-300">
+                      <span className="mb-2 block font-medium">{label}</span>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={themeValues[key] || '#000063'}
+                          disabled={!editing}
+                          onChange={(e) => updateThemeColor(theme as 'light' | 'dark', key as any, e.target.value)}
+                          className="w-14 h-10 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={themeValues[key] || '#000063'}
+                          disabled={!editing}
+                          onChange={(e) => updateThemeColor(theme as 'light' | 'dark', key as any, e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </section>
 
       {/* Favicon Section */}

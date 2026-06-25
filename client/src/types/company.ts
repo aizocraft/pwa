@@ -36,6 +36,20 @@ export interface CompanySettings {
   socialLinks: SocialLink[];
   taxRate: number;
   taxExemptCategories: string[]; 
+  themeColors: {
+    light: {
+      primary: string;
+      primaryForeground: string;
+      primaryMid: string;
+      primaryLight: string;
+    };
+    dark: {
+      primary: string;
+      primaryForeground: string;
+      primaryMid: string;
+      primaryLight: string;
+    };
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -52,6 +66,20 @@ export interface UpdateCompanyRequest {
   socialLinks?: SocialLink[];
   taxRate?: number;
   taxExemptCategories?: string[]; 
+  themeColors?: {
+    light?: {
+      primary?: string;
+      primaryForeground?: string;
+      primaryMid?: string;
+      primaryLight?: string;
+    };
+    dark?: {
+      primary?: string;
+      primaryForeground?: string;
+      primaryMid?: string;
+      primaryLight?: string;
+    };
+  };
 }
 
 export interface UploadLogoResponse {
