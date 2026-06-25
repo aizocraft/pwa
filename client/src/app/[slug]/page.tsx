@@ -1,13 +1,13 @@
 // src/app/[slug]/page.tsx
 
-import { getProductBySlug } from '../../lib/api';
+import { getProduct } from '../../lib/api';
 import ProductDetailClient from './ProductDetailClient';
 import ProductSchema from '@/components/ProductSchema';
 import type { Metadata } from 'next';
 
 /**
  * Generate SEO metadata for the product page
- * Fetches product by slug and builds optimized meta tags
+ * Fetches product by ID and builds optimized meta tags
  */
 export async function generateMetadata({ 
   params 
@@ -20,7 +20,8 @@ export async function generateMetadata({
   let product = null;
   
   try {
-    product = await getProductBySlug(slug);
+    // Use getProduct which fetches by ID (the slug parameter is actually the ID)
+    product = await getProduct(slug);
   } catch (error) {
     console.error('Failed to fetch product for metadata:', error);
     product = null;
@@ -172,7 +173,8 @@ export default async function ProductPage({
   let error = null;
   
   try {
-    product = await getProductBySlug(slug);
+    // Use getProduct which fetches by ID (the slug parameter is actually the ID)
+    product = await getProduct(slug);
   } catch (err) {
     console.error('Failed to fetch product:', err);
     error = err instanceof Error ? err.message : 'Failed to load product';

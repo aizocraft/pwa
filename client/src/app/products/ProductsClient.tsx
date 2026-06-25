@@ -15,7 +15,7 @@
  * - Multiple sort options (featured, price, rating, name)
  * - Grid and list view modes
  * - Pagination with page numbers
- * - Rich text rendering for product descriptions
+ * - Rich text rendering for product descriptions (list view only)
  * - Persistent URL state for shareable filters
  * - Cart integration with floating cart button
  * - Excludes Labour, Transport, and Other categories
@@ -802,30 +802,19 @@ export default function ProductsClient() {
             </button>
           </div>
         ) : viewMode === 'grid' ? (
-          // Grid View - Product Cards with Rich Text Description
+          // Grid View - Product Cards only (no description)
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filteredProducts.map((product) => (
-              <div key={product._id} className="group">
-                <ProductCard product={product} />
-                {/* Rich Text Description - Shows below the card in grid view */}
-                {product.description && (
-                  <div className="mt-2 px-2 text-xs text-gray-600 dark:text-gray-400 line-clamp-6">
-                    <RichTextRenderer 
-                      content={product.description} 
-                      className="prose prose-xs max-w-none [&>p]:mb-1 [&>p]:text-xs"
-                    />
-                  </div>
-                )}
-              </div>
+              <ProductCard key={product._id} product={product} />
             ))}
           </div>
         ) : (
-          // List View - Full width product cards
+          // List View - Full width product cards with Rich Text Description
           <div className="space-y-4">
             {filteredProducts.map((product) => (
               <div key={product._id}>
-                <ProductCard key={product._id} product={product} variant="list" />
-                {/* Rich Text Description - Shows below the card in list view */}
+                <ProductCard product={product} variant="list" />
+                {/* Rich Text Description - Shows below the card in list view only */}
                 {product.description && (
                   <div className="mt-1 px-4 text-sm text-gray-600 dark:text-gray-400">
                     <RichTextRenderer 
