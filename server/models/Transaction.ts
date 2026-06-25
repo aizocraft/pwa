@@ -44,7 +44,10 @@ export interface ITransaction extends Document {
   updatedAt: Date;
 }
 
-interface TransactionModel extends Model<ITransaction> {}
+// ✅ FIX: Add the static methods to the interface
+interface TransactionModel extends Model<ITransaction> {
+  generateTransactionId(prefix?: string, source?: string): string;
+}
 
 const transactionSchema = new Schema<ITransaction, TransactionModel>({
   orderId: { 
@@ -205,7 +208,7 @@ transactionSchema.index({ paymentMethod: 1, status: 1 });
 transactionSchema.index({ source: 1, status: 1 });
 
 // Virtual for formatted amount
-transactionSchema.virtual('formattedAmount').get(function() {
+transactionSchema.virtual('formattedAmount').get(function(this: ITransaction) {
   return new Intl.NumberFormat('en-KE', {
     style: 'currency',
     currency: this.currency || 'KES'
@@ -213,12 +216,12 @@ transactionSchema.virtual('formattedAmount').get(function() {
 });
 
 // Virtual for isRefund
-transactionSchema.virtual('isRefund').get(function() {
+transactionSchema.virtual('isRefund').get(function(this: ITransaction) {
   return this.status === 'refunded' || this.amount < 0;
 });
 
 // Pre-save middleware to ensure orderNumber is populated
-transactionSchema.pre('save', async function(next) {
+transactionSchema.pre('save', async function(this: ITransaction, next) {
   // If orderId is present but orderNumber is missing, fetch it
   if (this.orderId && !this.orderNumber) {
     try {
@@ -240,7 +243,7 @@ transactionSchema.pre('save', async function(next) {
   next();
 });
 
-// Static method to generate transaction ID
+// ✅ Static method to generate transaction ID
 transactionSchema.statics.generateTransactionId = function(
   prefix: string = 'TXN',
   source: string = 'manual'

@@ -172,7 +172,8 @@ export class PaymentService {
     
     await transaction.save();
     
-    if (status === 'completed') {
+    // ✅ FIX: Check if orderId exists before updating
+    if (status === 'completed' && transaction.orderId) {
       await this.updateOrderPaymentSummary(transaction.orderId.toString());
     }
     
