@@ -88,8 +88,8 @@ export default function AddProductPage() {
     rating: 0,
   });
 
-  // Rich text description - updates on blur only to prevent auto-save issues
-  const [descriptionDraft, setDescriptionDraft] = useState<string>(formData.description || '');
+  // Rich text description - stores HTML content for live preview, only saved on submit
+  const [descriptionHTML, setDescriptionHTML] = useState<string>(formData.description || '');
 
   // Helper states
   const [newTag, setNewTag] = useState('');
@@ -134,9 +134,10 @@ export default function AddProductPage() {
     }));
   };
 
-  // Update formData.description when user leaves the rich text editor
-  const handleDescriptionBlur = (content: string) => {
-    setFormData(prev => ({ ...prev, description: content }));
+  // Handle description changes from editor - live preview, no save
+  const handleDescriptionChange = (content: string, isEmpty: boolean) => {
+    setDescriptionHTML(content);
+    // Update character count display
   };
 
   // ==================== BRANDS ====================
@@ -262,7 +263,7 @@ export default function AddProductPage() {
         price: Number(formData.price),
         buyingPrice: Number(formData.buyingPrice),
         compareAtPrice: formData.compareAtPrice ? Number(formData.compareAtPrice) : undefined,
-        description: formData.description, // Updated on blur
+        description: descriptionHTML, // ✅ Only saved on submit
         specs: formData.specs,
         stock: Number(formData.stock),
         tags: formData.tags,
@@ -407,6 +408,7 @@ export default function AddProductPage() {
                       <option value="Water Pumps">Water Pumps</option>
                       <option value="Cables & Connectors">Cables & Connectors</option>
                       <option value="Solar Lights">Solar Lights</option>
+                      <option value="Solar Water Heaters">Solar Water Heaters</option>
                       <option value="Generators">Generators</option>
                       <option value="Accessories">Accessories</option>
                       <option value="Labour">Labour</option>
@@ -612,18 +614,14 @@ export default function AddProductPage() {
               </div>
             </div>
             <div className="p-5 sm:p-6">
-              {/* Rich Text Editor - Updates formData.description on blur */}
+              {/* Rich Text Editor - Live preview, no auto-save */}
               <RichTextEditor
-                initialValue={descriptionDraft}
+                initialValue={descriptionHTML}
                 placeholder="Write a detailed description with rich formatting..."
-                onBlur={handleDescriptionBlur}
-                onChange={(content) => {
-                  // Update draft for character count display
-                  setDescriptionDraft(content);
-                }}
+                onChange={handleDescriptionChange}
               />
               <p className="text-xs text-gray-500 mt-2">
-                {descriptionDraft.length} characters
+                {descriptionHTML.length} characters
               </p>
             </div>
           </div>

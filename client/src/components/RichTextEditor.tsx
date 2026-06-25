@@ -1,3 +1,4 @@
+// src/components/RichTextEditor.tsx
 'use client'
 
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -47,13 +48,18 @@ export interface RichTextEditorHandle {
 }
 
 interface RichTextEditorProps {
+  /** Initial HTML content for the editor */
   initialValue?: string
+  /** Placeholder text when empty */
   placeholder?: string
+  /** Additional CSS classes */
   className?: string
+  /** Read-only mode */
   readOnly?: boolean
+  /** Called when editor is ready */
   onReady?: (handle: RichTextEditorHandle) => void
+  /** Called whenever content changes - for live preview */
   onChange?: (content: string, isEmpty: boolean) => void
-  onBlur?: (content: string) => void
 }
 
 interface ToolbarButtonProps {
@@ -93,18 +99,14 @@ export default function RichTextEditor({
   readOnly = false,
   onReady,
   onChange,
-  onBlur,
 }: RichTextEditorProps) {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [linkText, setLinkText] = useState('')
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
   const [selectedColor, setSelectedColor] = useState('#000000')
-  const [isFocused, setIsFocused] = useState(false)
 
-  const initialValueRef = useRef(initialValue)
   const didInitRef = useRef(false)
-  const isInternalUpdateRef = useRef(false)
 
   const editor = useEditor({
     extensions: [
@@ -158,20 +160,8 @@ export default function RichTextEditor({
       const html = editor.getHTML()
       const isEmpty = !html || html.trim() === '' || html.trim() === '<p></p>'
       
-      // Only trigger onChange if this is NOT an internal update (like formatting)
-      if (!isInternalUpdateRef.current) {
-        onChange?.(html, isEmpty)
-      }
-      // Reset the flag after the update
-      isInternalUpdateRef.current = false
-    },
-    onFocus: () => {
-      setIsFocused(true)
-    },
-    onBlur: ({ editor }) => {
-      setIsFocused(false)
-      const html = editor.getHTML()
-      onBlur?.(html)
+      // Always trigger onChange for live preview - parent decides when to save
+      onChange?.(html, isEmpty)
     },
     editorProps: {
       attributes: {
@@ -186,7 +176,6 @@ export default function RichTextEditor({
     if (didInitRef.current) return
     
     didInitRef.current = true
-    initialValueRef.current = initialValue
 
     const handle = {
       getHTML: () => editor.getHTML(),
@@ -199,9 +188,9 @@ export default function RichTextEditor({
     onReady?.(handle)
     const isEmpty = handle.isEmpty()
     onChange?.(editor.getHTML(), isEmpty)
-  }, [editor, initialValue, onReady, onChange])
+  }, [editor, onReady, onChange])
 
-  // Update content when initialValue changes (but only if editor is empty or initial load)
+  // Update content when initialValue changes (for loading existing product)
   useEffect(() => {
     if (!editor) return
     if (readOnly) return
@@ -210,8 +199,8 @@ export default function RichTextEditor({
     const currentHTML = editor.getHTML()
     const isCurrentlyEmpty = !currentHTML || currentHTML.trim() === '' || currentHTML.trim() === '<p></p>'
 
+    // Only update if editor is empty and initialValue is provided
     if (isCurrentlyEmpty && initialValue && initialValue !== currentHTML) {
-      isInternalUpdateRef.current = true
       editor.commands.setContent(initialValue)
     }
   }, [initialValue, editor, readOnly])
@@ -237,13 +226,6 @@ export default function RichTextEditor({
     []
   )
 
-  // Wrapper for editor commands that should NOT trigger onChange
-  const executeCommand = (commandFn: () => void) => {
-    isInternalUpdateRef.current = true
-    commandFn()
-    // The flag will be reset in onUpdate
-  }
-
   if (!editor) {
     return (
       <div
@@ -257,26 +239,24 @@ export default function RichTextEditor({
   const setLink = () => {
     if (!linkUrl) return
 
-    executeCommand(() => {
-      if (linkText) {
-        editor
-          .chain()
-          .focus()
-          .insertContent({
-            type: 'text',
-            text: linkText,
-            marks: [
-              {
-                type: 'link',
-                attrs: { href: linkUrl },
-              },
-            ],
-          })
-          .run()
-      } else {
-        editor.chain().focus().setLink({ href: linkUrl }).run()
-      }
-    })
+    if (linkText) {
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: 'text',
+          text: linkText,
+          marks: [
+            {
+              type: 'link',
+              attrs: { href: linkUrl },
+            },
+          ],
+        })
+        .run()
+    } else {
+      editor.chain().focus().setLink({ href: linkUrl }).run()
+    }
 
     setLinkUrl('')
     setLinkText('')
@@ -286,9 +266,7 @@ export default function RichTextEditor({
   const addImage = () => {
     const url = window.prompt('Enter image URL:')
     if (url) {
-      executeCommand(() => {
-        editor.chain().focus().setImage({ src: url }).run()
-      })
+      editor.chain().focus().setImage({ src: url }).run()
     }
   }
 
@@ -296,33 +274,34 @@ export default function RichTextEditor({
     <div
       className={`rich-text-editor border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900 shadow-sm ${className}`}
     >
+      {/* Toolbar */}
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-0.5 p-2 bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 backdrop-blur-sm">
           {/* Headings */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleHeading({ level: 1 }).run())}
+              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
               isActive={editor.isActive('heading', { level: 1 })}
               title="Heading 1"
             >
               <Heading1 className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleHeading({ level: 2 }).run())}
+              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
               isActive={editor.isActive('heading', { level: 2 })}
               title="Heading 2"
             >
               <Heading2 className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleHeading({ level: 3 }).run())}
+              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
               isActive={editor.isActive('heading', { level: 3 })}
               title="Heading 3"
             >
               <Heading3 className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleHeading({ level: 4 }).run())}
+              onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
               isActive={editor.isActive('heading', { level: 4 })}
               title="Heading 4"
             >
@@ -333,35 +312,35 @@ export default function RichTextEditor({
           {/* Text formatting */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleBold().run())}
+              onClick={() => editor.chain().focus().toggleBold().run()}
               isActive={editor.isActive('bold')}
               title="Bold"
             >
               <Bold className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleItalic().run())}
+              onClick={() => editor.chain().focus().toggleItalic().run()}
               isActive={editor.isActive('italic')}
               title="Italic"
             >
               <Italic className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleUnderline().run())}
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
               isActive={editor.isActive('underline')}
               title="Underline"
             >
               <UnderlineIcon className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleStrike().run())}
+              onClick={() => editor.chain().focus().toggleStrike().run()}
               isActive={editor.isActive('strike')}
               title="Strikethrough"
             >
               <Strikethrough className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleHighlight().run())}
+              onClick={() => editor.chain().focus().toggleHighlight().run()}
               isActive={editor.isActive('highlight')}
               title="Highlight"
             >
@@ -375,13 +354,11 @@ export default function RichTextEditor({
               <select
                 onChange={(e) => {
                   const value = e.target.value
-                  executeCommand(() => {
-                    if (value === 'inherit') {
-                      editor.chain().focus().unsetFontFamily().run()
-                    } else {
-                      editor.chain().focus().setFontFamily(value).run()
-                    }
-                  })
+                  if (value === 'inherit') {
+                    editor.chain().focus().unsetFontFamily().run()
+                  } else {
+                    editor.chain().focus().setFontFamily(value).run()
+                  }
                 }}
                 className="px-2 py-1 text-xs bg-transparent border border-gray-200 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
                 title="Font Family"
@@ -418,9 +395,7 @@ export default function RichTextEditor({
                         key={color}
                         onClick={() => {
                           setSelectedColor(color)
-                          executeCommand(() => {
-                            editor.chain().focus().setColor(color).run()
-                          })
+                          editor.chain().focus().setColor(color).run()
                           setIsColorPickerOpen(false)
                         }}
                         className="w-8 h-8 rounded-full hover:scale-110 transition-transform border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600"
@@ -431,9 +406,7 @@ export default function RichTextEditor({
                   <button
                     type="button"
                     onClick={() => {
-                      executeCommand(() => {
-                        editor.chain().focus().unsetColor().run()
-                      })
+                      editor.chain().focus().unsetColor().run()
                       setIsColorPickerOpen(false)
                     }}
                     className="mt-2 w-full text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
@@ -448,21 +421,21 @@ export default function RichTextEditor({
           {/* Lists */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleBulletList().run())}
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
               isActive={editor.isActive('bulletList')}
               title="Bullet List"
             >
               <List className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleOrderedList().run())}
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
               isActive={editor.isActive('orderedList')}
               title="Numbered List"
             >
               <ListOrdered className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleTaskList().run())}
+              onClick={() => editor.chain().focus().toggleTaskList().run()}
               isActive={editor.isActive('taskList')}
               title="Task List"
             >
@@ -473,14 +446,14 @@ export default function RichTextEditor({
           {/* Block elements */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().toggleBlockquote().run())}
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
               isActive={editor.isActive('blockquote')}
               title="Blockquote"
             >
               <Quote className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().setHorizontalRule().run())}
+              onClick={() => editor.chain().focus().setHorizontalRule().run()}
               title="Divider"
             >
               <Minus className="w-4 h-4" />
@@ -504,28 +477,28 @@ export default function RichTextEditor({
           {/* Alignment */}
           <div className="flex items-center gap-0.5 mr-1 border-r border-gray-200 dark:border-gray-700 pr-1.5">
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().setTextAlign('left').run())}
+              onClick={() => editor.chain().focus().setTextAlign('left').run()}
               isActive={editor.isActive({ textAlign: 'left' })}
               title="Align Left"
             >
               <AlignLeft className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().setTextAlign('center').run())}
+              onClick={() => editor.chain().focus().setTextAlign('center').run()}
               isActive={editor.isActive({ textAlign: 'center' })}
               title="Align Center"
             >
               <AlignCenter className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().setTextAlign('right').run())}
+              onClick={() => editor.chain().focus().setTextAlign('right').run()}
               isActive={editor.isActive({ textAlign: 'right' })}
               title="Align Right"
             >
               <AlignRight className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => executeCommand(() => editor.chain().focus().setTextAlign('justify').run())}
+              onClick={() => editor.chain().focus().setTextAlign('justify').run()}
               isActive={editor.isActive({ textAlign: 'justify' })}
               title="Justify"
             >
@@ -535,16 +508,17 @@ export default function RichTextEditor({
 
           {/* Undo/Redo */}
           <div className="flex items-center gap-0.5">
-            <ToolbarButton onClick={() => executeCommand(() => editor.chain().focus().undo().run())} title="Undo">
+            <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo">
               <Undo className="w-4 h-4" />
             </ToolbarButton>
-            <ToolbarButton onClick={() => executeCommand(() => editor.chain().focus().redo().run())} title="Redo">
+            <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo">
               <Redo className="w-4 h-4" />
             </ToolbarButton>
           </div>
         </div>
       )}
 
+      {/* Link Modal */}
       {isLinkModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl">
@@ -594,6 +568,7 @@ export default function RichTextEditor({
         </div>
       )}
 
+      {/* Editor Content */}
       <EditorContent editor={editor} className={readOnly ? 'bg-gray-50/50 dark:bg-gray-800/30' : ''} />
 
       <style jsx global>{`
@@ -789,11 +764,6 @@ export default function RichTextEditor({
           outline-offset: 2px;
         }
 
-        .rich-text-editor .ProseMirror img.ProseMirror-selectednode {
-          outline: 2px solid #3b82f6;
-          outline-offset: 2px;
-        }
-
         .dark .rich-text-editor .ProseMirror {
           color: #e2e8f0;
         }
@@ -809,20 +779,8 @@ export default function RichTextEditor({
           cursor: default;
         }
 
-        .rich-text-editor .ProseMirror .ProseMirror-gapcursor {
-          display: none;
-        }
-
         .rich-text-editor .ProseMirror ::selection {
           background: rgba(59, 130, 246, 0.3);
-        }
-
-        .rich-text-editor .ProseMirror li {
-          margin: 0.15rem 0;
-        }
-
-        .rich-text-editor .ProseMirror li p {
-          margin: 0;
         }
 
         @media (max-width: 640px) {

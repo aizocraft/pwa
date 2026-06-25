@@ -1,3 +1,4 @@
+// src/app/[slug]/page.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
@@ -39,6 +40,7 @@ import { cn, formatCurrency } from '../../lib/utils';
 import ReviewComponent from '../../components/Review';
 import OrderToWhatsApp from '../../components/OrderToWhatsApp';
 import RichTextRenderer from '@/components/RichTextRenderer';
+
 // Animation variants
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -164,16 +166,22 @@ export default function ProductDetail() {
   const currentImageUrl = getProductImageUrl(product, selectedImage) || '/placeholder-product.jpg';
   const hasMultipleImages = product.images && product.images.length > 1;
 
+  // Calculate discount percentage
+  const discountPercent = product.compareAtPrice 
+    ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
+    : 0;
+
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
           
-          {/* Breadcrumb - Compact */}
+          {/* Breadcrumb */}
           <motion.nav 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm mb-4 sm:mb-6 overflow-x-auto pb-2 scrollbar-thin"
+            aria-label="Breadcrumb"
           >
             <Link href="/" className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors whitespace-nowrap">
               Home
@@ -183,12 +191,14 @@ export default function ProductDetail() {
               Products
             </Link>
             <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
-            <span className="text-gray-900 dark:text-gray-100 font-medium truncate">{product.name}</span>
+            <span className="text-gray-900 dark:text-gray-100 font-medium truncate" aria-current="page">
+              {product.name}
+            </span>
           </motion.nav>
 
           <div className="grid lg:grid-cols-2 gap-6 lg:gap-10 xl:gap-12">
             
-            {/* Left Column - Images (Improved) */}
+            {/* Left Column - Images */}
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -219,7 +229,14 @@ export default function ProductDetail() {
                   unoptimized={true}
                 />
                 
-                {/* Zoom Button - Only show if no error */}
+                {/* Discount Badge */}
+                {discountPercent > 0 && (
+                  <div className="absolute top-3 right-3 sm:top-4 sm:right-4 px-2 py-1 sm:px-3 sm:py-1.5 bg-red-500 text-white text-xs sm:text-sm font-bold rounded-full shadow-lg z-20">
+                    -{discountPercent}%
+                  </div>
+                )}
+                
+                {/* Zoom Button */}
                 {!imageErrors[selectedImage] && (
                   <button
                     onClick={() => {
@@ -239,7 +256,7 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* Thumbnails - Horizontal Scroll on Mobile */}
+              {/* Thumbnails */}
               {hasMultipleImages && (
                 <div className="relative">
                   <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-thin px-0.5">
@@ -260,10 +277,11 @@ export default function ProductDetail() {
                               ? 'ring-2 ring-blue-500 shadow-lg' 
                               : 'ring-1 ring-gray-200 dark:ring-gray-700 hover:ring-blue-300 dark:hover:ring-blue-700 opacity-70 hover:opacity-100'
                           )}
+                          aria-label={`View ${product.name} image ${index + 1}`}
                         >
                           <Image
                             src={thumbnailImageErrors[index] ? '/placeholder-product.jpg' : thumbUrl}
-                            alt={`${product.name} view ${index + 1}`}
+                            alt={`${product.name} - view ${index + 1}`}
                             fill
                             className="object-cover"
                             sizes="80px"
@@ -274,14 +292,11 @@ export default function ProductDetail() {
                       );
                     })}
                   </div>
-                  {hasMultipleImages && product.images.length > 4 && (
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 bg-gradient-to-l from-gray-100 to-transparent dark:from-gray-800 w-8 h-full pointer-events-none sm:hidden" />
-                  )}
                 </div>
               )}
             </motion.div>
 
-            {/* Right Column - Product Info (Compact) */}
+            {/* Right Column - Product Info */}
             <motion.div 
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -308,7 +323,7 @@ export default function ProductDetail() {
                   )}
                 </div>
 
-                {/* Rating - Compact */}
+                {/* Rating */}
                 <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                   <div className="flex items-center gap-0.5">
                     {[...Array(5)].map((_, i) => (
@@ -352,31 +367,7 @@ export default function ProductDetail() {
                 )}
               </div>
 
-              {/* Quick Actions */}
-              <div className="flex gap-2">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setIsWishlisted(!isWishlisted)}
-                  className={cn(
-                    'p-2 rounded-xl border-2 transition-all',
-                    isWishlisted 
-                      ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-500' 
-                      : 'border-gray-200 dark:border-gray-700 hover:border-red-300 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/10'
-                  )}
-                >
-                  <Heart className={cn('w-4 h-4 sm:w-5 sm:h-5', isWishlisted && 'fill-current')} />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="p-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all"
-                >
-                  <Share2 className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
-                </motion.button>
-              </div>
-
-              {/* Quantity and Add to Cart - Compact */}
+              {/* Quantity and Add to Cart */}
               {isInStock && (
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -388,6 +379,7 @@ export default function ProductDetail() {
                         onClick={() => setQty(Math.max(1, qty - 1))}
                         className="w-8 h-8 sm:w-10 sm:h-10 rounded-l-lg sm:rounded-l-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center disabled:opacity-50"
                         disabled={qty <= 1}
+                        aria-label="Decrease quantity"
                       >
                         <Minus className={cn('w-3.5 h-3.5 sm:w-4 sm:h-4', qty <= 1 ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300')} />
                       </button>
@@ -398,6 +390,7 @@ export default function ProductDetail() {
                         onClick={() => setQty(Math.min(product.stock, qty + 1))}
                         className="w-8 h-8 sm:w-10 sm:h-10 rounded-r-lg sm:rounded-r-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center disabled:opacity-50"
                         disabled={qty >= product.stock}
+                        aria-label="Increase quantity"
                       >
                         <Plus className={cn('w-3.5 h-3.5 sm:w-4 sm:h-4', qty >= product.stock ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300')} />
                       </button>
@@ -406,6 +399,7 @@ export default function ProductDetail() {
                     <button
                       onClick={handleAddToCart}
                       className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 px-4 sm:py-2.5 sm:px-6 rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1.5 sm:gap-2 shadow-md hover:shadow-lg text-sm sm:text-base"
+                      aria-label={`Add ${qty} ${product.name} to cart`}
                     >
                       <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                       {itemQty > 0 ? `Add More (${itemQty})` : 'Add to Cart'}
@@ -440,22 +434,7 @@ export default function ProductDetail() {
                 </div>
               )}
 
-              {/* Delivery Info - Compact Grid */}
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-1 sm:pt-2">
-                {[
-                  { icon: Truck, label: 'Free Shipping', desc: 'Over KES 5000' },
-                  { icon: Shield, label: 'Secure Payment', desc: '100% secure' },
-                  { icon: RefreshCw, label: 'Easy Returns', desc: '7 days policy' },
-                ].map((item, idx) => (
-                  <div key={idx} className="p-1.5 sm:p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg sm:rounded-xl text-center">
-                    <item.icon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400 mx-auto mb-0.5 sm:mb-1" />
-                    <p className="text-[10px] sm:text-xs font-medium text-gray-900 dark:text-white">{item.label}</p>
-                    <p className="text-[8px] sm:text-[10px] text-gray-500 dark:text-gray-400 hidden sm:block">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Tabs - Compact */}
+              {/* Tabs */}
               <div className="pt-2 sm:pt-3">
                 <div className="flex gap-0.5 sm:gap-1 border-b border-gray-200 dark:border-gray-800">
                   {(['description', 'specs', 'shipping'] as const).map((tab) => (
@@ -468,9 +447,10 @@ export default function ProductDetail() {
                           ? 'text-blue-600 dark:text-blue-400' 
                           : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                       )}
+                      aria-current={activeTab === tab ? 'page' : undefined}
                     >
                       {tab === 'description' && 'Description'}
-                      {tab === 'specs' && 'Specs'}
+                      {tab === 'specs' && 'Specifications'}
                       {tab === 'shipping' && 'Shipping'}
                       {activeTab === tab && (
                         <motion.div
@@ -558,7 +538,7 @@ export default function ProductDetail() {
             <ReviewComponent productId={product._id!} productName={product.name} />
           </motion.div>
 
-          {/* Related Products - Compact Grid */}
+          {/* Related Products */}
           {relatedProducts && relatedProducts.products && relatedProducts.products.filter(p => p._id !== product._id).length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -619,7 +599,7 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* Lightbox Modal - Improved */}
+      {/* Lightbox Modal */}
       <AnimatePresence>
         {isLightbox && lightboxImg && (
           <motion.div
@@ -645,7 +625,7 @@ export default function ProductDetail() {
             >
               <Image
                 src={lightboxImg}
-                alt="Product zoom view"
+                alt={`${product.name} - zoom view`}
                 fill
                 className="object-contain"
                 sizes="90vw"
