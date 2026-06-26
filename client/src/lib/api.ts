@@ -404,20 +404,60 @@ export async function getBrands(): Promise<string[]> {
   return response.data;
 }
 
-// src/lib/api.ts - Add this function (place it after getBrands)
+export async function getProduct(idOrSlug: string): Promise<Product> {
+  if (!idOrSlug || typeof idOrSlug !== 'string') {
+    throw new Error('Product ID or slug is required');
+  }
 
-/**
- * Get a single product by its slug (SEO-friendly URL)
- * 
- * @param slug - Product slug string (e.g., 'solar-panel-100w')
- * @returns Product object with all product details
- * 
- * @example
- * const product = await getProductBySlug('solar-panel-100w');
- */
-export async function getProductBySlug(slug: string): Promise<Product> {
+  const trimmed = idOrSlug.trim();
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(trimmed);
+  
   try {
-    const response = await api.get(`/products/slug/${slug}`);
+    let response;
+    
+    if (isObjectId) {
+      response = await api.get(`/products/${trimmed}`);
+      return response.data;
+    } else {
+      const isValidSlug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(trimmed);
+      if (!isValidSlug) {
+        console.warn(`Invalid slug format: "${trimmed}", attempting anyway...`);
+      }
+      
+      response = await api.get(`/products/slug/${trimmed}`);
+      return response.data;
+    }
+  } catch (error: any) {
+    console.error(`Failed to fetch product by "${idOrSlug}":`, error);
+    
+    if (error.response?.status === 404) {
+      try {
+        if (isObjectId) {
+          const response = await api.get(`/products/slug/${trimmed}`);
+          return response.data;
+        } else {
+          if (trimmed.length === 24) {
+            const response = await api.get(`/products/${trimmed}`);
+            return response.data;
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+        throw new Error(`Product not found: ${idOrSlug}`);
+      }
+    }
+    
+    throw error;
+  }
+}
+
+export async function getProductBySlug(slug: string): Promise<Product> {
+  if (!slug || typeof slug !== 'string') {
+    throw new Error('Product slug is required');
+  }
+  
+  try {
+    const response = await api.get(`/products/slug/${encodeURIComponent(slug)}`);
     return response.data;
   } catch (error: any) {
     console.error(`Failed to fetch product by slug "${slug}":`, error);
@@ -425,36 +465,21 @@ export async function getProductBySlug(slug: string): Promise<Product> {
   }
 }
 
-// src/lib/api.ts
-
-export async function getProduct(idOrSlug: string): Promise<Product> {
-  // Check if it looks like a MongoDB ObjectId (24 hex characters)
-  const isObjectId = /^[0-9a-fA-F]{24}$/.test(idOrSlug);
+export async function getProductById(id: string): Promise<Product> {
+  if (!id || typeof id !== 'string') {
+    throw new Error('Product ID is required');
+  }
+  
+  if (!/^[0-9a-fA-F]{24}$/.test(id)) {
+    throw new Error('Invalid product ID format');
+  }
   
   try {
-    if (isObjectId) {
-      // It's an ID - use ID endpoint
-      const response = await api.get(`/products/${idOrSlug}`);
-      return response.data;
-    } else {
-      // It's a slug - use slug endpoint
-      const response = await api.get(`/products/slug/${idOrSlug}`);
-      return response.data;
-    }
+    const response = await api.get(`/products/${id}`);
+    return response.data;
   } catch (error: any) {
-    // Fallback: try the other method
-    try {
-      if (isObjectId) {
-        const response = await api.get(`/products/slug/${idOrSlug}`);
-        return response.data;
-      } else {
-        const response = await api.get(`/products/${idOrSlug}`);
-        return response.data;
-      }
-    } catch (fallbackError) {
-      console.error('Failed to fetch product:', error);
-      throw error;
-    }
+    console.error(`Failed to fetch product by ID "${id}":`, error);
+    throw error;
   }
 }
 
