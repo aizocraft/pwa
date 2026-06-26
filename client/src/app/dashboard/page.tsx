@@ -54,7 +54,7 @@ interface StatCardData {
   name: string
   value: string | number
   change?: string
-  icon: any
+  icon?: any
   color: string
   trend?: 'up' | 'down'
   subtitle?: string
@@ -122,44 +122,38 @@ const getPaymentStatusBadge = (order: any) => {
   }
 }
 
-// ==================== PREMIUM STAT CARD ====================
+// ==================== PREMIUM STAT CARD (NO ICON) ====================
 function PremiumStatCard({ stat }: { stat: StatCardData }) {
-  const Icon = stat.icon
   const isPositive = stat.trend === 'up'
   const TrendIcon = stat.trend === 'up' ? TrendingUp : stat.trend === 'down' ? TrendingDown : null
   
   return (
-    <div className="relative bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-xl transition-all duration-300 p-6 hover:-translate-y-1 overflow-hidden group">
+    <div className="relative bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-xl transition-all duration-300 p-6 hover:-translate-y-1 overflow-hidden group min-h-[140px] flex flex-col justify-center">
       {/* Gradient Background */}
       <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
       
       {/* Decorative Ring */}
       <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full bg-gradient-to-br ${stat.color} opacity-10 group-hover:opacity-20 transition-opacity duration-300`} />
       
-      <div className="relative flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-            {stat.name}
-          </p>
-          <p className={`text-3xl sm:text-4xl font-bold ${stat.valueColor || 'text-gray-900 dark:text-white'} truncate`}>
-            {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
-          </p>
-          {stat.subtitle && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 font-medium">{stat.subtitle}</p>
-          )}
-          {stat.change && stat.trend && TrendIcon && (
-            <div className="flex items-center gap-1.5 mt-2">
-              <TrendIcon className={`w-4 h-4 ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`} />
-              <span className={`text-sm font-semibold ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-                {stat.change}
-              </span>
-              <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">vs last month</span>
-            </div>
-          )}
-        </div>
-        <div className={`bg-gradient-to-br ${stat.color} p-3.5 rounded-2xl shadow-lg shrink-0 ml-3 group-hover:scale-110 transition-transform duration-300`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
+      <div className="relative">
+        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+          {stat.name}
+        </p>
+        <p className={`text-3xl sm:text-4xl font-bold ${stat.valueColor || 'text-gray-900 dark:text-white'} truncate`}>
+          {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
+        </p>
+        {stat.subtitle && (
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 font-medium">{stat.subtitle}</p>
+        )}
+        {stat.change && stat.trend && TrendIcon && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <TrendIcon className={`w-4 h-4 ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`} />
+            <span className={`text-sm font-semibold ${isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
+              {stat.change}
+            </span>
+            <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">vs last month</span>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -262,8 +256,12 @@ function RecentOrderItem({ order }: { order: Order }) {
                order.paymentStatus === ('paid' as any) || 
                order.status === 'paid' || 
                order.status === 'delivered'
-  // ✅ Fix: Count actual items in the order
-  const itemCount = Array.isArray(order.items) ? order.items.length : 0
+  
+  // ✅ Calculate total items (sum of quantities, not just line items)
+  const totalItems = Array.isArray(order.items) 
+    ? order.items.reduce((sum, item) => sum + (item.qty || 0), 0) 
+    : 0
+  
   const orderNumber = order.orderNumber || `#${order._id?.slice(-8).toUpperCase()}`
   const totalAmount = typeof order.total === 'number' ? order.total : parseFloat(order.total || '0')
   
@@ -284,7 +282,7 @@ function RecentOrderItem({ order }: { order: Order }) {
             </div>
           </div>
           <p className="text-sm text-gray-900 dark:text-white mt-1 font-medium">
-            {itemCount} item{itemCount !== 1 ? 's' : ''}
+            {totalItems} item{totalItems !== 1 ? 's' : ''}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap">
             <span className="truncate">{customerName}</span>
@@ -349,49 +347,50 @@ export default function DashboardOverviewPage() {
   const activeCustomers = Number(summary?.activeCustomers) || 0
   const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0
 
-  // ✅ Build stats array with properly formatted values
-  const stats: StatCardData[] = dashboardStats.length > 0 ? dashboardStats : [
-    { 
-      name: 'Total Revenue', 
-      value: totalRevenue, 
-      change: summary?.revenueGrowth || '+0%', 
-      icon: DollarSign, 
-      color: 'from-emerald-500 to-green-600',
-      trend: totalRevenue > 0 ? 'up' : 'down',
-      subtitle: `${totalOrders} orders`,
-      valueColor: 'text-emerald-600 dark:text-emerald-400'
-    },
-    { 
-      name: 'Total Profit', 
-      value: totalProfit, 
-      change: summary?.profitGrowth || '+0%', 
-      icon: TrendingUp, 
-      color: 'from-blue-500 to-cyan-600',
-      trend: totalProfit > 0 ? 'up' : 'down',
-      subtitle: `Margin: ${profitMargin.toFixed(1)}%`,
-      valueColor: 'text-blue-600 dark:text-blue-400'
-    },
-    { 
-      name: 'Total Products', 
-      value: totalProducts, 
-      change: '+5.3%', 
-      icon: Package, 
-      color: 'from-purple-500 to-pink-600',
-      trend: totalProducts > 0 ? 'up' : 'down',
-      subtitle: `${lowStockProducts} low stock`,
-      valueColor: 'text-purple-600 dark:text-purple-400'
-    },
-    { 
-      name: 'Total Transactions', 
-      value: totalTransactions, 
-      change: '+15.7%', 
-      icon: CreditCard, 
-      color: 'from-orange-500 to-red-600',
-      trend: totalTransactions > 0 ? 'up' : 'down',
-      subtitle: `Avg: KSh ${totalTransactions > 0 ? (totalRevenue / totalTransactions).toLocaleString() : 0}`,
-      valueColor: 'text-orange-600 dark:text-orange-400'
-    },
-  ]
+  // ✅ Build stats array WITHOUT icons for top cards
+const stats: StatCardData[] = dashboardStats && Array.isArray(dashboardStats) && dashboardStats.length > 0 
+  ? dashboardStats.map((s: any) => ({ 
+      ...(typeof s === 'object' && s !== null ? s : {}), 
+      icon: undefined 
+    }))
+  : [
+      { 
+        name: 'Total Revenue', 
+        value: `KSh ${totalRevenue.toLocaleString()}`, 
+        change: summary?.revenueGrowth || '+0%', 
+        color: 'from-emerald-500 to-green-600',
+        trend: totalRevenue > 0 ? 'up' : 'down',
+        subtitle: `${totalOrders} orders`,
+        valueColor: 'text-emerald-600 dark:text-emerald-400'
+      },
+      { 
+        name: 'Total Profit', 
+        value: `KSh ${totalProfit.toLocaleString()}`, 
+        change: summary?.profitGrowth || '+0%', 
+        color: 'from-blue-500 to-cyan-600',
+        trend: totalProfit > 0 ? 'up' : 'down',
+        subtitle: `Margin: ${profitMargin.toFixed(1)}%`,
+        valueColor: 'text-blue-600 dark:text-blue-400'
+      },
+      { 
+        name: 'Total Products', 
+        value: totalProducts, 
+        change: '+5.3%', 
+        color: 'from-purple-500 to-pink-600',
+        trend: totalProducts > 0 ? 'up' : 'down',
+        subtitle: `${lowStockProducts} low stock`,
+        valueColor: 'text-purple-600 dark:text-purple-400'
+      },
+      { 
+        name: 'Total Transactions', 
+        value: totalTransactions, 
+        change: '+15.7%', 
+        color: 'from-orange-500 to-red-600',
+        trend: totalTransactions > 0 ? 'up' : 'down',
+        subtitle: `Avg: KSh ${totalTransactions > 0 ? (totalRevenue / totalTransactions).toLocaleString() : 0}`,
+        valueColor: 'text-orange-600 dark:text-orange-400'
+      },
+    ]
 
   // Loading state
   if (isLoading) {
@@ -460,7 +459,7 @@ export default function DashboardOverviewPage() {
         </button>
       </div>
 
-      {/* ==================== PREMIUM STATS CARDS ==================== */}
+      {/* ==================== PREMIUM STATS CARDS (NO ICONS) ==================== */}
       {stats.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {stats.map((stat, idx) => (
@@ -586,8 +585,8 @@ export default function DashboardOverviewPage() {
             </p>
           </div>
           <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Paid Orders</p>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-500 mt-1">{paidOrders.toLocaleString()}</p>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Active Customers</p>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-500 mt-1">{activeCustomers.toLocaleString()}</p>
           </div>
         </div>
       </div>

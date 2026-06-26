@@ -733,7 +733,7 @@ export default function RichTextEditor({
   // Render Helpers
   // --------------------------------------------------------------------------
 
-  const isContentEmpty = !editor.getHTML() || editor.getHTML().trim() === '' || editor.getHTML().trim() === '<p></p>'
+const isContentEmpty = !editor || !editor.getHTML() || editor.getHTML().trim() === '' || editor.getHTML().trim() === '<p></p>'
 
   // Show loading state while editor initializes
   if (!editor) {
