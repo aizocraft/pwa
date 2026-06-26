@@ -177,7 +177,7 @@ export default function SolarWaterHeatersClient() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-xl">
                 <Image
-                  src="/solar-heaters/solar-water-heaters-preview.png"
+                  src="/solar-heaters/solar_water_heaters-preview.png"
                   alt="Solar water heater installation"
                   fill
                   className="object-cover"

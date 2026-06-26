@@ -70,7 +70,7 @@ const solarServices = [
     description: 'Seven Stars solar water heaters. Save up to 85% on water heating costs with endless hot water.',
     icon: Droplets,
     features: ['70-90% Savings', '20-25 Year Lifespan', 'Low Maintenance', 'All-Weather'],
-    image: '/solar-heaters/solar-water-heaters.png',
+    image: '/solar-water-heaters.jpg',
     savings: '85%',
   },
   {
