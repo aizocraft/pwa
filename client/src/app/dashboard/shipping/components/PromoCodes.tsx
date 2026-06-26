@@ -62,7 +62,7 @@ export default function PromoCodes({ promoCodes, onUpdatePromoCodes }: PromoCode
       await reloadPromoCodes()
       setIsAddingPromo(false)
       setNewPromoData({ code: '', type: 'percent', value: 0, maxUses: 100, minSubtotal: 0, expiryDate: '' })
-      toast.success('Promo code created successfully')
+    
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create promo')
     } finally {
@@ -86,7 +86,7 @@ export default function PromoCodes({ promoCodes, onUpdatePromoCodes }: PromoCode
       })
       await reloadPromoCodes()
       setEditingPromo(null)
-      toast.success('Promo code updated successfully')
+
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update promo')
     } finally {
@@ -101,7 +101,7 @@ export default function PromoCodes({ promoCodes, onUpdatePromoCodes }: PromoCode
     try {
       await deletePromoCode(id)
       await reloadPromoCodes()
-      toast.success('Promo code deleted successfully')
+      
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to delete')
     } finally {

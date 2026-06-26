@@ -469,7 +469,7 @@ export default function SalesCustomers() {
     if (!confirm('Are you sure you want to delete this customer?')) return;
     try {
       await deleteSalesCustomer(id);
-      toast.success('Customer deleted successfully');
+
       fetchCustomers();
       fetchStats();
     } catch (error: any) {
@@ -480,7 +480,7 @@ export default function SalesCustomers() {
   const handleToggleStatus = async (id: string, status: 'active' | 'inactive') => {
     try {
       await toggleSalesCustomerStatus(id, status);
-      toast.success(`Customer ${status === 'active' ? 'activated' : 'deactivated'}`);
+     
       fetchCustomers();
       fetchStats();
     } catch (error: any) {

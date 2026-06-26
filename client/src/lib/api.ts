@@ -32,6 +32,54 @@ import type { ShippingArea, CreateShippingAreaRequest, UpdateShippingAreaRequest
 import type { PromoCode } from '@/types/order';
 import type { PeriodInfo, SalesCustomer, Supplier } from './sales';
 
+// src/lib/api.ts
+
+// ========== ADD THIS AFTER ALL IMPORTS ==========
+
+// List of reserved/placeholder names that should NOT be treated as product slugs
+const RESERVED_PLACEHOLDERS = [
+  'placeholder-product.png',
+  'placeholder-product.jpg',
+  'placeholder-product.jpeg',
+  'placeholder-product.svg',
+  'placeholder-solar.png',
+  'placeholder-solar.jpg',
+  'placeholder-solar.jpeg',
+  'placeholder-solar.svg',
+  'grid.svg',
+  'favicon.ico',
+  'placeholder.png',
+  'placeholder.jpg',
+  'no-image.png',
+  'default.png',
+  'thumbnail.png',
+  'avatar.png',
+];
+
+// Check if a string is a valid product identifier (not a placeholder)
+const isValidProductIdentifier = (idOrSlug: string): boolean => {
+  if (!idOrSlug || typeof idOrSlug !== 'string') return false;
+  const trimmed = idOrSlug.trim().toLowerCase();
+  if (trimmed === '') return false;
+  
+  // Check against reserved placeholders
+  if (RESERVED_PLACEHOLDERS.includes(trimmed)) {
+    return false;
+  }
+  
+  // Check if it looks like an image file
+  if (/\.(jpg|jpeg|png|gif|webp|svg|ico|avif|bmp|tiff|jfif)$/i.test(trimmed)) {
+    return false;
+  }
+  
+  // Check if it contains placeholder keywords
+  if (/placeholder|no-image|default|thumbnail|avatar|grid|favicon/i.test(trimmed)) {
+    return false;
+  }
+  
+  return true;
+};
+
 // ✅ FIX 1: Detect server vs client
 const isServer = typeof window === 'undefined';
 
@@ -335,18 +383,33 @@ export async function exportUsersToCSV(params?: { role?: string; isActive?: bool
 
 // ✅ FIX 4: Updated getImageUrl with server detection
 export const getImageUrl = (image: import('@/types/product').ProductImage): string => {
-  if ((image as any).type === 'url' && image.url) return image.url;
+  if (!image) return '/placeholder-product.png';
+  
+  // Handle URL type images
+  if ((image as any).type === 'url' && image.url) {
+    try {
+      // Validate URL
+      new URL(image.url);
+      return image.url;
+    } catch {
+      return '/placeholder-product.png';
+    }
+  }
+  
+  // Handle GridFS images
   if (image.type === 'gridfs' && image.fileId) {
     const baseUrl = isServer 
       ? process.env.API_BASE_URL || 'http://localhost:4000/api'
       : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
     return `${baseUrl}/products/image/${image.fileId}`;
   }
-  return '/placeholder.svg';
+  
+  // Fallback to placeholder
+  return '/placeholder-product.png';
 };
 
 export const getProductImageUrl = (product: import('@/types/product').Product, index: number = 0): string => {
-  if (!product?.images?.[index]) return '/placeholder-product.jpg';
+  if (!product?.images?.[index]) return '/placeholder-product.png';
   return getImageUrl(product.images[index]);
 };
 
@@ -424,6 +487,13 @@ export async function getProduct(idOrSlug: string): Promise<Product> {
   }
 
   const trimmed = idOrSlug.trim();
+  
+  // ✅ FIX: Skip if it's a placeholder/reserved name
+  if (!isValidProductIdentifier(trimmed)) {
+    console.warn(`Skipping product fetch for placeholder: "${trimmed}"`);
+    throw new Error(`Invalid product identifier: "${trimmed}" appears to be an image placeholder`);
+  }
+
   const isObjectId = /^[0-9a-fA-F]{24}$/.test(trimmed);
   
   try {
@@ -585,7 +655,7 @@ export async function updateProduct(slug: string, productData: Partial<Omit<Prod
       dataToSend.buyingPrice = typeof dataToSend.buyingPrice === 'string' ? parseFloat(dataToSend.buyingPrice) : dataToSend.buyingPrice;
     }
     const response = await api.put(`/products/slug/${slug}`, dataToSend);
-    toast.success('Product updated successfully');
+    
     return response.data;
   } catch (error: any) {
     toast.error(error.response?.data?.error || 'Failed to update product');

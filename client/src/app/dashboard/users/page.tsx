@@ -162,7 +162,6 @@ export default function UsersPage() {
       return
     }
     await toggleUserStatus.mutateAsync(user._id!)
-    toast.success(`User ${user.isActive ? 'deactivated' : 'activated'} successfully`)
   }
 
   const handleExportCSV = async () => {
@@ -566,12 +565,12 @@ export default function UsersPage() {
                           </td>
                         )}
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
-                              {user.name.charAt(0).toUpperCase()}
-                            </div>
+<div className="flex items-center gap-3">
+<div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+  {user.name ? user.name.charAt(0).toUpperCase() : '?'}
+</div>
                             <div>
-                              <div className="font-semibold text-gray-900 dark:text-white">{user.name}</div>
+                              <div className="font-semibold text-gray-900 dark:text-white">{user.name || 'Unnamed User'}</div>
                               <button
                                 onClick={() => copyUserId(user._id!)}
                                 className="text-xs text-gray-400 font-mono hover:text-blue-600 transition-colors flex items-center gap-1"
@@ -771,11 +770,11 @@ export default function UsersPage() {
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">
-                    {showUserDetails.name.charAt(0).toUpperCase()}
-                  </div>
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">
+                  {showUserDetails.name ? showUserDetails.name.charAt(0).toUpperCase() : '?'}
+                </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{showUserDetails.name}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{showUserDetails.name || 'Unnamed User'}</h3>
                     <p className="text-sm text-gray-500">{showUserDetails.email}</p>
                   </div>
                 </div>

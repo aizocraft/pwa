@@ -62,6 +62,8 @@ export async function generateInvoicePDF(
   const calculatedTotal = calculatedSubtotal - discountAmount + calculatedTax + transportCost;
   const amountPaid = invoice.amountPaid || 0;
   const balanceDue = calculatedTotal - amountPaid;
+  const paymentStatus = invoice.paymentStatus || 'unpaid';
+  const isPartiallyPaid = paymentStatus === 'partially_paid';
 
   function escapeHtml(str: string): string {
     if (!str) return '';
@@ -95,6 +97,20 @@ export async function generateInvoicePDF(
     } else {
       return '<span class="status-badge status-unpaid">! UNPAID</span>';
     }
+  };
+
+  // ✅ NEW: Get payment info for partially paid invoices
+  const getPaymentInfoHTML = () => {
+    if (!isPartiallyPaid) return '';
+    return `
+      <div class="payment-info-container">
+        <span class="payment-info-label">Amount Paid:</span>
+        <span class="payment-info-value">KES ${amountPaid.toLocaleString()}</span>
+        <span class="payment-info-divider">|</span>
+        <span class="payment-info-label">Balance Due:</span>
+        <span class="payment-info-value balance">KES ${balanceDue.toLocaleString()}</span>
+      </div>
+    `;
   };
 
   const getHeaderHTML = () => `
@@ -188,18 +204,18 @@ export async function generateInvoicePDF(
           <span class="grand-total-label">Total Amount</span>
           <span class="grand-total-amount">KES ${calculatedTotal.toLocaleString()}</span>
         </div>
-        ${amountPaid > 0 ? `
+        {/*
+        ${isPartiallyPaid ? `
           <div class="total-row paid-row">
             <span>Amount Paid</span>
-            <span class="paid-amount">-KES ${amountPaid.toLocaleString()}</span>
+            <span class="paid-amount">KES ${amountPaid.toLocaleString()}</span>
           </div>
-        ` : ''}
-        ${balanceDue > 0 ? `
           <div class="total-row balance-row">
             <span class="balance-label">Balance Due</span>
             <span class="balance-amount">KES ${balanceDue.toLocaleString()}</span>
           </div>
-        ` : ''}
+        ` : ''} 
+        */}
       </div>
     </div>
   `;
@@ -296,6 +312,7 @@ export async function generateInvoicePDF(
         
         <div class="status-badge-container">
           ${getPaymentStatusBadge()}
+          ${getPaymentInfoHTML()}
         </div>
         
         <div class="info-section">
@@ -409,6 +426,7 @@ export async function generateInvoicePDF(
         
         <div class="status-badge-container">
           ${getPaymentStatusBadge()}
+          ${getPaymentInfoHTML()}
         </div>
         
         ${(transportCost > 0 || transportDescription || estimatedDelivery) ? `
@@ -568,19 +586,54 @@ export async function generateInvoicePDF(
       }
       
       .status-badge-container {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 0px;
+        display: flex !important;
+        justify-content: flex-end !important;
+        align-items: center !important;
+        gap: 20px !important;
+        margin-bottom: 0px !important;
+        flex-wrap: wrap !important;
       }
       
       .status-badge {
         display: inline-block;
-        padding: 6px 16px 18px 16px; 
-        border-radius: 30px;
-        font-size: 13px;
-        font-weight: 700;
-        letter-spacing: 1px;
-        text-transform: uppercase;
+        padding: 6px 16px 18px 16px !important;
+        border-radius: 30px !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        letter-spacing: 1px !important;
+        text-transform: uppercase !important;
+      }
+      
+      .payment-info-container {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 6px 16px 18px 16px !important;
+        font-size: 14px !important;
+        background: #fef3c7 !important;
+        border-radius: 30px !important;
+        border: 1px solid #fcd34d !important;
+      }
+      
+      .payment-info-label {
+        font-weight: 600 !important;
+        color: #92400e !important;
+        font-size: 13px !important;
+      }
+      
+      .payment-info-value {
+        font-weight: 700 !important;
+        color: #92400e !important;
+        font-size: 14px !important;
+      }
+      
+      .payment-info-value.balance {
+        color: #b45309 !important;
+      }
+      
+      .payment-info-divider {
+        color: #d97706 !important;
+        font-weight: 300 !important;
       }
       
       .status-paid {
@@ -931,15 +984,12 @@ export async function generateInvoicePDF(
         flex-direction: column;
       }
 
-      .notes-title, .terms-title {
+      .notes-title {
         font-size: 13px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
         margin-bottom: 8px;
-      }
-
-      .notes-title {
         color: #b46f0b;
       }
 
@@ -962,6 +1012,11 @@ export async function generateInvoicePDF(
       }
 
       .terms-title {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
         color: #5a6e7c;
       }
 

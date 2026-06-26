@@ -422,10 +422,11 @@ function productRoutes(productModel: typeof ProductModel) {
    */
   router.put('/slug/:slug', authMiddleware, async (req: Request, res: Response) => {
     try {
-      if (!isAdmin(req)) {
-        return res.status(403).json({ error: 'Admin access required' });
+      const role = (req as any).user?.role;
+      if (role !== 'admin' && role !== 'sales') {
+        return res.status(403).json({ error: 'Admin or sales access required' });
       }
-      
+        
       const { slug } = req.params;
       const updateData = { ...req.body };
       

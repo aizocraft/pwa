@@ -1,4 +1,3 @@
-// src/components/ProductCard.tsx
 'use client'
 
 import Link from 'next/link';
@@ -10,6 +9,9 @@ import { cn, formatCurrency } from '../lib/utils';
 import { useState } from 'react';
 import { getImageUrl } from '../lib/api';
 import RichTextRenderer from '@/components/RichTextRenderer';
+
+// ✅ FIX: Use .png placeholder (matches your public folder)
+const PLACEHOLDER_IMAGE = '/placeholder-product.png';
 
 interface ProductCardProps {
   product: Product;
@@ -40,6 +42,29 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
   const isList = variant === 'list';
   const hasDiscount = typeof product.compareAtPrice === 'number' && product.compareAtPrice > product.price;
   const discountPercent = hasDiscount ? Math.round(((product.compareAtPrice! - product.price) / product.compareAtPrice!) * 100) : 0;
+
+  // ✅ FIX: Safe image URL getter with placeholder fallback
+  const getSafeImageUrl = (): string => {
+    try {
+      if (product.images?.[0]) {
+        const url = getImageUrl(product.images[0]);
+        // If URL is valid and not a placeholder
+        if (url && 
+            !url.includes('undefined') && 
+            !url.includes('null') &&
+            !url.includes('placeholder') &&
+            !url.includes('grid.svg') &&
+            !url.includes('favicon.ico')) {
+          return url;
+        }
+      }
+    } catch (e) {
+      console.warn('Image error for product:', product.slug);
+    }
+    return PLACEHOLDER_IMAGE;
+  };
+
+  const imageUrl = getSafeImageUrl();
 
   return (
     <Link href={`/${product.slug}`} className="block">
@@ -76,16 +101,7 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
               <div className="absolute inset-0 bg-gray-100 dark:bg-gray-800 animate-pulse" />
             )}
             <Image
-              src={(() => {
-                try {
-                  if (product.images?.[0]) {
-                    return getImageUrl(product.images[0]);
-                  }
-                } catch (e) {
-                  console.warn('Image error:', e);
-                }
-                return '/placeholder-solar.jpg';
-              })()}
+              src={imageUrl}
               alt={product.name}
               fill
               className={cn(
@@ -96,7 +112,8 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
               onLoad={() => setImageLoaded(true)}
               onError={(e) => {
                 setImageLoaded(true);
-                (e.target as HTMLImageElement).src = '/placeholder-solar.jpg';
+                // ✅ FIX: Use .png placeholder
+                (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
               }}
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               unoptimized={true}
@@ -104,7 +121,7 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
             />
           </div>
 
-          {/* Low Stock Indicator - Modern Minimal */}
+          {/* Low Stock Indicator */}
           {product.stock <= 5 && product.stock > 0 && (
             <div className="absolute top-3 right-3 z-20">
               <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-950/80 rounded-md border border-amber-200 dark:border-amber-800">
@@ -152,7 +169,7 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
               )}
             </div>
 
-            {/* Title - Larger and bolder */}
+            {/* Title */}
             <h3
               className={cn(
                 'font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-2 leading-tight',
@@ -162,7 +179,7 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
               {product.name}
             </h3>
 
-            {/* Description (list view only) - Now using RichTextRenderer */}
+            {/* Description (list view only) */}
             {isList && product.description && (
               <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-h-28 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
                 <RichTextRenderer 
@@ -183,9 +200,8 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
               </div>
             )}
 
-            {/* Price Section - Larger numbers with prominent strike-through */}
+            {/* Price Section */}
             <div className="flex flex-col items-center gap-1 pt-3">
-              {/* Main Price - Large and bold */}
               <div className="flex items-baseline justify-center gap-2 flex-wrap">
                 <span 
                   className={cn(
@@ -208,7 +224,7 @@ export default function ProductCard({ product, variant = 'grid' }: ProductCardPr
               </div>
             </div>
 
-            {/* Action Buttons - Larger touch targets */}
+            {/* Action Buttons */}
             <div className={cn(
               'flex gap-2 pt-4',
               isList ? 'flex-row' : 'flex-row'

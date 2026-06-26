@@ -79,7 +79,6 @@ export default function ReviewsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminReviews'] })
       queryClient.invalidateQueries({ queryKey: ['adminReviewStats'] })
-      toast.success('Review status updated')
     },
     onError: () => {
       toast.error('Failed to update review status')
@@ -91,7 +90,7 @@ export default function ReviewsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminReviews'] })
       queryClient.invalidateQueries({ queryKey: ['adminReviewStats'] })
-      toast.success('Review deleted successfully')
+      
     },
     onError: () => {
       toast.error('Failed to delete review')
@@ -148,7 +147,7 @@ export default function ReviewsPage() {
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['adminReviews'] })
     queryClient.invalidateQueries({ queryKey: ['adminReviewStats'] })
-    toast.success('Reviews refreshed')
+  
   }
 
   const handleExport = () => {
@@ -180,7 +179,7 @@ export default function ReviewsPage() {
     a.download = `reviews_${new Date().toISOString().split('T')[0]}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success(`Exported ${csvData.length} reviews`)
+   
   }
 
   const handleApprove = (id: string) => {

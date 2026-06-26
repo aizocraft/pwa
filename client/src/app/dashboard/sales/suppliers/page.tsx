@@ -354,10 +354,9 @@ const fetchStats = useCallback(async () => {
     try {
       if (editingSupplier) {
         await updateSupplier(editingSupplier._id, formData);
-        toast.success('Supplier updated successfully');
+        
       } else {
         await createSupplier(formData);
-        toast.success('Supplier created successfully');
       }
       setShowModal(false);
       resetForm();
@@ -372,7 +371,6 @@ const fetchStats = useCallback(async () => {
     if (!confirm('Are you sure you want to delete this supplier?')) return;
     try {
       await deleteSupplier(id);
-      toast.success('Supplier deleted successfully');
       fetchSuppliers();
       fetchStats();
     } catch (error: any) {

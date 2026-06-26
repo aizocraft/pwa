@@ -6,27 +6,6 @@
  * 
  * A full-featured WYSIWYG editor built on TipTap with extensive formatting options.
  * Supports rich text editing, media embedding, tables, code blocks, and more.
- * 
- * Features:
- * - Full formatting toolbar (bold, italic, underline, strikethrough)
- * - Multiple heading levels (H1-H6)
- * - Font family and font size selection
- * - Text color picker with predefined colors
- * - Bullet, numbered, and task lists
- * - Blockquotes and horizontal dividers
- * - Table creation and editing
- * - Link insertion with custom text
- * - Image and video embedding (YouTube/Vimeo)
- * - File uploads with preview
- * - Code blocks with syntax highlighting
- * - Find and replace functionality
- * - Emoji picker (hidden by default, toggled via toolbar button)
- * - Word and character count
- * - Auto-save with localStorage
- * - Fullscreen mode
- * - Dark mode support
- * - Export HTML to clipboard
- * - Read-only mode support
  */
 
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -126,7 +105,6 @@ import {
   X,
   Check,
   Type,
-  Text,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
@@ -141,33 +119,19 @@ export interface RichTextEditorHandle {
 }
 
 interface RichTextEditorProps {
-  /** Initial HTML content for the editor */
   initialValue?: string
-  /** Placeholder text when empty */
   placeholder?: string
-  /** Additional CSS classes */
   className?: string
-  /** Read-only mode */
   readOnly?: boolean
-  /** Called when editor is ready */
   onReady?: (handle: RichTextEditorHandle) => void
-  /** Called whenever content changes - for live preview */
   onChange?: (content: string, isEmpty: boolean) => void
-  /** Max character limit */
   maxChars?: number
-  /** Show character/word count */
   showCount?: boolean
-  /** Enable auto-save */
   autoSave?: boolean
-  /** Auto-save key for localStorage */
   autoSaveKey?: string
-  /** Enable fullscreen */
   enableFullscreen?: boolean
-  /** Enable emoji picker */
   enableEmoji?: boolean
-  /** Enable mentions */
   enableMentions?: boolean
-  /** Mention suggestions */
   mentionSuggestions?: string[]
 }
 
@@ -184,9 +148,6 @@ interface ToolbarButtonProps {
 // Sub-Components
 // ----------------------------------------------------------------------------
 
-/**
- * Reusable toolbar button with consistent styling
- */
 const ToolbarButton = ({
   onClick,
   isActive = false,
@@ -210,10 +171,6 @@ const ToolbarButton = ({
   </button>
 )
 
-/**
- * Font size dropdown with predefined sizes
- * Uses inline styles to apply font size to selected text
- */
 const FontSizeDropdown = ({ editor }: { editor: any }) => {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -227,7 +184,6 @@ const FontSizeDropdown = ({ editor }: { editor: any }) => {
   ]
 
   const setFontSize = (size: string) => {
-    // Apply font size using inline style
     editor.chain().focus().setMark('textStyle', { fontSize: size }).run()
     setIsOpen(false)
   }
@@ -291,18 +247,13 @@ export default function RichTextEditor({
   // State Management
   // --------------------------------------------------------------------------
 
-  /** Modal states for various features */
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [linkText, setLinkText] = useState('')
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
   const [selectedColor, setSelectedColor] = useState('#000000')
-  
-  /** Editor statistics */
   const [wordCount, setWordCount] = useState(0)
   const [charCount, setCharCount] = useState(0)
-  
-  /** UI states */
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showFindReplace, setShowFindReplace] = useState(false)
@@ -314,22 +265,26 @@ export default function RichTextEditor({
   const [showCodeBlock, setShowCodeBlock] = useState(false)
   const [selectedLanguage, setSelectedLanguage] = useState('javascript')
 
-  /** Refs */
   const didInitRef = useRef(false)
   const editorRef = useRef<HTMLDivElement>(null)
 
   // --------------------------------------------------------------------------
-  // Editor Configuration
+  // Editor Configuration - FIXED: No duplicate extensions
   // --------------------------------------------------------------------------
 
-  /**
-   * Configure TipTap extensions based on props
-   */
   const editorExtensions = useMemo(() => {
     const extensions: any[] = [
+      // StarterKit includes: bold, italic, code, blockquote, heading, horizontalRule, 
+      // listItem, orderedList, bulletList, codeBlock, paragraph, text, strike, hardBreak
       StarterKit.configure({
         heading: {
           levels: [1, 2, 3, 4, 5, 6],
+        },
+        // CodeBlock is included in StarterKit, no need to add separately
+        codeBlock: {
+          HTMLAttributes: {
+            class: 'rounded-lg overflow-hidden',
+          },
         },
       }),
       TextAlign.configure({
@@ -358,6 +313,7 @@ export default function RichTextEditor({
         },
       }),
       Typography,
+      // Underline is included in StarterKit with the correct configuration
       Underline,
       TextStyle,
       TaskList,
@@ -387,6 +343,8 @@ export default function RichTextEditor({
           class: 'rounded-lg shadow-lg my-4',
         },
       }),
+      // CodeBlockLowlight is NOT needed if using StarterKit's codeBlock
+      // But we keep it for enhanced syntax highlighting
       CodeBlockLowlight.configure({
         lowlight,
         HTMLAttributes: {
@@ -397,7 +355,6 @@ export default function RichTextEditor({
       Superscript,
     ]
 
-    // Conditionally add mention extension
     if (enableMentions) {
       extensions.push(
         Mention.configure({
@@ -419,9 +376,6 @@ export default function RichTextEditor({
     return extensions
   }, [placeholder, enableMentions, mentionSuggestions])
 
-  /**
-   * Initialize the TipTap editor instance
-   */
   const editor = useEditor({
     extensions: editorExtensions,
     editable: !readOnly,
@@ -435,7 +389,6 @@ export default function RichTextEditor({
       setWordCount(words)
       setCharCount(chars)
 
-      // Enforce character limit
       if (chars > maxChars) {
         toast.error(`Character limit exceeded (${maxChars})`)
         const truncated = text.slice(0, maxChars)
@@ -445,7 +398,6 @@ export default function RichTextEditor({
 
       const isEmpty = !html || html.trim() === '' || html.trim() === '<p></p>'
       
-      // Auto-save with debounce
       if (autoSave && !isEmpty) {
         debounce(() => {
           localStorage.setItem(autoSaveKey, html)
@@ -465,9 +417,6 @@ export default function RichTextEditor({
   // Effects
   // --------------------------------------------------------------------------
 
-  /**
-   * Restore auto-saved content from localStorage
-   */
   useEffect(() => {
     if (!editor || !autoSave || readOnly) return
     
@@ -477,9 +426,6 @@ export default function RichTextEditor({
     }
   }, [editor, autoSave, autoSaveKey, initialValue, readOnly])
 
-  /**
-   * Initialize editor and notify parent
-   */
   useEffect(() => {
     if (!editor) return
     if (didInitRef.current) return
@@ -498,15 +444,11 @@ export default function RichTextEditor({
     const isEmpty = handle.isEmpty()
     onChange?.(editor.getHTML(), isEmpty)
 
-    // Initial word/char count
     const text = editor.getText()
     setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0)
     setCharCount(text.length)
   }, [editor, onReady, onChange])
 
-  /**
-   * Update content when initialValue changes
-   */
   useEffect(() => {
     if (!editor) return
     if (readOnly) return
@@ -520,9 +462,6 @@ export default function RichTextEditor({
     }
   }, [initialValue, editor, readOnly])
 
-  /**
-   * Handle fullscreen mode
-   */
   useEffect(() => {
     if (!enableFullscreen) return
     
@@ -533,9 +472,6 @@ export default function RichTextEditor({
     }
   }, [isFullscreen, enableFullscreen])
 
-  /**
-   * Listen for fullscreen changes from the browser
-   */
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement)
@@ -593,15 +529,12 @@ export default function RichTextEditor({
   // Editor Actions
   // --------------------------------------------------------------------------
 
-  /**
-   * Insert or update a link in the editor
-   */
   const setLink = () => {
     if (!linkUrl) return
 
     if (linkText) {
       editor
-        .chain()
+        ?.chain()
         .focus()
         .insertContent({
           type: 'text',
@@ -615,7 +548,7 @@ export default function RichTextEditor({
         })
         .run()
     } else {
-      editor.chain().focus().setLink({ href: linkUrl }).run()
+      editor?.chain().focus().setLink({ href: linkUrl }).run()
     }
 
     setLinkUrl('')
@@ -623,117 +556,97 @@ export default function RichTextEditor({
     setIsLinkModalOpen(false)
   }
 
-  /**
-   * Insert an image from URL
-   */
   const addImage = () => {
     const url = window.prompt('Enter image URL:')
     if (url) {
-      editor.chain().focus().setImage({ src: url }).run()
+      editor?.chain().focus().setImage({ src: url }).run()
     }
   }
 
-  /**
-   * Insert a video from YouTube or Vimeo
-   */
   const addVideo = () => {
     const url = window.prompt('Enter YouTube or Vimeo URL:')
     if (url) {
-      editor.chain().focus().setYoutubeVideo({ src: url }).run()
+      editor?.chain().focus().setYoutubeVideo({ src: url }).run()
     }
   }
 
-  /**
-   * Insert a table with specified dimensions
-   */
   const insertTable = () => {
     if (tableRows < 1 || tableCols < 1) return
-    editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: true }).run()
+    editor?.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: true }).run()
     setShowTableModal(false)
   }
 
-  /**
-   * Insert a code block with language selection
-   */
   const addCodeBlock = () => {
     editor
-      .chain()
+      ?.chain()
       .focus()
       .setCodeBlock({ language: selectedLanguage })
       .run()
     setShowCodeBlock(false)
   }
 
-  /**
-   * Clear all formatting from the selection
-   */
   const handleClearFormatting = () => {
-    editor.chain().focus().clearNodes().unsetAllMarks().run()
+    editor?.chain().focus().clearNodes().unsetAllMarks().run()
     toast.success('Formatting cleared')
   }
 
-  /**
-   * Find and replace text in the editor
-   */
   const handleFindReplace = () => {
-    const content = editor.getText()
+    const content = editor?.getText() || ''
     if (!findText) {
       toast.error('Please enter text to find')
       return
     }
     const newContent = content.replace(new RegExp(findText, 'g'), replaceText)
-    editor.commands.setContent(newContent)
+    editor?.commands.setContent(newContent)
     setShowFindReplace(false)
     toast.success(`Replaced all occurrences of "${findText}"`)
   }
 
-  /**
-   * Handle file uploads (images and documents)
-   */
   const handleFileUpload = (file: File) => {
     const reader = new FileReader()
     reader.onload = (e) => {
       const base64 = e.target?.result as string
       if (file.type.startsWith('image/')) {
-        editor.chain().focus().setImage({ src: base64 }).run()
+        editor?.chain().focus().setImage({ src: base64 }).run()
       } else {
         const link = `<a href="${base64}" target="_blank" rel="noopener noreferrer">${file.name}</a>`
-        editor.chain().focus().insertContent(link).run()
+        editor?.chain().focus().insertContent(link).run()
       }
       toast.success(`Uploaded ${file.name}`)
     }
     reader.readAsDataURL(file)
   }
 
-  /**
-   * Export editor content as HTML to clipboard
-   */
   const exportHTML = () => {
-    const html = editor.getHTML()
+    const html = editor?.getHTML() || ''
     navigator.clipboard.writeText(html)
     toast.success('HTML copied to clipboard!')
   }
 
-  /**
-   * Toggle emoji picker visibility
-   */
   const toggleEmojiPicker = () => {
     setShowEmojiPicker(!showEmojiPicker)
   }
 
-  /**
-   * Insert emoji at cursor position
-   */
   const insertEmoji = (emojiData: any) => {
-    editor.chain().focus().insertContent(emojiData.emoji).run()
+    editor?.chain().focus().insertContent(emojiData.emoji).run()
     setShowEmojiPicker(false)
   }
 
   // --------------------------------------------------------------------------
-  // Render Helpers
+  // Render Helpers - ✅ FIXED: Proper null check
   // --------------------------------------------------------------------------
 
-const isContentEmpty = !editor || !editor.getHTML() || editor.getHTML().trim() === '' || editor.getHTML().trim() === '<p></p>'
+  const getEditorContent = (): string => {
+    if (!editor) return '<p></p>'
+    try {
+      return editor.getHTML() || '<p></p>'
+    } catch {
+      return '<p></p>'
+    }
+  }
+
+  const editorContent = getEditorContent()
+  const isContentEmpty = !editorContent || editorContent.trim() === '' || editorContent.trim() === '<p></p>'
 
   // Show loading state while editor initializes
   if (!editor) {
@@ -755,9 +668,7 @@ const isContentEmpty = !editor || !editor.getHTML() || editor.getHTML().trim() =
       ref={editorRef}
       className={`rich-text-editor border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900 shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''} ${className}`}
     >
-      {/* ======================================================================
-        TOOLBAR
-      ====================================================================== */}
+      {/* TOOLBAR */}
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-0.5 p-2 bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 backdrop-blur-sm max-h-[200px] overflow-y-auto">
           
@@ -1168,9 +1079,7 @@ const isContentEmpty = !editor || !editor.getHTML() || editor.getHTML().trim() =
         </div>
       )}
 
-      {/* ======================================================================
-        EMOJI PICKER (Hidden by default, toggled by toolbar button)
-      ====================================================================== */}
+      {/* EMOJI PICKER */}
       {enableEmoji && showEmojiPicker && (
         <div className="absolute z-30 mt-1" style={{ right: '1rem', top: '3.5rem' }}>
           <div className="relative">
@@ -1192,235 +1101,106 @@ const isContentEmpty = !editor || !editor.getHTML() || editor.getHTML().trim() =
         </div>
       )}
 
-      {/* ======================================================================
-        MODALS
-      ====================================================================== */}
-
-      {/* Link Modal */}
+      {/* MODALS - Link, Table, Code Block, Find & Replace */}
       {isLinkModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Insert Link
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Insert Link</h3>
             <div className="space-y-3">
               <input
                 type="text"
                 value={linkText}
                 onChange={(e) => setLinkText(e.target.value)}
                 placeholder="Link text (optional)"
-                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
               />
               <input
                 type="url"
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 placeholder="https://example.com"
-                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') setLink()
-                }}
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                onKeyDown={(e) => { if (e.key === 'Enter') setLink() }}
               />
             </div>
             <div className="flex gap-2 mt-4">
-              <button
-                type="button"
-                onClick={setLink}
-                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all hover:shadow-lg"
-              >
-                Add Link
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLinkModalOpen(false)
-                  setLinkUrl('')
-                  setLinkText('')
-                }}
-                className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
-              >
-                Cancel
-              </button>
+              <button onClick={setLink} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Add Link</button>
+              <button onClick={() => { setIsLinkModalOpen(false); setLinkUrl(''); setLinkText(''); }} className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Table Modal */}
       {showTableModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Insert Table
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Insert Table</h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <label className="text-sm text-gray-700 dark:text-gray-300">Rows:</label>
-                <input
-                  type="number"
-                  value={tableRows}
-                  onChange={(e) => setTableRows(Math.max(1, parseInt(e.target.value) || 1))}
-                  min="1"
-                  max="10"
-                  className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                />
+                <input type="number" value={tableRows} onChange={(e) => setTableRows(Math.max(1, parseInt(e.target.value) || 1))} min="1" max="10" className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900" />
               </div>
               <div className="flex items-center gap-3">
                 <label className="text-sm text-gray-700 dark:text-gray-300">Columns:</label>
-                <input
-                  type="number"
-                  value={tableCols}
-                  onChange={(e) => setTableCols(Math.max(1, parseInt(e.target.value) || 1))}
-                  min="1"
-                  max="10"
-                  className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                />
+                <input type="number" value={tableCols} onChange={(e) => setTableCols(Math.max(1, parseInt(e.target.value) || 1))} min="1" max="10" className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900" />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button
-                type="button"
-                onClick={insertTable}
-                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all hover:shadow-lg"
-              >
-                Insert
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowTableModal(false)}
-                className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
-              >
-                Cancel
-              </button>
+              <button onClick={insertTable} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Insert</button>
+              <button onClick={() => setShowTableModal(false)} className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Code Block Modal */}
       {showCodeBlock && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Insert Code Block
-            </h3>
-            <div className="space-y-3">
-              <select
-                value={selectedLanguage}
-                onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-              >
-                {codeLanguages.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {lang.charAt(0).toUpperCase() + lang.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Insert Code Block</h3>
+            <select value={selectedLanguage} onChange={(e) => setSelectedLanguage(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900">
+              {codeLanguages.map((lang) => (<option key={lang} value={lang}>{lang.charAt(0).toUpperCase() + lang.slice(1)}</option>))}
+            </select>
             <div className="flex gap-2 mt-4">
-              <button
-                type="button"
-                onClick={addCodeBlock}
-                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all hover:shadow-lg"
-              >
-                Insert
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowCodeBlock(false)}
-                className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
-              >
-                Cancel
-              </button>
+              <button onClick={addCodeBlock} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Insert</button>
+              <button onClick={() => setShowCodeBlock(false)} className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Find & Replace Modal */}
       {showFindReplace && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Find & Replace
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Find & Replace</h3>
             <div className="space-y-3">
-              <input
-                type="text"
-                value={findText}
-                onChange={(e) => setFindText(e.target.value)}
-                placeholder="Find..."
-                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-              />
-              <input
-                type="text"
-                value={replaceText}
-                onChange={(e) => setReplaceText(e.target.value)}
-                placeholder="Replace with..."
-                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleFindReplace()
-                }}
-              />
+              <input type="text" value={findText} onChange={(e) => setFindText(e.target.value)} placeholder="Find..." className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900" />
+              <input type="text" value={replaceText} onChange={(e) => setReplaceText(e.target.value)} placeholder="Replace with..." className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900" onKeyDown={(e) => { if (e.key === 'Enter') handleFindReplace() }} />
             </div>
             <div className="flex gap-2 mt-4">
-              <button
-                type="button"
-                onClick={handleFindReplace}
-                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all hover:shadow-lg"
-              >
-                Replace All
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowFindReplace(false)
-                  setFindText('')
-                  setReplaceText('')
-                }}
-                className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
-              >
-                Cancel
-              </button>
+              <button onClick={handleFindReplace} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Replace All</button>
+              <button onClick={() => { setShowFindReplace(false); setFindText(''); setReplaceText(''); }} className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ======================================================================
-        EDITOR CONTENT
-      ====================================================================== */}
+      {/* EDITOR CONTENT */}
       <EditorContent editor={editor} className={readOnly ? 'bg-gray-50/50 dark:bg-gray-800/30' : ''} />
 
-      {/* ======================================================================
-        FOOTER - Word/Character Count
-      ====================================================================== */}
+      {/* FOOTER */}
       {showCount && !readOnly && (
         <div className="flex justify-between items-center px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 text-xs text-gray-400 dark:text-gray-500">
           <div className="flex items-center gap-4">
             <span>{wordCount} words</span>
             <span>{charCount} characters</span>
-            {maxChars && (
-              <span className={charCount > maxChars * 0.9 ? 'text-yellow-500' : ''}>
-                {charCount}/{maxChars}
-              </span>
-            )}
+            {maxChars && <span className={charCount > maxChars * 0.9 ? 'text-yellow-500' : ''}>{charCount}/{maxChars}</span>}
           </div>
-          {autoSave && (
-            <span className="flex items-center gap-1">
-              <Check className="w-3 h-3 text-green-500" />
-              Auto-saved
-            </span>
-          )}
-          {isContentEmpty && (
-            <span className="text-gray-400 italic">Empty content</span>
-          )}
+          {autoSave && <span className="flex items-center gap-1"><Check className="w-3 h-3 text-green-500" />Auto-saved</span>}
+          {isContentEmpty && <span className="text-gray-400 italic">Empty content</span>}
         </div>
       )}
 
-      {/* ======================================================================
-        GLOBAL STYLES
-      ====================================================================== */}
+      {/* GLOBAL STYLES */}
       <style jsx global>{`
         .rich-text-editor .ProseMirror {
           min-height: 200px;
@@ -1429,295 +1209,58 @@ const isContentEmpty = !editor || !editor.getHTML() || editor.getHTML().trim() =
           font-family: 'Inter', system-ui, -apple-system, sans-serif;
           line-height: 1.8;
         }
-
-        .rich-text-editor .ProseMirror p {
-          margin: 0.5rem 0;
-        }
-
-        .rich-text-editor .ProseMirror h1 {
-          font-size: 2em;
-          font-weight: 700;
-          margin: 1.2rem 0 0.5rem;
-          letter-spacing: -0.02em;
-        }
-
-        .rich-text-editor .ProseMirror h2 {
-          font-size: 1.5em;
-          font-weight: 600;
-          margin: 1rem 0 0.5rem;
-          letter-spacing: -0.01em;
-        }
-
-        .rich-text-editor .ProseMirror h3 {
-          font-size: 1.25em;
-          font-weight: 600;
-          margin: 0.8rem 0 0.4rem;
-        }
-
-        .rich-text-editor .ProseMirror h4 {
-          font-size: 1.1em;
-          font-weight: 600;
-          margin: 0.6rem 0 0.3rem;
-        }
-
-        .rich-text-editor .ProseMirror h5 {
-          font-size: 1em;
-          font-weight: 600;
-          margin: 0.5rem 0 0.2rem;
-        }
-
-        .rich-text-editor .ProseMirror h6 {
-          font-size: 0.9em;
-          font-weight: 600;
-          margin: 0.4rem 0 0.2rem;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .rich-text-editor .ProseMirror ul {
-          padding-left: 1.5rem;
-          list-style-type: disc;
-          margin: 0.5rem 0;
-        }
-
-        .rich-text-editor .ProseMirror ul ul {
-          list-style-type: circle;
-        }
-
-        .rich-text-editor .ProseMirror ul ul ul {
-          list-style-type: square;
-        }
-
-        .rich-text-editor .ProseMirror ol {
-          padding-left: 1.5rem;
-          list-style-type: decimal;
-          margin: 0.5rem 0;
-        }
-
-        .rich-text-editor .ProseMirror ol ol {
-          list-style-type: lower-alpha;
-        }
-
-        .rich-text-editor .ProseMirror ol ol ol {
-          list-style-type: lower-roman;
-        }
-
-        .rich-text-editor .ProseMirror ul[data-type='taskList'] {
-          list-style: none;
-          padding-left: 0;
-        }
-
-        .rich-text-editor .ProseMirror ul[data-type='taskList'] li {
-          display: flex;
-          align-items: flex-start;
-          gap: 0.5rem;
-          margin: 0.25rem 0;
-        }
-
-        .rich-text-editor .ProseMirror ul[data-type='taskList'] li > label {
-          flex-shrink: 0;
-          margin-top: 0.2rem;
-        }
-
-        .rich-text-editor .ProseMirror ul[data-type='taskList'] li > label input[type='checkbox'] {
-          width: 1.2rem;
-          height: 1.2rem;
-          cursor: pointer;
-          accent-color: #3b82f6;
-          border-radius: 4px;
-        }
-
-        .rich-text-editor .ProseMirror blockquote {
-          border-left: 4px solid #3b82f6;
-          padding: 0.5rem 0 0.5rem 1rem;
-          margin: 0.5rem 0;
-          color: #64748b;
-          background: rgba(59, 130, 246, 0.05);
-          border-radius: 0 4px 4px 0;
-          font-style: italic;
-        }
-
-        .dark .rich-text-editor .ProseMirror blockquote {
-          color: #94a3b8;
-          background: rgba(59, 130, 246, 0.1);
-        }
-
-        .rich-text-editor .ProseMirror table {
-          border-collapse: collapse;
-          margin: 1rem 0;
-          width: 100%;
-        }
-
-        .rich-text-editor .ProseMirror table td,
-        .rich-text-editor .ProseMirror table th {
-          border: 1px solid #e2e8f0;
-          padding: 0.5rem 0.75rem;
-          text-align: left;
-        }
-
-        .dark .rich-text-editor .ProseMirror table td,
-        .dark .rich-text-editor .ProseMirror table th {
-          border-color: #334155;
-        }
-
-        .rich-text-editor .ProseMirror table th {
-          background: #f1f5f9;
-          font-weight: 600;
-        }
-
-        .dark .rich-text-editor .ProseMirror table th {
-          background: #1e293b;
-        }
-
-        .rich-text-editor .ProseMirror code {
-          background: #f1f5f9;
-          padding: 0.15rem 0.4rem;
-          border-radius: 4px;
-          font-family: 'Courier New', monospace;
-          font-size: 0.9rem;
-          color: #e74c3c;
-        }
-
-        .dark .rich-text-editor .ProseMirror code {
-          background: #1e293b;
-          color: #f87171;
-        }
-
-        .rich-text-editor .ProseMirror pre {
-          background: #1e293b;
-          padding: 1rem;
-          border-radius: 8px;
-          overflow-x: auto;
-          font-family: 'Courier New', monospace;
-          font-size: 0.9rem;
-          margin: 0.5rem 0;
-          border: 1px solid #334155;
-        }
-
-        .rich-text-editor .ProseMirror pre code {
-          background: transparent;
-          padding: 0;
-          color: #e2e8f0;
-        }
-
-        .rich-text-editor .ProseMirror img {
-          max-width: 100%;
-          border-radius: 8px;
-          margin: 0.75rem 0;
-          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-        }
-
-        .rich-text-editor .ProseMirror a {
-          color: #3b82f6;
-          text-decoration: underline;
-          text-underline-offset: 2px;
-          transition: color 0.2s;
-        }
-
-        .rich-text-editor .ProseMirror a:hover {
-          color: #1d4ed8;
-        }
-
-        .dark .rich-text-editor .ProseMirror a {
-          color: #60a5fa;
-        }
-
-        .dark .rich-text-editor .ProseMirror a:hover {
-          color: #93bbfc;
-        }
-
-        .rich-text-editor .ProseMirror hr {
-          border: none;
-          border-top: 2px solid #e2e8f0;
-          margin: 1.5rem 0;
-        }
-
-        .dark .rich-text-editor .ProseMirror hr {
-          border-color: #334155;
-        }
-
-        .rich-text-editor .ProseMirror .mention {
-          background: #dbeafe;
-          color: #1d4ed8;
-          padding: 0.1rem 0.3rem;
-          border-radius: 4px;
-          font-weight: 500;
-        }
-
-        .dark .rich-text-editor .ProseMirror .mention {
-          background: #1e3a5f;
-          color: #60a5fa;
-        }
-
-        .rich-text-editor .ProseMirror .is-editor-empty:first-child::before {
-          content: attr(data-placeholder);
-          float: left;
-          color: #94a3b8;
-          pointer-events: none;
-          height: 0;
-          font-style: italic;
-        }
-
-        .rich-text-editor .ProseMirror .ProseMirror-selectednode {
-          outline: 2px solid #3b82f6;
-          outline-offset: 2px;
-        }
-
-        .dark .rich-text-editor .ProseMirror {
-          color: #e2e8f0;
-        }
-
-        .dark .rich-text-editor .ProseMirror h1,
-        .dark .rich-text-editor .ProseMirror h2,
-        .dark .rich-text-editor .ProseMirror h3,
-        .dark .rich-text-editor .ProseMirror h4,
-        .dark .rich-text-editor .ProseMirror h5,
-        .dark .rich-text-editor .ProseMirror h6 {
-          color: #f1f5f9;
-        }
-
-        .rich-text-editor .ProseMirror[contenteditable='false'] {
-          cursor: default;
-        }
-
-        .rich-text-editor .ProseMirror ::selection {
-          background: rgba(59, 130, 246, 0.3);
-        }
-
-        .rich-text-editor .ProseMirror .youtube {
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-          margin: 1rem 0;
-        }
-
-        /* Mobile Responsive */
+        .rich-text-editor .ProseMirror p { margin: 0.5rem 0; }
+        .rich-text-editor .ProseMirror h1 { font-size: 2em; font-weight: 700; margin: 1.2rem 0 0.5rem; }
+        .rich-text-editor .ProseMirror h2 { font-size: 1.5em; font-weight: 600; margin: 1rem 0 0.5rem; }
+        .rich-text-editor .ProseMirror h3 { font-size: 1.25em; font-weight: 600; margin: 0.8rem 0 0.4rem; }
+        .rich-text-editor .ProseMirror h4 { font-size: 1.1em; font-weight: 600; margin: 0.6rem 0 0.3rem; }
+        .rich-text-editor .ProseMirror h5 { font-size: 1em; font-weight: 600; margin: 0.5rem 0 0.2rem; }
+        .rich-text-editor .ProseMirror h6 { font-size: 0.9em; font-weight: 600; margin: 0.4rem 0 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .rich-text-editor .ProseMirror ul { padding-left: 1.5rem; list-style-type: disc; margin: 0.5rem 0; }
+        .rich-text-editor .ProseMirror ul ul { list-style-type: circle; }
+        .rich-text-editor .ProseMirror ul ul ul { list-style-type: square; }
+        .rich-text-editor .ProseMirror ol { padding-left: 1.5rem; list-style-type: decimal; margin: 0.5rem 0; }
+        .rich-text-editor .ProseMirror ol ol { list-style-type: lower-alpha; }
+        .rich-text-editor .ProseMirror ol ol ol { list-style-type: lower-roman; }
+        .rich-text-editor .ProseMirror ul[data-type='taskList'] { list-style: none; padding-left: 0; }
+        .rich-text-editor .ProseMirror ul[data-type='taskList'] li { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0.25rem 0; }
+        .rich-text-editor .ProseMirror ul[data-type='taskList'] li > label { flex-shrink: 0; margin-top: 0.2rem; }
+        .rich-text-editor .ProseMirror ul[data-type='taskList'] li > label input[type='checkbox'] { width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: #3b82f6; border-radius: 4px; }
+        .rich-text-editor .ProseMirror blockquote { border-left: 4px solid #3b82f6; padding: 0.5rem 0 0.5rem 1rem; margin: 0.5rem 0; color: #64748b; background: rgba(59, 130, 246, 0.05); border-radius: 0 4px 4px 0; font-style: italic; }
+        .dark .rich-text-editor .ProseMirror blockquote { color: #94a3b8; background: rgba(59, 130, 246, 0.1); }
+        .rich-text-editor .ProseMirror table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+        .rich-text-editor .ProseMirror table td, .rich-text-editor .ProseMirror table th { border: 1px solid #e2e8f0; padding: 0.5rem 0.75rem; text-align: left; }
+        .dark .rich-text-editor .ProseMirror table td, .dark .rich-text-editor .ProseMirror table th { border-color: #334155; }
+        .rich-text-editor .ProseMirror table th { background: #f1f5f9; font-weight: 600; }
+        .dark .rich-text-editor .ProseMirror table th { background: #1e293b; }
+        .rich-text-editor .ProseMirror code { background: #f1f5f9; padding: 0.15rem 0.4rem; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.9rem; color: #e74c3c; }
+        .dark .rich-text-editor .ProseMirror code { background: #1e293b; color: #f87171; }
+        .rich-text-editor .ProseMirror pre { background: #1e293b; padding: 1rem; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.9rem; margin: 0.5rem 0; border: 1px solid #334155; }
+        .rich-text-editor .ProseMirror pre code { background: transparent; padding: 0; color: #e2e8f0; }
+        .rich-text-editor .ProseMirror img { max-width: 100%; border-radius: 8px; margin: 0.75rem 0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .rich-text-editor .ProseMirror a { color: #3b82f6; text-decoration: underline; text-underline-offset: 2px; transition: color 0.2s; }
+        .rich-text-editor .ProseMirror a:hover { color: #1d4ed8; }
+        .dark .rich-text-editor .ProseMirror a { color: #60a5fa; }
+        .dark .rich-text-editor .ProseMirror a:hover { color: #93bbfc; }
+        .rich-text-editor .ProseMirror hr { border: none; border-top: 2px solid #e2e8f0; margin: 1.5rem 0; }
+        .dark .rich-text-editor .ProseMirror hr { border-color: #334155; }
+        .rich-text-editor .ProseMirror .mention { background: #dbeafe; color: #1d4ed8; padding: 0.1rem 0.3rem; border-radius: 4px; font-weight: 500; }
+        .dark .rich-text-editor .ProseMirror .mention { background: #1e3a5f; color: #60a5fa; }
+        .rich-text-editor .ProseMirror .is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; color: #94a3b8; pointer-events: none; height: 0; font-style: italic; }
+        .rich-text-editor .ProseMirror .ProseMirror-selectednode { outline: 2px solid #3b82f6; outline-offset: 2px; }
+        .dark .rich-text-editor .ProseMirror { color: #e2e8f0; }
+        .dark .rich-text-editor .ProseMirror h1, .dark .rich-text-editor .ProseMirror h2, .dark .rich-text-editor .ProseMirror h3, .dark .rich-text-editor .ProseMirror h4, .dark .rich-text-editor .ProseMirror h5, .dark .rich-text-editor .ProseMirror h6 { color: #f1f5f9; }
+        .rich-text-editor .ProseMirror[contenteditable='false'] { cursor: default; }
+        .rich-text-editor .ProseMirror ::selection { background: rgba(59, 130, 246, 0.3); }
+        .rich-text-editor .ProseMirror .youtube { border-radius: 12px; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.15); margin: 1rem 0; }
         @media (max-width: 640px) {
-          .rich-text-editor .flex-wrap {
-            gap: 0.25rem;
-          }
-          .rich-text-editor .border-r {
-            border-right: none !important;
-            padding-right: 0 !important;
-            margin-right: 0 !important;
-          }
-          .rich-text-editor .ProseMirror {
-            padding: 0.75rem;
-            min-height: 150px;
-          }
-          .rich-text-editor .absolute.z-30 {
-            right: 0.5rem !important;
-            left: 0.5rem !important;
-          }
-          .rich-text-editor .absolute.z-30 .emoji-picker-react {
-            width: 100% !important;
-          }
+          .rich-text-editor .flex-wrap { gap: 0.25rem; }
+          .rich-text-editor .border-r { border-right: none !important; padding-right: 0 !important; margin-right: 0 !important; }
+          .rich-text-editor .ProseMirror { padding: 0.75rem; min-height: 150px; }
+          .rich-text-editor .absolute.z-30 { right: 0.5rem !important; left: 0.5rem !important; }
+          .rich-text-editor .absolute.z-30 .emoji-picker-react { width: 100% !important; }
         }
-
-        /* Emoji Picker Responsive */
-        .rich-text-editor .emoji-picker-react {
-          box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important;
-        }
+        .rich-text-editor .emoji-picker-react { box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important; }
       `}</style>
     </div>
   )

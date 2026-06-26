@@ -377,9 +377,9 @@ router.post('/quotations', authMiddleware, requireSalesRole, async (req: Request
     const customer = await SalesCustomerModel.findById(customerId);
     if (!customer) return res.status(404).json({ error: 'Customer not found' });
 
-    if (req.user!.role === 'sales' && customer.createdBy.toString() !== req.user!.userId) {
-      return res.status(403).json({ error: 'Not allowed for this customer' });
-    }
+   // if (req.user!.role === 'sales' && customer.createdBy.toString() !== req.user!.userId) {
+    //  return res.status(403).json({ error: 'Not allowed for this customer' });
+  //  }
 
     const settings = await CompanySettings.findOne();
     const taxRate = settings?.taxRate ?? 0.16;

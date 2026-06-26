@@ -39,8 +39,9 @@ const notifyAdmins = async (title: string, message: string, actionUrl: string, m
 // GET /api/suppliers - List all suppliers
 router.get('/', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    const user = (req as any).user;
+    if (user?.role !== 'admin' && user?.role !== 'sales') {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
 
     const { status, search, page = '1', limit = '20' } = req.query;
@@ -86,8 +87,9 @@ router.get('/', authMiddleware, async (req: Request & { user?: any }, res: Respo
 // GET /api/suppliers/:id - Get single supplier with products
 router.get('/:id', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    const user = (req as any).user;
+    if (user?.role !== 'admin' && user?.role !== 'sales') {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
 
     const supplier = await SupplierModel.findById(req.params.id).lean();
@@ -465,10 +467,10 @@ router.get('/stats/summary', authMiddleware, async (req: Request & { user?: any 
 // GET /api/suppliers/:id/products - Get all products from a supplier with pagination
 router.get('/:id/products', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    const user = (req as any).user;
+    if (user?.role !== 'admin' && user?.role !== 'sales') {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
-
     const supplier = await SupplierModel.findById(req.params.id);
     if (!supplier) {
       return res.status(404).json({ error: 'Supplier not found' });
@@ -593,8 +595,9 @@ router.post('/:id/record-purchase', authMiddleware, async (req: Request & { user
 // GET /api/suppliers/active - Get all active suppliers
 router.get('/active', authMiddleware, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Admin access required' });
+    const user = (req as any).user;
+    if (user?.role !== 'admin' && user?.role !== 'sales') {
+      return res.status(403).json({ error: 'Admin or sales access required' });
     }
 
     const { search, limit = '50' } = req.query;
