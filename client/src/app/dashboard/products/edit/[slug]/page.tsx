@@ -30,7 +30,7 @@ import {
   TrendingDown
 } from 'lucide-react';
 import Link from 'next/link';
-import { getProductBySlug, updateProduct, uploadProductImages, deleteProductImage, getImageUrl } from '@/lib/api';
+import { getProduct, updateProduct, uploadProductImages, deleteProductImage, getImageUrl } from '@/lib/api';
 import type { Product, ProductImage } from '@/types/product';
 import { cn } from '@/lib/utils';
 import RichTextEditor from '@/components/RichTextEditor';
@@ -108,8 +108,7 @@ export default function EditProductPage() {
   // ==================== FETCH PRODUCT ====================
 const { data: product, isLoading } = useQuery({
   queryKey: ['product', productSlug],
-  queryFn: () => getProductBySlug(productSlug), 
-  enabled: !!productSlug
+  queryFn: () => getProduct(productSlug), 
 });
 
   // ==================== LOAD PRODUCT DATA ====================

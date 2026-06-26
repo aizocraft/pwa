@@ -425,13 +425,36 @@ export async function getProductBySlug(slug: string): Promise<Product> {
   }
 }
 
-export async function getProduct(id: string): Promise<Product> {
+// src/lib/api.ts
+
+export async function getProduct(idOrSlug: string): Promise<Product> {
+  // Check if it looks like a MongoDB ObjectId (24 hex characters)
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(idOrSlug);
+  
   try {
-    const response = await api.get(`/products/${id}`);
-    return response.data;
+    if (isObjectId) {
+      // It's an ID - use ID endpoint
+      const response = await api.get(`/products/${idOrSlug}`);
+      return response.data;
+    } else {
+      // It's a slug - use slug endpoint
+      const response = await api.get(`/products/slug/${idOrSlug}`);
+      return response.data;
+    }
   } catch (error: any) {
-    console.error('Failed to fetch product:', error);
-    throw error;
+    // Fallback: try the other method
+    try {
+      if (isObjectId) {
+        const response = await api.get(`/products/slug/${idOrSlug}`);
+        return response.data;
+      } else {
+        const response = await api.get(`/products/${idOrSlug}`);
+        return response.data;
+      }
+    } catch (fallbackError) {
+      console.error('Failed to fetch product:', error);
+      throw error;
+    }
   }
 }
 
