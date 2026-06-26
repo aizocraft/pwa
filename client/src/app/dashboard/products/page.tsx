@@ -307,7 +307,7 @@ export default function DashboardProductsPage() {
           </p>
         </div>
         <Link 
-          href="/dashboard/products/add" 
+          href="/dashboard/products/new" 
           className={`inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl ${buttonHover}`}
         >
           <Plus className="w-4 h-4" />
@@ -522,7 +522,7 @@ export default function DashboardProductsPage() {
             </button>
           ) : (
             <Link 
-              href="/dashboard/products/add"
+              href="/dashboard/products/new"
               className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-all"
             >
               <Plus className="w-4 h-4" />
@@ -622,7 +622,7 @@ export default function DashboardProductsPage() {
 
                   <div className="flex gap-2">
                     <Link 
-                      href={`/dashboard/products/edit/${product.slug}`}
+                      href={`/dashboard/products/${product.slug}/edit`}
                       className="flex-1 py-2 bg-gray-50 text-gray-600 dark:bg-gray-700/50 dark:text-gray-400 rounded-xl text-sm font-medium transition-all hover:bg-gray-100 flex items-center justify-center gap-2"
                     >
                       <Edit className="w-4 h-4" />
@@ -767,7 +767,7 @@ export default function DashboardProductsPage() {
                           <Eye className="w-4 h-4" />
                         </Link>
                         <Link 
-                          href={`/dashboard/products/edit/${product.slug}`}
+                          href={`/dashboard/products/${product.slug}/edit`}
                           className="inline-flex p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all hover:scale-110"
                           title="Edit"
                         >

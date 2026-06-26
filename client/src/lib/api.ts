@@ -1,4 +1,3 @@
-// src/lib/api.ts
 import axios from 'axios';
 import { Product, ProductListResponse } from '@/types/product';
 import { User, UserListResponse, UserResponse, BulkStatusResponse, CreateUserRequest, UpdateUserRequest } from '@/types/user';
@@ -33,7 +32,13 @@ import type { ShippingArea, CreateShippingAreaRequest, UpdateShippingAreaRequest
 import type { PromoCode } from '@/types/order';
 import type { PeriodInfo, SalesCustomer, Supplier } from './sales';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+// ✅ FIX 1: Detect server vs client
+const isServer = typeof window === 'undefined';
+
+// ✅ FIX 2: Use different URL for server vs client
+const API_URL = isServer 
+  ? process.env.API_BASE_URL || 'http://localhost:4000/api'
+  : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -251,8 +256,12 @@ export async function deleteAvatar(userId: string): Promise<{ success: true; mes
   return response.data;
 }
 
+// ✅ FIX 3: Updated getAvatarUrl with server detection
 export function getAvatarUrl(userId: string): string {
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/users/${userId}/avatar`;
+  const baseUrl = isServer 
+    ? process.env.API_BASE_URL || 'http://localhost:4000/api'
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+  return `${baseUrl}/users/${userId}/avatar`;
 }
 
 // ========== USER MANAGEMENT API ==========
@@ -324,10 +333,15 @@ export async function exportUsersToCSV(params?: { role?: string; isActive?: bool
   return response.data;
 }
 
-// Image utility
+// ✅ FIX 4: Updated getImageUrl with server detection
 export const getImageUrl = (image: import('@/types/product').ProductImage): string => {
   if ((image as any).type === 'url' && image.url) return image.url;
-  if (image.type === 'gridfs' && image.fileId) return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/products/image/${image.fileId}`;
+  if (image.type === 'gridfs' && image.fileId) {
+    const baseUrl = isServer 
+      ? process.env.API_BASE_URL || 'http://localhost:4000/api'
+      : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+    return `${baseUrl}/products/image/${image.fileId}`;
+  }
   return '/placeholder.svg';
 };
 
@@ -413,30 +427,73 @@ export async function getProduct(idOrSlug: string): Promise<Product> {
   const isObjectId = /^[0-9a-fA-F]{24}$/.test(trimmed);
   
   try {
-    let response;
-    
-    if (isObjectId) {
-      response = await api.get(`/products/${trimmed}`);
-      return response.data;
-    } else {
-      const isValidSlug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(trimmed);
-      if (!isValidSlug) {
-        console.warn(`Invalid slug format: "${trimmed}", attempting anyway...`);
+    // ✅ Server-side: use fetch directly
+    if (typeof window === 'undefined') {
+      const baseUrl = process.env.API_BASE_URL || 'http://localhost:4000/api';
+      let url;
+      
+      if (isObjectId) {
+        url = `${baseUrl}/products/${trimmed}`;
+      } else {
+        url = `${baseUrl}/products/slug/${trimmed}`;
       }
       
-      response = await api.get(`/products/slug/${trimmed}`);
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } else {
+      // Client-side: use axios (with auth interceptors)
+      let response;
+      if (isObjectId) {
+        response = await api.get(`/products/${trimmed}`);
+      } else {
+        response = await api.get(`/products/slug/${trimmed}`);
+      }
       return response.data;
     }
   } catch (error: any) {
     console.error(`Failed to fetch product by "${idOrSlug}":`, error);
     
-    if (error.response?.status === 404) {
+    // Fallback logic for 404
+    if (error.response?.status === 404 || error.message?.includes('404')) {
       try {
-        if (isObjectId) {
-          const response = await api.get(`/products/slug/${trimmed}`);
-          return response.data;
+        if (typeof window === 'undefined') {
+          const baseUrl = process.env.API_BASE_URL || 'http://localhost:4000/api';
+          let fallbackUrl;
+          
+          if (isObjectId) {
+            fallbackUrl = `${baseUrl}/products/slug/${trimmed}`;
+          } else if (trimmed.length === 24) {
+            fallbackUrl = `${baseUrl}/products/${trimmed}`;
+          } else {
+            throw new Error(`Product not found: ${idOrSlug}`);
+          }
+          
+          const response = await fetch(fallbackUrl, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            cache: 'no-store',
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Product not found: ${idOrSlug}`);
+          }
+          
+          return await response.json();
         } else {
-          if (trimmed.length === 24) {
+          // Client-side fallback
+          if (isObjectId) {
+            const response = await api.get(`/products/slug/${trimmed}`);
+            return response.data;
+          } else if (trimmed.length === 24) {
             const response = await api.get(`/products/${trimmed}`);
             return response.data;
           }
@@ -457,8 +514,27 @@ export async function getProductBySlug(slug: string): Promise<Product> {
   }
   
   try {
-    const response = await api.get(`/products/slug/${encodeURIComponent(slug)}`);
-    return response.data;
+    // ✅ Server-side: use fetch directly (no auth needed)
+    if (typeof window === 'undefined') {
+      const baseUrl = process.env.API_BASE_URL || 'http://localhost:4000/api';
+      const url = `${baseUrl}/products/slug/${encodeURIComponent(slug)}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } else {
+      // Client-side: use axios (with auth interceptors)
+      const response = await api.get(`/products/slug/${encodeURIComponent(slug)}`);
+      return response.data;
+    }
   } catch (error: any) {
     console.error(`Failed to fetch product by slug "${slug}":`, error);
     throw error;
