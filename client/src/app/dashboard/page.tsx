@@ -139,7 +139,7 @@ function PremiumStatCard({ stat }: { stat: StatCardData }) {
         <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
           {stat.name}
         </p>
-        <p className={`text-3xl sm:text-4xl font-bold ${stat.valueColor || 'text-gray-900 dark:text-white'} truncate`}>
+        <p className={`text-2xl sm:text-3xl font-bold ${stat.valueColor || 'text-gray-900 dark:text-white'} truncate`}>
           {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
         </p>
         {stat.subtitle && (

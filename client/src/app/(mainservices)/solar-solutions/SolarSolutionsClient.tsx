@@ -39,7 +39,7 @@ const CircularGallery = dynamic(
 const galleryItems = [
   { image: '/backup/solar-backup-kenya.png', text: 'Residential Solar' },
   { image: '/images/100kw_solar_plant.jpg', text: 'Commercial Solar' },
-  { image: '/solar-heaters/solar-water-heaters.png', text: 'Solar Water Heater' },
+  { image: '/solar-water-heaters.jpg', text: 'Solar Water Heater' },
   { image: '/water-pump/Honda-Water-Pump.png', text: 'Solar Water Pump' },
   { image: '/images/solar.jpg', text: 'Solar Installation' },
   { image: '/images/solar-4.jpg', text: 'Hybrid System' },

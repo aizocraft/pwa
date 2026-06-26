@@ -177,7 +177,7 @@ export default function SolarWaterHeatersClient() {
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-xl">
                 <Image
-                  src="/solar-heaters/solar-water-heater-preview.png"
+                  src="/solar-heaters/solar-water-heaters-preview.png"
                   alt="Solar water heater installation"
                   fill
                   className="object-cover"
@@ -247,7 +247,7 @@ export default function SolarWaterHeatersClient() {
         </div>
       </section>
 
-      {/* Solar Water Heaters Products Section - FIXED */}
+      {/* Solar Water Heaters Products Section */}
       <section className="py-20 lg:py-24 bg-gray-50 dark:bg-gray-900/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
