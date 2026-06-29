@@ -204,18 +204,6 @@ export async function generateInvoicePDF(
           <span class="grand-total-label">Total Amount</span>
           <span class="grand-total-amount">KES ${calculatedTotal.toLocaleString()}</span>
         </div>
-        {/*
-        ${isPartiallyPaid ? `
-          <div class="total-row paid-row">
-            <span>Amount Paid</span>
-            <span class="paid-amount">KES ${amountPaid.toLocaleString()}</span>
-          </div>
-          <div class="total-row balance-row">
-            <span class="balance-label">Balance Due</span>
-            <span class="balance-amount">KES ${balanceDue.toLocaleString()}</span>
-          </div>
-        ` : ''} 
-        */}
       </div>
     </div>
   `;

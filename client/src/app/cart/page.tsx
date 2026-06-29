@@ -208,7 +208,6 @@ export default function CartPage() {
               <button className="group relative inline-flex items-center gap-3 px-8 py-4 bg-white/20 dark:bg-white/10 backdrop-blur-xl border border-white/30 dark:border-white/20 text-blue-900 dark:text-blue-100 font-semibold rounded-3xl shadow-2xl hover:shadow-blue-500/20 hover:bg-white/30 dark:hover:bg-white/20 transition-all duration-400 hover:scale-105 hover:-translate-y-1 active:scale-95 bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-600/30 hover:to-blue-700/30">
                 <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-all duration-300" />
                 <span className="relative z-10">Start Shopping</span>
-                <Sparkles className="w-4 h-4 ml-1 opacity-70 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110" />
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-400/50 to-cyan-400/50 rounded-3xl blur-xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               </button>
             </Link>
