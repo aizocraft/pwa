@@ -43,6 +43,15 @@ interface Product {
   stock?: number
 }
 
+interface ProfitSummary {
+  totalProfit?: number
+  totalUnitsSold?: number
+}
+
+interface InventorySummary {
+  totalStockValue?: number
+}
+
 export interface DashboardSummary {
   totalRevenue: number
   totalOrders: number
@@ -150,12 +159,12 @@ export function useDashboardData() {
     const salesOrders = salesData?.orders || {}
     const adminTransactions = adminData?.transactions || {}
     const salesTransactions = salesData?.transactions || {}
-    const adminProducts = adminData?.products || {}
+    const adminProducts: any = adminData?.products || {}
     const adminCustomers = adminData?.customers || {}
     const salesCustomers = salesData?.customers || {}
-    const profitSummary = profitSummaryQuery.data?.summary || {}
+    const profitSummary: ProfitSummary = profitSummaryQuery.data?.summary || {}
     const orderStatsSummary = orderStatsQuery.data?.summary || {}
-    const inventorySummary = inventorySummaryQuery.data?.summary || {}
+    const inventorySummary: InventorySummary = inventorySummaryQuery.data?.summary || {}
 
     const rawOrders = ordersQuery.data?.orders || ordersQuery.data || []
     const allOrders = Array.isArray(rawOrders) ? rawOrders : []
@@ -191,7 +200,7 @@ export function useDashboardData() {
     ) || 0
 
     const totalItemsSold = Number(
-      profitSummary.totalUnitsSold ??
+      (profitSummary as any).totalUnitsSold ??
       adminOverview.totalItemsSold ??
       salesOverview.totalItemsSold ??
       paidOrders.reduce((sum, o) => {
@@ -202,8 +211,8 @@ export function useDashboardData() {
 
     const derivedProfit = paidOrders.reduce((sum, o) => sum + Number((o as any).totalProfit || 0), 0)
     const totalProfit = Number(
-      profitSummary.totalProfit ??
-      orderStatsSummary.totalProfit ??
+      (profitSummary as any).totalProfit ??
+      (orderStatsSummary as any).totalProfit ??
       adminOverview.totalProfit ??
       salesOverview.totalProfit ??
       derivedProfit
