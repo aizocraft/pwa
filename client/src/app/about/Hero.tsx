@@ -118,7 +118,7 @@ return (
         <div className="max-w-5xl mx-auto text-center">
           {/* Eyebrow Section */}
           <motion.div
-            className="flex items-center justify-center gap-4 mb-8"
+            className="mt-2 flex items-center justify-center gap-4 mb-8 sm:mt-3"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}

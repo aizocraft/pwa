@@ -87,10 +87,36 @@ const navItems = [
 
 // Quick action items
 const quickActions = [
-  { label: 'New Quotation', icon: FileSpreadsheet, href: '/sales/quotations/new', color: 'cyan' },
-  { label: 'New Customer', icon: Users2, href: '/sales/customers/new', color: 'purple' },
+  { label: 'New Quotation', icon: FileSpreadsheet, href: '/sales/quotations', color: 'cyan' },
+  { label: 'New Customer', icon: Users2, href: '/sales/customers', color: 'purple' },
   { label: 'View Reports', icon: TrendingUp, href: '/sales/analytics', color: 'green' },
 ];
+
+const getActionClasses = (color: string) => {
+  switch (color) {
+    case 'cyan':
+      return 'hover:bg-cyan-50 dark:hover:bg-cyan-900/20';
+    case 'purple':
+      return 'hover:bg-purple-50 dark:hover:bg-purple-900/20';
+    case 'green':
+      return 'hover:bg-emerald-50 dark:hover:bg-emerald-900/20';
+    default:
+      return 'hover:bg-slate-50 dark:hover:bg-slate-800/70';
+  }
+};
+
+const getActionIconClass = (color: string) => {
+  switch (color) {
+    case 'cyan':
+      return 'text-cyan-600 dark:text-cyan-400';
+    case 'purple':
+      return 'text-purple-600 dark:text-purple-400';
+    case 'green':
+      return 'text-emerald-600 dark:text-emerald-400';
+    default:
+      return 'text-slate-600 dark:text-slate-400';
+  }
+};
 
 export default function SalesLayout({
   children,
@@ -222,29 +248,30 @@ export default function SalesLayout({
   const isAdmin = user?.role === 'admin';
   const displayName = user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'User';
   const userInitial = user?.name?.charAt(0) || user?.email?.charAt(0) || 'U';
+  const isDashboardActive = pathname === '/sales' || pathname === '/sales/overview';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm">
-        <div className="px-4 sm:px-6 py-3">
-          <div className="flex items-center justify-between">
+      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 shadow-[0_8px_30px_rgba(15,23,42,0.06)] backdrop-blur-2xl dark:border-slate-800/70 dark:bg-slate-900/90">
+        <div className="px-4 py-3 sm:px-6">
+          <div className="flex items-center justify-between gap-3">
             {/* Logo / Brand */}
             <Link href="/" className="flex items-center gap-3 group">
               <div className="relative">
-              <div className="w-9 h-9 rounded-xl overflow-hidden bg-white shadow-lg flex items-center justify-center">
-                <img src="/logo.png" alt="Sales Logo" className="w-full h-full object-contain" />
-              </div>
-              {isAdmin && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-gray-900 animate-pulse" />
-              )}
-            </div>
-            <div>
-              <span className="font-bold text-gray-900 dark:text-white hidden sm:inline">
-                Sales Portal
-              </span>
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-200/80 dark:bg-slate-800 dark:ring-slate-700">
+                  <img src="/logo.png" alt="Sales Logo" className="h-full w-full object-contain" />
+                </div>
                 {isAdmin && (
-                  <span className="hidden sm:inline ml-2 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
+                  <span className="absolute -right-1 -top-1 h-3 w-3 animate-pulse rounded-full border-2 border-white bg-amber-500 dark:border-slate-900" />
+                )}
+              </div>
+              <div>
+                <span className="hidden font-semibold text-slate-900 dark:text-white sm:inline">
+                  Sales Portal
+                </span>
+                {isAdmin && (
+                  <span className="ml-2 hidden rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 sm:inline">
                     Admin
                   </span>
                 )}
@@ -252,28 +279,29 @@ export default function SalesLayout({
             </Link>
 
             {/* Desktop Navigation Tabs */}
-            <nav className="hidden lg:flex items-center gap-0.5 bg-gray-100/50 dark:bg-gray-800/50 rounded-xl p-1 backdrop-blur-sm">
-              {navItems.map((item) => {
-                const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.id}
-                    href={item.href}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 relative ${
-                      isActive
-                        ? 'bg-white dark:bg-gray-900 text-cyan-600 dark:text-cyan-400 shadow-md'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-900/50'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-sm font-medium">{item.label}</span>
-                    {isActive && (
-                      <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-cyan-500 rounded-full" />
-                    )}
-                  </Link>
-                );
-              })}
+            <nav className="mx-2 hidden flex-1 items-center justify-center lg:flex xl:mx-4">
+              <div className="flex w-full max-w-5xl items-center gap-1.5 rounded-2xl border border-slate-200/70 bg-white/80 p-1.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-800/80">
+                {navItems.map((item) => {
+                  const isActive = item.href === '/sales'
+                    ? isDashboardActive
+                    : pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 transition-all duration-200 relative min-w-0 ${
+                        isActive
+                          ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-600/20 ring-1 ring-cyan-500/20'
+                          : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-white'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="whitespace-nowrap text-sm font-medium">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </nav>
 
             {/* Right Side Actions */}
@@ -300,15 +328,15 @@ export default function SalesLayout({
               </div>
 
               {/* Quick Actions - Desktop */}
-              <div className="hidden lg:flex items-center gap-1">
+              <div className="hidden lg:flex items-center gap-1.5">
                 {quickActions.map((action) => (
                   <Link
                     key={action.label}
                     href={action.href}
-                    className={`p-2 rounded-lg hover:bg-${action.color}-50 dark:hover:bg-${action.color}-900/20 transition-colors group`}
+                    className={`rounded-xl border border-slate-200/70 bg-white/80 p-2.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${getActionClasses(action.color)}`}
                     title={action.label}
                   >
-                    <action.icon className={`w-4 h-4 text-${action.color}-500`} />
+                    <action.icon className={`h-4 w-4 ${getActionIconClass(action.color)}`} />
                   </Link>
                 ))}
               </div>
@@ -483,7 +511,9 @@ export default function SalesLayout({
               {/* Mobile Navigation */}
               <nav className="grid grid-cols-2 gap-1 mb-3">
                 {navItems.map((item) => {
-                  const isActive = pathname === item.href;
+                  const isActive = item.href === '/sales'
+                    ? isDashboardActive
+                    : pathname === item.href || pathname?.startsWith(`${item.href}/`);
                   const Icon = item.icon;
                   return (
                     <Link
@@ -507,18 +537,18 @@ export default function SalesLayout({
               </nav>
 
               {/* Mobile Quick Actions */}
-              <div className="border-t border-gray-200 dark:border-gray-800 pt-3">
-                <p className="text-xs text-gray-500 px-3 mb-2">Quick Actions</p>
+              <div className="border-t border-gray-200 pt-3 dark:border-gray-800">
+                <p className="mb-2 px-3 text-xs text-gray-500">Quick Actions</p>
                 <div className="grid grid-cols-3 gap-2">
                   {quickActions.map((action) => (
                     <Link
                       key={action.label}
                       href={action.href}
                       onClick={() => setMobileMenuOpen(false)}
-                      className={`flex flex-col items-center gap-1 p-3 rounded-lg bg-${action.color}-50 dark:bg-${action.color}-900/20 hover:bg-${action.color}-100 dark:hover:bg-${action.color}-800/30 transition-colors`}
+                      className={`flex flex-col items-center gap-1 rounded-xl border border-slate-200/70 bg-slate-50/80 p-3 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm dark:border-slate-700/70 dark:bg-slate-800/70 ${getActionClasses(action.color)}`}
                     >
-                      <action.icon className={`w-4 h-4 text-${action.color}-500`} />
-                      <span className="text-xs text-gray-700 dark:text-gray-300">{action.label}</span>
+                      <action.icon className={`h-4 w-4 ${getActionIconClass(action.color)}`} />
+                      <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">{action.label}</span>
                     </Link>
                   ))}
                 </div>
@@ -564,15 +594,12 @@ export default function SalesLayout({
             <div className="flex items-center gap-4">
               <span>©Sales Portal</span>
               <span className="hidden sm:inline">•</span>
-              <span className="text-xs">v2.0.0</span>
+              <span className="hidden sm:inline">Version 1.0.0</span>
             </div>
             <div className="flex items-center gap-4">
               <Link href="/privacy" className="hover:text-gray-700 dark:hover:text-gray-300">Privacy</Link>
               <Link href="/terms" className="hover:text-gray-700 dark:hover:text-gray-300">Terms</Link>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-xs">System Online</span>
-              </span>
+
             </div>
           </div>
         </div>

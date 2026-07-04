@@ -1,7 +1,7 @@
 // app/sales/overview.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   DollarSign,
@@ -60,24 +60,9 @@ import {
 import Link from 'next/link';
 import SalesActionCard from '@/components/ui/SalesActionCard';
 
-// Mock data for charts
-const weeklyData = [
-  { name: 'Mon', sales: 45000, orders: 12 },
-  { name: 'Tue', sales: 52000, orders: 15 },
-  { name: 'Wed', sales: 38000, orders: 10 },
-  { name: 'Thu', sales: 61000, orders: 18 },
-  { name: 'Fri', sales: 73000, orders: 22 },
-  { name: 'Sat', sales: 42000, orders: 14 },
-  { name: 'Sun', sales: 35000, orders: 9 },
-];
-
-const monthlyData = [
-  { name: 'Jan', sales: 850000, orders: 45 },
-  { name: 'Feb', sales: 920000, orders: 52 },
-  { name: 'Mar', sales: 780000, orders: 41 },
-  { name: 'Apr', sales: 1030000, orders: 58 },
-  { name: 'May', sales: 890000, orders: 47 },
-  { name: 'Jun', sales: 1150000, orders: 63 },
+// Fallback data for charts when analytics has not returned any points yet
+const fallbackChartData = [
+  { name: 'No activity', sales: 0, orders: 0 },
 ];
 
 const paymentMethodData = [
@@ -89,13 +74,6 @@ const paymentMethodData = [
 ];
 
 const COLORS = ['#06b6d4', '#10b981', '#6366f1', '#f59e0b', '#ef4444'];
-
-const statusData = [
-  { status: 'Completed', count: 85, percentage: 85 },
-  { status: 'Pending', count: 10, percentage: 10 },
-  { status: 'Failed', count: 3, percentage: 3 },
-  { status: 'Refunded', count: 2, percentage: 2 },
-];
 
 export default function SalesOverview() {
   const { user } = useAuth();
@@ -110,18 +88,18 @@ export default function SalesOverview() {
     if (user?.role === 'admin') {
       router.replace('/sales/analytics');
     }
-  }, [user, router]);
+  }, [user?.role, router]);
 
   useEffect(() => {
     if (user?.role === 'sales') {
-      fetchAnalytics();
+      fetchAnalytics(timeRange);
     }
-  }, [user]);
+  }, [user?.role, timeRange]);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (period: 'week' | 'month' | 'quarter' = timeRange) => {
     try {
       setLoading(true);
-      const data = await getSalesAnalyticsOverview();
+      const data = await getSalesAnalyticsOverview(period);
       setAnalytics(data);
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
@@ -154,6 +132,36 @@ export default function SalesOverview() {
       </div>
     );
   }
+
+  const formatGrowth = (value?: number | string) => {
+    const numericValue = typeof value === 'string' ? Number(value) : value ?? 0;
+    const sign = numericValue >= 0 ? '+' : '';
+    return `${sign}${numericValue.toFixed(1)}%`;
+  };
+
+  const chartData = useMemo(() => {
+    const sourceData = analytics?.charts?.dailyPerformance ?? [];
+    if (!sourceData.length) {
+      return fallbackChartData;
+    }
+
+    return sourceData.map((item) => ({
+      name: new Date(item.date).toLocaleDateString('en', { month: 'short', day: 'numeric' }),
+      sales: item.revenue ?? 0,
+      orders: item.orders ?? 0,
+    }));
+  }, [analytics?.charts?.dailyPerformance]);
+
+  const periodLabel = useMemo(() => {
+    switch (timeRange) {
+      case 'week':
+        return 'the last 7 days';
+      case 'quarter':
+        return 'this quarter';
+      default:
+        return 'this month';
+    }
+  }, [timeRange]);
 
   // Helper functions
   const getTotalRevenue = () => analytics?.orders?.totalRevenue || 0;
@@ -188,7 +196,7 @@ export default function SalesOverview() {
       value: `KES ${getTotalRevenue().toLocaleString()}`,
       icon: DollarSign,
       color: 'green',
-      change: analytics?.overview?.revenueGrowth ? `+${analytics.overview.revenueGrowth}%` : '+0%',
+      change: formatGrowth(analytics?.overview?.revenueGrowth),
       trend: 'up' as const,
       detail: 'This month'
     },
@@ -197,7 +205,7 @@ export default function SalesOverview() {
       value: getTotalOrders().toString(),
       icon: ShoppingCart,
       color: 'blue',
-      change: analytics?.overview?.orderGrowth ? `+${analytics.overview.orderGrowth}%` : '+0%',
+      change: formatGrowth(analytics?.overview?.orderGrowth),
       trend: 'up' as const,
       detail: `${getPaidOrders()} completed`
     },
@@ -266,12 +274,12 @@ export default function SalesOverview() {
             </span>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Here's your sales performance overview for today
+            Here's your sales performance overview for {periodLabel}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={fetchAnalytics}
+            onClick={() => fetchAnalytics(timeRange)}
             className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2 text-sm"
           >
             <RefreshCw className="w-4 h-4" />
@@ -339,7 +347,7 @@ export default function SalesOverview() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Sales Overview</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Weekly sales and order trends</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Daily sales and order trends for {periodLabel}</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -365,9 +373,14 @@ export default function SalesOverview() {
             </div>
           </div>
           <div className="h-72">
+            {chartData.length === 0 ? (
+              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-400">
+                No activity recorded for this period yet.
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
               {selectedChart === 'sales' ? (
-                <AreaChart data={weeklyData}>
+                <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
@@ -396,7 +409,7 @@ export default function SalesOverview() {
                   />
                 </AreaChart>
               ) : (
-                <BarChart data={weeklyData}>
+                <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.5} />
                   <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
                   <YAxis stroke="#9ca3af" fontSize={12} />
@@ -412,6 +425,7 @@ export default function SalesOverview() {
                 </BarChart>
               )}
             </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -651,14 +665,14 @@ export default function SalesOverview() {
           icon={FileSpreadsheet}
           title="New Quotation"
           description="Create a new quotation for your customer"
-          href="/sales/quotations/new"
+          href="/sales/quotations"
           color="cyan"
         />
         <SalesActionCard
           icon={UserPlus}
           title="Add Customer"
           description="Register a new customer"
-          href="/sales/customers/new"
+          href="/sales/customers"
           color="purple"
         />
         <SalesActionCard

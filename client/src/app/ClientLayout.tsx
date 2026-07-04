@@ -25,8 +25,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const [mounted, setMounted] = useState(false);
   const hasInitialized = useRef(false);
 
-  // Check if we should show WhatsApp button (hide on dashboard, checkout, admin)
-  const shouldShowWhatsApp = !isDashboard && !isCheckout && !isAdmin;
+  // Check if we should show WhatsApp button (hide on dashboard, sales, checkout, and admin)
+  const shouldShowWhatsApp = !isDashboard && !isSales && !isCheckout && !isAdmin;
 
   useEffect(() => {
     setMounted(true);

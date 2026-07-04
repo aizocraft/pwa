@@ -1,7 +1,7 @@
 // app/dashboard/sales/layout.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   FileSpreadsheet,
@@ -51,6 +51,8 @@ export default function DashboardSalesLayout({
   const pathname = usePathname();
   const { user, isLoggedIn, isAdminOrSales: hasSalesAccess } = useAuth();
   const [activeTab, setActiveTab] = useState('quotations');
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   // Check if user has access
   useEffect(() => {
@@ -59,6 +61,11 @@ export default function DashboardSalesLayout({
       toast.error('Please login to access sales portal');
     }
   }, [isLoggedIn, hasSalesAccess, router]);
+
+  // Prefetch routes so tab switches feel instant.
+  useEffect(() => {
+    tabs.forEach((tab) => router.prefetch(tab.route));
+  }, [router]);
 
   // Set active tab based on current pathname (persist on refresh)
   useEffect(() => {
@@ -70,11 +77,17 @@ export default function DashboardSalesLayout({
     if (currentTab) {
       setActiveTab(currentTab.id);
     }
+    setIsNavigating(false);
   }, [pathname]);
 
   const handleTabChange = (tabId: string, route: string) => {
+    if (activeTab === tabId) return;
+
     setActiveTab(tabId);
-    router.push(route);
+    setIsNavigating(true);
+    startTransition(() => {
+      router.push(route);
+    });
   };
 
   if (!user || !hasSalesAccess) {
@@ -118,7 +131,20 @@ export default function DashboardSalesLayout({
 
       {/* Main Content */}
       <main className="p-4 sm:p-6">
-        {children}
+        {isNavigating || isPending ? (
+          <div className="space-y-4 animate-pulse" aria-live="polite">
+            <div className="h-8 w-56 rounded-xl bg-gray-200/80 dark:bg-gray-800/80" />
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="h-36 rounded-2xl border border-gray-200/70 bg-white/80 dark:border-gray-800 dark:bg-gray-900/70" />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="animate-[fadeIn_220ms_ease-out]">
+            {children}
+          </div>
+        )}
       </main>
     </div>
   );

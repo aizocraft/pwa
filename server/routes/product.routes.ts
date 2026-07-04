@@ -278,8 +278,9 @@ function productRoutes(productModel: typeof ProductModel) {
    */
   router.post('/upload-images', authMiddleware, upload.array('images', 6), async (req: Request, res: Response) => {
     try {
-      if (!isAdmin(req)) {
-        return res.status(403).json({ error: 'Admin access required' });
+      const role = (req as any).user?.role;
+      if (role !== 'admin' && role !== 'sales') {
+        return res.status(403).json({ error: 'Admin or sales access required' });
       }
       
       if (!req.files || (req.files as any[]).length === 0) {
@@ -643,8 +644,9 @@ function productRoutes(productModel: typeof ProductModel) {
    */
   router.post('/:id/upload-images', authMiddleware, upload.array('images', 6), async (req: Request, res: Response) => {
     try {
-      if (!isAdmin(req)) {
-        return res.status(403).json({ error: 'Admin access required' });
+      const role = (req as any).user?.role;
+      if (role !== 'admin' && role !== 'sales') {
+        return res.status(403).json({ error: 'Admin or sales access required' });
       }
       
       if (!req.files || (req.files as any[]).length === 0) {

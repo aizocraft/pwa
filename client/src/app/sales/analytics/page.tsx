@@ -488,63 +488,72 @@ export default function AnalyticsPage() {
     }
 
     if (!rawData || rawData.length === 0) {
-      // Generate sample data if none exists
-      return Array.from({ length: 7 }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        return {
-          date: d.toISOString().split('T')[0],
-          revenue: Math.floor(Math.random() * 50000) + 10000,
-          orders: Math.floor(Math.random() * 8) + 1,
-          quotations: Math.floor(Math.random() * 5) + 1,
-        };
-      });
+      return [];
     }
 
     return rawData.map((item) => ({
       date: item._id || item.date || '',
-      revenue: item.revenue || 0,
-      orders: item.orders || 0,
-      quotations: item.quotations || 0,
+      revenue: Number(item.revenue || 0),
+      orders: Number(item.orders || 0),
+      quotations: Number(item.quotations || 0),
     }));
   };
 
-  const getPaymentMethodsData = () => {
-    if (isAdmin && (analytics as AdminAnalytics)?.charts?.paymentMethods) {
-      const pm = (analytics as AdminAnalytics).charts?.paymentMethods;
-      if (pm?.labels && pm?.datasets) {
-        return pm.labels.map((label, index) => ({
-          name: label,
-          value: pm.datasets[0]?.data[index] || 0,
-          volume: pm.datasets[1]?.data[index] || 0,
-        }));
-      }
+  const getQuotationTrendData = (): any[] => {
+    const rawData = (analytics as any)?.charts?.quotationTrends || [];
+    if (!rawData || rawData.length === 0) {
+      return [];
     }
-    // Sample data
-    return [
-      { name: 'MPESA', value: 45, volume: 450000 },
-      { name: 'CARD', value: 30, volume: 300000 },
-      { name: 'COD', value: 15, volume: 150000 },
-      { name: 'CASH', value: 10, volume: 100000 },
-    ];
+
+    return rawData.map((item: any) => {
+      const total = Object.entries(item || {}).reduce((sum, [key, value]) => {
+        if (key === 'date' || key === '_id') {
+          return sum;
+        }
+        return sum + (typeof value === 'number' ? value : Number(value || 0));
+      }, 0);
+
+      return {
+        date: item.date || item._id || '',
+        total,
+        accepted: Number(item.accepted || item.Accepted || 0),
+        converted: Number(item.converted || item.Converted || 0),
+      };
+    });
+  };
+
+  const getChartSeriesData = (): any[] => {
+    const dailyData = getDailySalesData();
+    const quotationData = getQuotationTrendData();
+
+    if (!quotationData.length) {
+      return dailyData;
+    }
+
+    return dailyData.map((item) => {
+      const matchingQuotation = quotationData.find((quote) => quote.date === item.date);
+      return {
+        ...item,
+        quotations: matchingQuotation ? matchingQuotation.total : 0,
+      };
+    });
+  };
+
+  const getPaymentMethodsData = () => {
+    const paymentMethods = (analytics as any)?.charts?.paymentMethods;
+    if (paymentMethods?.labels?.length && paymentMethods?.datasets?.length) {
+      return paymentMethods.labels.map((label: string, index: number) => ({
+        name: label,
+        value: paymentMethods.datasets[0]?.data[index] || 0,
+        volume: paymentMethods.datasets[1]?.data[index] || 0,
+      }));
+    }
+
+    return [];
   };
 
   const getCategorySalesData = (): any[] => {
-    let categories: any[] = [];
-    if (isAdmin && (analytics as AdminAnalytics)?.charts?.categorySales) {
-      categories = (analytics as AdminAnalytics).charts?.categorySales || [];
-    }
-
-    if (!categories || categories.length === 0) {
-      return [
-        { category: 'Solar Panels', revenue: 250000, quantity: 45 },
-        { category: 'Inverters', revenue: 180000, quantity: 30 },
-        { category: 'Batteries', revenue: 150000, quantity: 25 },
-        { category: 'Accessories', revenue: 80000, quantity: 60 },
-        { category: 'Water Pumps', revenue: 120000, quantity: 15 },
-        { category: 'Generators', revenue: 200000, quantity: 10 },
-      ];
-    }
+    const categories = isAdmin ? (analytics as AdminAnalytics)?.charts?.categorySales || [] : [];
 
     return categories
       .filter((cat) => {
@@ -559,8 +568,8 @@ export default function AnalyticsPage() {
       .map((cat) => ({
         ...cat,
         category: cat.category || 'Other',
-        revenue: cat.revenue || 0,
-        quantity: cat.quantity || 0,
+        revenue: Number(cat.revenue || 0),
+        quantity: Number(cat.quantity || 0),
       }));
   };
 
@@ -571,17 +580,13 @@ export default function AnalyticsPage() {
     }
 
     if (!rawData || rawData.length === 0) {
-      return Array.from({ length: 24 }, (_, i) => ({
-        hour: i,
-        orders: Math.floor(Math.random() * 8),
-        revenue: Math.floor(Math.random() * 30000) + 5000,
-      }));
+      return [];
     }
 
     return rawData.map((item) => ({
       hour: item.hour ?? 0,
-      orders: item.orders || 0,
-      revenue: item.revenue || 0,
+      orders: Number(item.orders || 0),
+      revenue: Number(item.revenue || 0),
     }));
   };
 
@@ -600,7 +605,7 @@ export default function AnalyticsPage() {
   const customers = getCustomers();
   const monthlyTarget = getMonthlyTarget();
   const topProducts = getTopProducts();
-  const dailySales = getDailySalesData();
+  const chartData = useMemo(() => getChartSeriesData(), [analytics, isAdmin]);
   const paymentMethodData = getPaymentMethodsData();
   const categorySales = getCategorySalesData();
   const hourlyDistribution = getHourlyDistributionData();
@@ -608,6 +613,11 @@ export default function AnalyticsPage() {
 
   const hasCategoryData = categorySales.length > 0;
   const displayCategories = showAllCategories ? categorySales : categorySales.slice(0, 6);
+  const activeMetricKey = activeChart === 'revenue' ? 'revenue' : activeChart === 'orders' ? 'orders' : 'quotations';
+  const activeMetricLabel = activeChart === 'revenue' ? 'Revenue' : activeChart === 'orders' ? 'Orders' : 'Quotations';
+  const comparisonMetricKey = activeChart === 'revenue' ? 'orders' : activeChart === 'orders' ? 'revenue' : 'orders';
+  const comparisonMetricLabel = activeChart === 'revenue' ? 'Orders' : activeChart === 'orders' ? 'Revenue' : 'Orders';
+  const hasMetricData = chartData.some((item) => Number(item[activeMetricKey] || 0) > 0);
 
   const totalRevenue = overview.totalRevenue || 0;
   const totalOrders = overview.totalOrders || 0;
@@ -1015,69 +1025,73 @@ export default function AnalyticsPage() {
           </div>
         </div>
         <div className="p-6">
-          {dailySales.length > 0 ? (
+          {chartData.length > 0 && hasMetricData ? (
             <ResponsiveContainer width="100%" height={350}>
               {chartView === 'trend' ? (
-                <ComposedChart data={dailySales}>
+                <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
                   <XAxis dataKey="date" stroke="#6b7280" className="dark:stroke-gray-400" />
                   <YAxis yAxisId="left" stroke="#6b7280" tickFormatter={formatCompact} className="dark:stroke-gray-400" />
                   <YAxis yAxisId="right" orientation="right" stroke="#6b7280" className="dark:stroke-gray-400" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Area
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="revenue"
-                    name="Revenue"
-                    fill="#0043b3"
-                    fillOpacity={0.1}
-                    stroke="#0043b3"
-                    strokeWidth={2}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="orders"
-                    name="Orders"
-                    stroke="#009dff"
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: '#009dff' }}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="quotations"
-                    name="Quotations"
-                    stroke="#00c853"
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: '#00c853' }}
-                    strokeDasharray="5 5"
-                  />
+                  {activeChart === 'revenue' ? (
+                    <Area
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="revenue"
+                      name="Revenue"
+                      fill="#0043b3"
+                      fillOpacity={0.1}
+                      stroke="#0043b3"
+                      strokeWidth={2}
+                    />
+                  ) : activeChart === 'orders' ? (
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="orders"
+                      name="Orders"
+                      stroke="#009dff"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: '#009dff' }}
+                    />
+                  ) : (
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="quotations"
+                      name="Quotations"
+                      stroke="#00c853"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: '#00c853' }}
+                      strokeDasharray="5 5"
+                    />
+                  )}
                 </ComposedChart>
               ) : chartView === 'comparison' ? (
-                <ReBarChart data={dailySales}>
+                <ReBarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
                   <XAxis dataKey="date" stroke="#6b7280" className="dark:stroke-gray-400" />
                   <YAxis stroke="#6b7280" tickFormatter={formatCompact} className="dark:stroke-gray-400" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Bar dataKey="revenue" name="Revenue" fill="#0043b3" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="orders" name="Orders" fill="#009dff" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey={activeMetricKey} name={activeMetricLabel} fill="#0043b3" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey={comparisonMetricKey} name={comparisonMetricLabel} fill="#009dff" radius={[4, 4, 0, 0]} />
                 </ReBarChart>
               ) : (
                 <RePieChart>
                   <Pie
-                    data={dailySales.slice(0, 10)}
+                    data={chartData.filter((item) => Number(item[activeMetricKey] || 0) > 0).slice(0, 10)}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
                     label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                     outerRadius={120}
-                    dataKey="revenue"
+                    dataKey={activeMetricKey}
                     nameKey="date"
                   >
-                    {dailySales.slice(0, 10).map((entry, index) => (
+                    {chartData.filter((item) => Number(item[activeMetricKey] || 0) > 0).slice(0, 10).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>

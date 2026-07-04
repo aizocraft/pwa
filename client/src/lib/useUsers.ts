@@ -172,6 +172,7 @@ export function useUsersPage(params: UsersQueryParams) {
     users: usersQuery.data?.users || [],
     pagination: usersQuery.data?.pagination,
     isLoading: usersQuery.isLoading,
+    isFetching: usersQuery.isFetching,
     error: usersQuery.error,
     refetch,
     

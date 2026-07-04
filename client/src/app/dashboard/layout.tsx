@@ -102,8 +102,10 @@ export default function DashboardLayout({
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
-    toast.success('Successfully signed out! 👋', {
-      duration: 3000,
+
+    const logoutToastId = toast.success('Successfully signed out! 👋', {
+      id: 'logout-success',
+      duration: 2500,
       style: {
         background: '#10B981',
         color: '#fff',
@@ -112,9 +114,11 @@ export default function DashboardLayout({
         fontWeight: '500',
       },
     })
+
     setTimeout(() => {
+      toast.dismiss(logoutToastId)
       router.push('/auth/login')
-    }, 1500)
+    }, 2500)
   }
 
   const navigation = [

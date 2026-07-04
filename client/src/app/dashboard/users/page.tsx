@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useDeferredValue } from 'react'
 import { useUsersPage } from '@/lib/useUsers'
 import { useAuth } from '@/lib/auth'
 import { User, CreateUserRequest, UpdateUserRequest } from '@/types/user'
@@ -15,6 +15,28 @@ import {
   CheckCircle, AlertCircle, Eye, EyeOff, Key, AlertTriangle,
   Download, Upload, ShieldAlert, Copy, Check, Clock
 } from 'lucide-react'
+
+function UsersPageSkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+        <div className="mb-8 animate-pulse lg:mb-12">
+          <div className="h-9 w-56 rounded-2xl bg-gray-200/80 dark:bg-gray-800/80" />
+          <div className="mt-3 h-4 w-80 rounded-xl bg-gray-200/70 dark:bg-gray-800/70" />
+        </div>
+
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="h-24 rounded-2xl border border-gray-200/70 bg-white/80 p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900/70" />
+          ))}
+        </div>
+
+        <div className="mb-6 h-20 rounded-2xl border border-gray-200/70 bg-white/80 shadow-sm dark:border-gray-800 dark:bg-gray-900/70" />
+        <div className="h-[420px] rounded-2xl border border-gray-200/70 bg-white/80 shadow-sm dark:border-gray-800 dark:bg-gray-900/70" />
+      </div>
+    </div>
+  )
+}
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth()
@@ -34,6 +56,7 @@ export default function UsersPage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [showUserDetails, setShowUserDetails] = useState<User | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const deferredSearch = useDeferredValue(search)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -47,6 +70,7 @@ export default function UsersPage() {
     users,
     pagination,
     isLoading,
+    isFetching,
     error,
     refetch,
     createUser,
@@ -54,7 +78,7 @@ export default function UsersPage() {
     deleteUser,
     toggleUserStatus
   } = useUsersPage({
-    search: search || undefined,
+    search: deferredSearch || undefined,
     role: roleFilter || undefined,
     isActive: statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined,
     page,
@@ -65,6 +89,10 @@ export default function UsersPage() {
 
   // Check if current user is admin
   const isAdmin = currentUser?.role === 'admin'
+  const activeUsersCount = useMemo(() => users.filter((u) => u.isActive).length, [users])
+  const salesUsersCount = useMemo(() => users.filter((u) => u.role === 'sales').length, [users])
+  const adminUsersCount = useMemo(() => users.filter((u) => u.role === 'admin').length, [users])
+  const inactiveUsersCount = useMemo(() => users.filter((u) => !u.isActive).length, [users])
 
   const handleCloseModal = () => {
     setShowModal(false)
@@ -257,6 +285,10 @@ export default function UsersPage() {
     }
   }
 
+  if (isLoading || isFetching) {
+    return <UsersPageSkeleton />
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -331,7 +363,7 @@ export default function UsersPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Active Users</p>
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-                  {users.filter(u => u.isActive).length}
+                  {activeUsersCount}
                 </p>
               </div>
               <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
@@ -344,7 +376,7 @@ export default function UsersPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Sales Team</p>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
-                  {users.filter(u => u.role === 'sales').length}
+                  {salesUsersCount}
                 </p>
               </div>
               <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
@@ -357,7 +389,7 @@ export default function UsersPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Admins</p>
                 <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
-                  {users.filter(u => u.role === 'admin').length}
+                  {adminUsersCount}
                 </p>
               </div>
               <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
@@ -370,7 +402,7 @@ export default function UsersPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Inactive</p>
                 <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-                  {users.filter(u => !u.isActive).length}
+                  {inactiveUsersCount}
                 </p>
               </div>
               <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center">

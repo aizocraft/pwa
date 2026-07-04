@@ -1,55 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function Hero() {
-  const [isDark, setIsDark] = useState(true);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    setIsDark(prefersDark);
-    
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === "class") {
-          const isDarkMode = document.documentElement.classList.contains("dark");
-          setIsDark(isDarkMode);
-        }
-      });
-    });
-    
-    observer.observe(document.documentElement, { attributes: true });
-    return () => observer.disconnect();
-  }, []);
-
-  if (!mounted) return null;
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   return (
-    <section className="relative pt-4 md:pt-8 lg:pt-12 overflow-hidden bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]">
-      {/* Background (no gradients; relies on globals.css vars) */}
-      <div className="absolute inset-0" />
+    <section className="relative overflow-hidden bg-[hsl(var(--background))] px-4 py-10 sm:px-6 sm:py-14 md:px-8 md:py-16 lg:px-12 lg:py-20">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,157,255,0.12),transparent_55%)]" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/70 to-transparent" />
 
-      
-      {/* Content Container */}
-      <div className="relative z-10 container mx-auto px-6 sm:px-8 lg:px-12">
-        <div className="max-w-4xl mx-auto text-center">
-          {/* Title */}
-          <h1 className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-tight mb-4 transition-colors duration-500 ${
-            isDark ? "text-white" : "text-gray-900"
-          }`}>
-            Our{" "}
-            <span className="text-cyan-500 dark:text-cyan-400">
-              Projects
-            </span>
-          </h1>
-          
-
-          
-          {/* Decorative Line */}
-          <div className="w-16 h-0.5 bg-cyan-500 mx-auto mt-6 rounded-full" />
+      <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center text-center">
+        <div className="mb-4 inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-600 dark:text-cyan-300">
+          Trusted installations
         </div>
+
+        <h1 className={`text-4xl font-bold leading-tight sm:text-5xl md:text-6xl lg:text-7xl ${isDark ? "text-white" : "text-slate-900"}`}>
+          Our
+          <span className="ml-2 bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 bg-clip-text text-transparent">
+            Projects
+          </span>
+        </h1>
+
+        <p className={`mt-4 max-w-2xl text-sm leading-7 sm:text-base md:text-lg ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+          From solar systems to water solutions, we deliver dependable projects built for performance, durability, and long-term value.
+        </p>
+
+        <div className="mt-6 h-1.5 w-20 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600" />
       </div>
     </section>
   );

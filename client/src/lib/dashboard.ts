@@ -140,128 +140,104 @@ export function useDashboardData() {
     enabled: !!user && isAdmin,
   })
 
-  // Memoized summary data from analytics
+  // Memoized summary data from analytics and order/profit endpoints
   const summary = useMemo((): DashboardSummary | null => {
-    // Use admin analytics if available
-    if (adminAnalyticsQuery.data?.data) {
-      const data = adminAnalyticsQuery.data.data
-      const overview = data.overview || {}
-      const orders = data.orders || {}
-      const transactions = data.transactions || {}
-      const products = data.products || {}
-      const customers = data.customers || {}
+    const adminData = adminAnalyticsQuery.data?.data
+    const salesData = salesAnalyticsQuery.data?.data
+    const adminOverview = adminData?.overview || {}
+    const salesOverview = salesData?.overview || {}
+    const adminOrders = adminData?.orders || {}
+    const salesOrders = salesData?.orders || {}
+    const adminTransactions = adminData?.transactions || {}
+    const salesTransactions = salesData?.transactions || {}
+    const adminProducts = adminData?.products || {}
+    const adminCustomers = adminData?.customers || {}
+    const salesCustomers = salesData?.customers || {}
+    const profitSummary = profitSummaryQuery.data?.summary || {}
+    const orderStatsSummary = orderStatsQuery.data?.summary || {}
+    const inventorySummary = inventorySummaryQuery.data?.summary || {}
 
-      return {
-        totalRevenue: overview.totalRevenue || 0,
-        totalOrders: overview.totalOrders || 0,
-        totalItemsSold: 0,
-        pendingOrders: orders.pendingOrders || 0,
-        cancelledOrders: 0,
-        totalProfit: 0,
-        totalProducts: products.totalProducts || 0,
-        totalTransactions: transactions.totalTransactions || 0,
-        lowStockProducts: products.lowStockProducts || 0,
-        averageOrderValue: overview.averageOrderValue || 0,
-        activeCustomers: customers.activeCustomers || 0,
-        paidOrders: orders.paidOrders || 0,
-        revenueGrowth: overview.revenueGrowth || '0',
-        orderGrowth: overview.orderGrowth || '0',
-        conversionRate: overview.conversionRate || 0,
-        totalStockValue: products.totalStockValue || 0,
-      }
+    const rawOrders = ordersQuery.data?.orders || ordersQuery.data || []
+    const allOrders = Array.isArray(rawOrders) ? rawOrders : []
+    const productsArray = Array.isArray(productsQuery.data)
+      ? productsQuery.data
+      : (productsQuery.data as any)?.products || []
+
+    const isPaidOrder = (order: Order) => {
+      return order.paymentStatus === 'completed' ||
+        order.paymentStatus === 'paid' ||
+        order.status === 'paid' ||
+        order.status === 'delivered'
     }
 
-    // Use sales analytics if available
-    if (salesAnalyticsQuery.data?.data) {
-      const data = salesAnalyticsQuery.data.data
-      const overview = data.overview || {}
-      const orders = data.orders || {}
-      const transactions = data.transactions || {}
-      const customers = data.customers || {}
-
-      return {
-        totalRevenue: overview.totalRevenue || 0,
-        totalOrders: overview.totalOrders || 0,
-        totalItemsSold: 0,
-        pendingOrders: orders.pendingOrders || 0,
-        cancelledOrders: 0,
-        totalProfit: 0,
-        totalProducts: 0,
-        totalTransactions: transactions.totalTransactions || 0,
-        lowStockProducts: 0,
-        averageOrderValue: overview.averageOrderValue || 0,
-        activeCustomers: customers.activeCustomers || 0,
-        paidOrders: orders.paidOrders || 0,
-        revenueGrowth: overview.revenueGrowth || '0',
-        orderGrowth: overview.orderGrowth || '0',
-        conversionRate: overview.conversionRate || 0,
-      }
-    }
-
-    // Fallback: calculate from orders data
-    if (!ordersQuery.data) return null
-
-    const allOrders = ordersQuery.data.orders || ordersQuery.data || []
-    const paidOrders = allOrders.filter((order: Order) => 
-      order.paymentStatus === 'completed' || 
-      order.paymentStatus === 'paid' ||
-      order.status === 'paid' || 
-      order.status === 'delivered'
-    )
-
-    const pendingOrders = allOrders.filter((o: Order) => 
-      o.paymentStatus !== 'completed' && 
+    const paidOrders = allOrders.filter(isPaidOrder)
+    const pendingOrders = allOrders.filter((o: Order) =>
+      o.paymentStatus !== 'completed' &&
       o.paymentStatus !== 'paid' &&
       !['paid', 'delivered', 'cancelled'].includes(o.status || '')
     )
-
     const cancelledOrders = allOrders.filter((o: Order) => o.status === 'cancelled')
 
-    const totalRevenue = paidOrders.reduce((sum, o) => {
-      const total = typeof o.total === 'number' ? o.total : parseFloat(o.total || '0')
-      return sum + total
-    }, 0)
+    const totalRevenue = Number(
+      adminOverview.totalRevenue ??
+      salesOverview.totalRevenue ??
+      paidOrders.reduce((sum, o) => sum + (typeof o.total === 'number' ? o.total : parseFloat(o.total || '0')), 0)
+    ) || 0
 
-    const totalItemsSold = paidOrders.reduce((sum, o) => {
-      const items = o.items || []
-      return sum + items.reduce((itemSum, item) => itemSum + (item.qty || 0), 0)
-    }, 0)
+    const totalOrders = Number(
+      adminOverview.totalOrders ??
+      salesOverview.totalOrders ??
+      allOrders.length
+    ) || 0
 
-    // Get product count from products query
-    const productsArray = Array.isArray(productsQuery.data) 
-      ? productsQuery.data 
-      : (productsQuery.data as any)?.products || []
-    const totalProducts = productsArray.length
+    const totalItemsSold = Number(
+      profitSummary.totalUnitsSold ??
+      adminOverview.totalItemsSold ??
+      salesOverview.totalItemsSold ??
+      paidOrders.reduce((sum, o) => {
+        const items = o.items || []
+        return sum + items.reduce((itemSum, item) => itemSum + (item.qty || 0), 0)
+      }, 0)
+    ) || 0
+
+    const derivedProfit = paidOrders.reduce((sum, o) => sum + Number((o as any).totalProfit || 0), 0)
+    const totalProfit = Number(
+      profitSummary.totalProfit ??
+      orderStatsSummary.totalProfit ??
+      adminOverview.totalProfit ??
+      salesOverview.totalProfit ??
+      derivedProfit
+    ) || 0
+
+    const totalProducts = Number(adminProducts.totalProducts ?? productsArray.length) || 0
     const lowStockProducts = productsArray.filter((p: any) => p.stock !== undefined && p.stock < 10).length
 
-    // Get transactions count from transaction stats
-    const txStats = transactionStatsQuery.data
-    const totalTransactions = txStats?.summary?.totalTransactions || 0
+    const totalTransactions = Number(
+      transactionStatsQuery.data?.summary?.totalTransactions ??
+      adminTransactions.totalTransactions ??
+      salesTransactions.totalTransactions ??
+      0
+    ) || 0
 
-    // Get profit from profit summary
-    const profitData = profitSummaryQuery.data
-    const totalProfit = profitData?.summary?.totalProfit || 0
-
-    // Get inventory value
-    const inventoryData = inventorySummaryQuery.data
-    const totalStockValue = inventoryData?.summary?.totalStockValue || 0
+    const totalStockValue = Number(inventorySummary.totalStockValue ?? adminProducts.totalStockValue ?? 0) || 0
 
     return {
       totalRevenue,
-      totalOrders: allOrders.length,
+      totalOrders,
       totalItemsSold,
-      pendingOrders: pendingOrders.length,
-      cancelledOrders: cancelledOrders.length,
+      pendingOrders: Number(adminOrders.pendingOrders ?? salesOrders.pendingOrders ?? pendingOrders.length) || 0,
+      cancelledOrders: Number(cancelledOrders.length) || 0,
       totalProfit,
       totalProducts,
       totalTransactions,
       lowStockProducts,
-      averageOrderValue: allOrders.length > 0 ? totalRevenue / allOrders.length : 0,
-      activeCustomers: 0,
-      paidOrders: paidOrders.length,
-      revenueGrowth: '0',
-      orderGrowth: '0',
-      conversionRate: 0,
+      averageOrderValue: Number(adminOverview.averageOrderValue ?? salesOverview.averageOrderValue ?? (totalOrders > 0 ? totalRevenue / totalOrders : 0)) || 0,
+      activeCustomers: Number(adminCustomers.activeCustomers ?? salesCustomers.activeCustomers ?? 0) || 0,
+      paidOrders: Number(adminOrders.paidOrders ?? salesOrders.paidOrders ?? paidOrders.length) || 0,
+      revenueGrowth: adminOverview.revenueGrowth || salesOverview.revenueGrowth || '0',
+      orderGrowth: adminOverview.orderGrowth || salesOverview.orderGrowth || '0',
+      profitGrowth: adminOverview.profitGrowth || salesOverview.profitGrowth || '0',
+      conversionRate: Number(adminOverview.conversionRate ?? salesOverview.conversionRate ?? 0) || 0,
       totalStockValue,
     }
   }, [
@@ -271,22 +247,16 @@ export function useDashboardData() {
     productsQuery.data,
     transactionStatsQuery.data,
     profitSummaryQuery.data,
+    orderStatsQuery.data,
     inventorySummaryQuery.data,
   ])
 
   const recentOrders = useMemo(() => {
-    // Use analytics data if available
-    if (adminAnalyticsQuery.data?.data?.recentActivities?.orders) {
-      return adminAnalyticsQuery.data.data.recentActivities.orders.slice(0, 5)
-    }
-    if (salesAnalyticsQuery.data?.data?.recentActivities?.orders) {
-      return salesAnalyticsQuery.data.data.recentActivities.orders.slice(0, 5)
-    }
+    const fallbackOrders = ordersQuery.data?.orders || ordersQuery.data || []
+    const analyticsOrders = adminAnalyticsQuery.data?.data?.recentActivities?.orders || salesAnalyticsQuery.data?.data?.recentActivities?.orders || []
+    const sourceOrders = Array.isArray(fallbackOrders) && fallbackOrders.length > 0 ? fallbackOrders : analyticsOrders
 
-    // Fallback to orders query
-    if (!ordersQuery.data) return []
-    const allOrders = ordersQuery.data.orders || ordersQuery.data || []
-    return [...allOrders]
+    return [...sourceOrders]
       .sort((a: Order, b: Order) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
@@ -296,23 +266,23 @@ export function useDashboardData() {
   }, [adminAnalyticsQuery.data, salesAnalyticsQuery.data, ordersQuery.data])
 
   const topProducts = useMemo((): DashboardTopProduct[] => {
-    // Use analytics data for top products if available
     const analyticsData = adminAnalyticsQuery.data?.data || salesAnalyticsQuery.data?.data
-    if (analyticsData?.topProducts && analyticsData.topProducts.length > 0) {
-      return analyticsData.topProducts.slice(0, 5).map((p: any, index: number) => ({
+    const analyticsProducts = Array.isArray(analyticsData?.topProducts) ? analyticsData.topProducts : []
+
+    if (analyticsProducts.length > 0) {
+      return analyticsProducts.slice(0, 5).map((p: any, index: number) => ({
         id: p.id || p.productId || String(index),
         name: p.name || 'Unknown Product',
-        sales: p.quantity || p.sales || 0,
-        revenue: p.revenue || p.totalRevenue || 0,
-        growth: '+0%',
+        sales: Number(p.quantity ?? p.sales ?? 0) || 0,
+        revenue: Number(p.revenue ?? p.totalRevenue ?? 0) || 0,
+        growth: p.growth || '+0%',
         stock: p.stock,
         rank: index + 1,
-        margin: p.margin || p.profitMargin || 0,
-        profit: p.profit || 0,
+        margin: Number(p.margin ?? p.profitMargin ?? 0) || 0,
+        profit: Number(p.profit ?? p.totalProfit ?? 0) || 0,
       }))
     }
 
-    // Fallback: calculate from orders
     if (!ordersQuery.data || !productsQuery.data) return []
 
     const allOrders = ordersQuery.data.orders || ordersQuery.data || []
