@@ -660,15 +660,15 @@ export default function AnalyticsPage() {
           generatedAt: new Date().toISOString(),
           exportedBy: user?.name || user?.email || 'Unknown',
         };
-      } else if (exportType === 'charts') {
-        exportData = {
-          dailySales: dailySales,
-          paymentMethods: paymentMethodData,
-          categorySales: categorySales,
-          hourlyDistribution: hourlyDistribution,
-          topProducts: topProducts,
-          generatedAt: new Date().toISOString(),
-        };
+} else if (exportType === 'charts') {
+  exportData = {
+    dailySales: chartData,  // ← Use chartData instead
+    paymentMethods: paymentMethodData,
+    categorySales: categorySales,
+    hourlyDistribution: hourlyDistribution,
+    topProducts: topProducts,
+    generatedAt: new Date().toISOString(),
+  };
       } else if (exportType === 'pdf') {
         // Generate PDF report (simplified - would use a library in production)
         const reportContent = `
@@ -1239,40 +1239,48 @@ export default function AnalyticsPage() {
                       paddingAngle={2}
                       dataKey="value"
                     >
-                      {paymentMethodData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={CHART_COLORS[index % CHART_COLORS.length]}
-                          stroke="white"
-                          strokeWidth={2}
-                        />
-                      ))}
+                    {paymentMethodData.map((entry: { name: string; value: number; volume: number }, index: number) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        stroke="white"
+                        strokeWidth={2}
+                      />
+                    ))}
                     </Pie>
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
-                              <p className="font-semibold text-gray-900 dark:text-white">{data.name}</p>
-                              <p className="text-sm text-gray-600 dark:text-gray-300">
-                                Count: {data.value} ({((data.value / paymentMethodData.reduce((s, p) => s + p.value, 0)) * 100).toFixed(0)}%)
-                              </p>
-                              <p className="text-sm text-gray-600 dark:text-gray-300">
-                                Volume: {formatCurrency(data.volume)}
-                              </p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
+                   <Tooltip
+                    content={({ active, payload }: { active?: boolean; payload?: readonly any[] }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0]?.payload;
+                        if (!data) return null;
+                        
+                        const totalValue = paymentMethodData.reduce(
+                          (sum: number, item: { value: number }) => sum + item.value, 
+                          0
+                        );
+                        const percentage = totalValue > 0 ? ((data.value / totalValue) * 100) : 0;
+                        
+                        return (
+                          <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
+                            <p className="font-semibold text-gray-900 dark:text-white">{data.name}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                              Count: {data.value} ({percentage.toFixed(0)}%)
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                              Volume: {formatCurrency(data.volume)}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
                     <Legend verticalAlign="bottom" height={36} />
                   </RePieChart>
                 </ResponsiveContainer>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                  {paymentMethodData.map((method, idx) => {
+                  {paymentMethodData.map((method: { name: string; volume: number }, idx: number) => {
                     const icons: Record<string, any> = {
                       MPESA: Smartphone,
                       CARD: CreditCard,
