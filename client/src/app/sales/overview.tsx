@@ -109,6 +109,30 @@ export default function SalesOverview() {
     }
   };
 
+  const chartData = useMemo(() => {
+    const sourceData = analytics?.charts?.dailyPerformance ?? [];
+    if (!sourceData.length) {
+      return fallbackChartData;
+    }
+
+    return sourceData.map((item) => ({
+      name: new Date(item.date).toLocaleDateString('en', { month: 'short', day: 'numeric' }),
+      sales: item.revenue ?? 0,
+      orders: item.orders ?? 0,
+    }));
+  }, [analytics?.charts?.dailyPerformance]);
+
+  const periodLabel = useMemo(() => {
+    switch (timeRange) {
+      case 'week':
+        return 'the last 7 days';
+      case 'quarter':
+        return 'this quarter';
+      default:
+        return 'this month';
+    }
+  }, [timeRange]);
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -138,30 +162,6 @@ export default function SalesOverview() {
     const sign = numericValue >= 0 ? '+' : '';
     return `${sign}${numericValue.toFixed(1)}%`;
   };
-
-  const chartData = useMemo(() => {
-    const sourceData = analytics?.charts?.dailyPerformance ?? [];
-    if (!sourceData.length) {
-      return fallbackChartData;
-    }
-
-    return sourceData.map((item) => ({
-      name: new Date(item.date).toLocaleDateString('en', { month: 'short', day: 'numeric' }),
-      sales: item.revenue ?? 0,
-      orders: item.orders ?? 0,
-    }));
-  }, [analytics?.charts?.dailyPerformance]);
-
-  const periodLabel = useMemo(() => {
-    switch (timeRange) {
-      case 'week':
-        return 'the last 7 days';
-      case 'quarter':
-        return 'this quarter';
-      default:
-        return 'this month';
-    }
-  }, [timeRange]);
 
   // Helper functions
   const getTotalRevenue = () => analytics?.orders?.totalRevenue || 0;
