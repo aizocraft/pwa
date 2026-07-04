@@ -96,14 +96,25 @@ export default function SalesOverview() {
     }
   }, [user?.role, timeRange]);
 
-  const fetchAnalytics = async (period: 'week' | 'month' | 'quarter' = timeRange) => {
+  const fetchAnalytics = async (
+    period: 'week' | 'month' | 'quarter' = timeRange,
+    showToast = false
+  ) => {
+    const toastId = showToast ? toast.loading('Loading sales dashboard...') : undefined;
     try {
       setLoading(true);
       const data = await getSalesAnalyticsOverview(period);
       setAnalytics(data);
+      if (toastId) {
+        toast.success('Sales dashboard refreshed', { id: toastId, duration: 4000 });
+      }
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
-      toast.error('Failed to load dashboard data');
+      if (toastId) {
+        toast.error('Failed to load dashboard data', { id: toastId, duration: 5000 });
+      } else {
+        toast.error('Failed to load dashboard data');
+      }
     } finally {
       setLoading(false);
     }
@@ -279,7 +290,7 @@ export default function SalesOverview() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => fetchAnalytics(timeRange)}
+            onClick={() => fetchAnalytics(timeRange, true)}
             className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2 text-sm"
           >
             <RefreshCw className="w-4 h-4" />

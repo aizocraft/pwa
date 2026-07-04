@@ -448,43 +448,46 @@ export default function SalesCustomers() {
   // ==================== HANDLERS ====================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const toastId = toast.loading(editingCustomer ? 'Updating customer...' : 'Creating customer...');
     try {
       if (editingCustomer) {
         await updateSalesCustomer(editingCustomer._id, formData);
-        toast.success('Customer updated successfully');
+        toast.success('Customer updated successfully', { id: toastId, duration: 4500 });
       } else {
         await createSalesCustomer(formData);
-        toast.success('Customer created successfully');
+        toast.success('Customer created successfully', { id: toastId, duration: 4500 });
       }
       setShowModal(false);
       resetForm();
       fetchCustomers();
       fetchStats();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Operation failed');
+      toast.error(error.response?.data?.error || 'Operation failed', { id: toastId, duration: 5000 });
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this customer?')) return;
+    const toastId = toast.loading('Deleting customer...');
     try {
       await deleteSalesCustomer(id);
-
+      toast.success('Customer deleted successfully', { id: toastId, duration: 4500 });
       fetchCustomers();
       fetchStats();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Delete failed');
+      toast.error(error.response?.data?.error || 'Delete failed', { id: toastId, duration: 5000 });
     }
   };
 
   const handleToggleStatus = async (id: string, status: 'active' | 'inactive') => {
+    const toastId = toast.loading('Updating status...');
     try {
       await toggleSalesCustomerStatus(id, status);
-     
+      toast.success('Customer status updated successfully', { id: toastId, duration: 4500 });
       fetchCustomers();
       fetchStats();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update status');
+      toast.error(error.response?.data?.error || 'Failed to update status', { id: toastId, duration: 5000 });
     }
   };
 
