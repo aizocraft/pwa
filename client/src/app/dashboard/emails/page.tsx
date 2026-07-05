@@ -409,12 +409,6 @@ export default function EmailsPage() {
                 Send and manage transactional emails with ease
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0043b3]/5 dark:bg-[#0043b3]/10 rounded-full border border-[#0043b3]/20">
-                <div className="w-2 h-2 rounded-full bg-[#00c853] animate-pulse" />
-                <span className="text-xs text-gray-600 dark:text-gray-400">All systems operational</span>
-              </div>
-            </div>
           </div>
         </div>
 
