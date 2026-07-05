@@ -103,7 +103,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent"
+           className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white"
           >
             {getPageTitle()}
           </motion.h1>
@@ -132,7 +132,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   onClick={() => handleTabChange('login')}
                   className={`relative flex-1 py-3 px-4 lg:py-3.5 lg:px-6 rounded-xl font-semibold text-sm lg:text-base transition-all duration-300 z-10 ${
                     activeTab === 'login'
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25'
+                      ? 'bg-[#0043b3] text-white shadow-md shadow-blue-500/25'
                       : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-gray-800/50'
                   }`}
                 >
@@ -142,7 +142,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   onClick={() => handleTabChange('register')}
                   className={`relative flex-1 py-3 px-4 lg:py-3.5 lg:px-6 rounded-xl font-semibold text-sm lg:text-base transition-all duration-300 z-10 ${
                     activeTab === 'register'
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25'
+                      ? 'bg-[#0043b3] text-white shadow-md shadow-blue-500/25'
                       : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-gray-800/50'
                   }`}
                 >
@@ -151,7 +151,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 <motion.div
                   layout
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl shadow-lg ${
+                  className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-[#0043b3] rounded-xl shadow-lg ${
                     activeTab === 'login' ? 'left-1' : 'left-[calc(50%-2px)]'
                   }`}
                 />

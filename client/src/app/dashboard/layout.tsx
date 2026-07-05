@@ -268,8 +268,7 @@ export default function DashboardLayout({
           <div className="flex h-20 items-center justify-between px-6 border-b border-gray-200/50 dark:border-gray-800/50 shrink-0">
             <Link href="/" className="flex items-center gap-3 group">
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl blur"></div>
-                <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg group-hover:scale-105 transition-transform duration-200 overflow-hidden flex items-center justify-center">
+                <div className="h-10 w-10 rounded-xl bg-white dark:bg-gray-800 shadow-lg group-hover:scale-105 transition-transform duration-200 overflow-hidden flex items-center justify-center border border-gray-200 dark:border-gray-700">
                   {faviconUrl ? (
                     <Image
                       src={faviconUrl}
@@ -280,7 +279,7 @@ export default function DashboardLayout({
                       unoptimized={faviconUrl.includes('/company/favicon/')}
                     />
                   ) : (
-                    <span className="text-white font-bold text-lg">
+                    <span className="text-gray-700 dark:text-gray-300 font-bold text-lg">
                       {companyName.charAt(0)}
                     </span>
                   )}
@@ -301,21 +300,6 @@ export default function DashboardLayout({
             </button>
           </div>
 
-          {/* User Profile Info */}
-          <div className="px-4 py-6 border-b border-gray-200/50 dark:border-gray-800/50 shrink-0">
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-gray-800/50 dark:to-gray-800/50">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-lg">{user?.name?.charAt(0) || 'A'}</span>
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full animate-pulse" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900 dark:text-white">{user?.name || 'Admin'}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user?.role || 'Administrator'}</p>
-              </div>
-            </div>
-          </div>
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto px-3 py-6">

@@ -211,15 +211,28 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
         { $sort: { _id: 1 } }
       ]),
       
-      // Top 10 products by revenue
+      // Top 10 products by total profit (paid/completed orders only)
       OrderModel.aggregate([
-        { $match: { createdAt: { $gte: periodStart } } },
+        {
+          $match: {
+            createdAt: { $gte: periodStart },
+            paymentStatus: 'completed'
+          }
+        },
         { $unwind: '$items' },
         {
           $group: {
             _id: '$items.productId',
             name: { $first: '$items.name' },
-            revenue: { $sum: { $multiply: ['$items.price', '$items.qty'] } },
+            // Use profit if available, otherwise fall back to sellingPrice - buyingPrice
+            revenue: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$items.profit', { $subtract: ['$items.sellingPrice', '$items.buyingPrice'] }] },
+                  '$items.qty'
+                ]
+              }
+            },
             quantity: { $sum: '$items.qty' },
             orders: { $sum: 1 }
           }

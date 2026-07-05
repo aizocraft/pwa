@@ -7,7 +7,7 @@ export default function Hero() {
   const isDark = theme === "dark";
 
   return (
-    <section className="relative overflow-hidden bg-[hsl(var(--background))] px-4 py-10 sm:px-6 sm:py-14 md:px-8 md:py-16 lg:px-12 lg:py-20">
+<section className="relative overflow-hidden bg-[hsl(var(--background))] px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10 lg:px-12 lg:py-12">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,157,255,0.12),transparent_55%)]" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/70 to-transparent" />
 
