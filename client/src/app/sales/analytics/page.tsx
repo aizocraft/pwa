@@ -613,6 +613,17 @@ export default function AnalyticsPage() {
 
   const hasCategoryData = categorySales.length > 0;
   const displayCategories = showAllCategories ? categorySales : categorySales.slice(0, 6);
+
+  // Backend should provide `percentage`, but add a safe fallback for older data
+  const normalizedDisplayCategories = useMemo(() => {
+    const total = displayCategories.reduce((sum, c) => sum + (Number(c.revenue) || 0), 0);
+    return displayCategories.map((c) => {
+      const revenue = Number(c.revenue) || 0;
+      const percentage = typeof c.percentage === 'number' ? c.percentage : total > 0 ? (revenue / total) * 100 : 0;
+      return { ...c, percentage };
+    });
+  }, [displayCategories]);
+
   const activeMetricKey = activeChart === 'revenue' ? 'revenue' : activeChart === 'orders' ? 'orders' : 'quotations';
   const activeMetricLabel = activeChart === 'revenue' ? 'Revenue' : activeChart === 'orders' ? 'Orders' : 'Quotations';
   const comparisonMetricKey = activeChart === 'revenue' ? 'orders' : activeChart === 'orders' ? 'revenue' : 'orders';
@@ -1131,8 +1142,8 @@ export default function AnalyticsPage() {
               <>
                 <ResponsiveContainer width="100%" height={300}>
                   <RePieChart>
-                          <Pie
-                            data={displayCategories}
+                  <Pie
+                            data={normalizedDisplayCategories}
                             cx="50%"
                             cy="50%"
                             innerRadius={50}
@@ -1166,10 +1177,10 @@ export default function AnalyticsPage() {
                 </ResponsiveContainer>
 
                 <div className="grid grid-cols-2 gap-2 mt-4">
-                  {displayCategories.map((cat, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:shadow-sm transition-all"
+                    {normalizedDisplayCategories.map((cat, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:shadow-sm transition-all"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">

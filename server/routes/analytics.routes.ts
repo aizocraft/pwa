@@ -588,11 +588,22 @@ router.get('/admin/overview', authMiddleware, async (req: Request & { user?: any
           quotationTrends: quotationTrendsChart,
           paymentMethods: paymentMethodData,
           hourlyDistribution: hourlyChart,
-          categorySales: categorySales.map((cat: any) => ({
-            category: cat._id,
-            revenue: cat.revenue,
-            quantity: cat.quantity
-          }))
+          categorySales: (() => {
+            const raw = (categorySales || []).map((cat: any) => ({
+              category: cat._id,
+              revenue: cat.revenue,
+              quantity: cat.quantity,
+            }));
+
+            const totalRevenue = raw.reduce((sum: number, c: any) => sum + (Number(c.revenue) || 0), 0);
+            return raw.map((c: any) => {
+              const share = totalRevenue > 0 ? ((Number(c.revenue) || 0) / totalRevenue) * 100 : 0;
+              return {
+                ...c,
+                percentage: share,
+              };
+            });
+          })()
         },
         topProducts: topProducts.map(p => ({
           id: p._id,
