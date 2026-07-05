@@ -45,8 +45,6 @@ import { Product } from '@/types/product';
 import ProductCard from '@/components/ProductCard';
 import { useCartStore } from '@/store/cart';
 import { getProducts, getBrands } from '@/lib/api';
-// RichTextRenderer is no longer needed here since ProductCard handles it internally
-// import RichTextRenderer from '@/components/RichTextRenderer';
 
 // ============================================================================
 // CONSTANTS
@@ -74,7 +72,10 @@ export default function ProductsClient() {
     searchParams.get('category') || 'all',
   );
   
-  /** Currently selected brand filter ('all' means no filter) */
+  /**
+   * Currently selected brand filter ('all' means no filter)
+   * Brand matching is done server-side via the `brand` query param.
+   */
   const [selectedBrand, setSelectedBrand] = useState(searchParams.get('brand') || 'all');
 
   /** Minimum price for range filtering */
@@ -127,7 +128,7 @@ export default function ProductsClient() {
    * Pre-fetch all brands for the filter dropdown
    * This runs in the background and caches brand names for autocomplete
    */
-  useQuery({
+  const { data: brandsData } = useQuery({
     queryKey: ['brands'],
     queryFn: () => getBrands().catch(() => []),
     staleTime: 30 * 60 * 1000, // 30 minutes cache
@@ -249,9 +250,13 @@ export default function ProductsClient() {
     // Search filtering
     if (search.trim()) params.q = search.trim();
     
-    // Category and brand filters
+    // Category filter
     if (selectedCategory !== 'all') params.category = selectedCategory;
-    if (selectedBrand !== 'all' && selectedBrand !== '') params.brand = selectedBrand;
+    
+    // Brand filter - FIXED: properly send brand parameter
+    if (selectedBrand && selectedBrand !== 'all' && selectedBrand !== '') {
+      params.brand = selectedBrand;
+    }
 
     // Price range filters
     if (minPrice > 0 && !isNaN(minPrice)) params.minPrice = minPrice;
@@ -290,7 +295,7 @@ export default function ProductsClient() {
   }, [
     search,
     selectedCategory,
-    selectedBrand,
+    selectedBrand, // ✅ FIX: Include brand in dependencies
     minPrice,
     maxPrice,
     showInStockOnly,
@@ -305,7 +310,11 @@ export default function ProductsClient() {
    */
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['products', getApiParams],
-    queryFn: () => getProducts(getApiParams),
+    queryFn: () => {
+      // Debug: Log what's being sent to the API
+      console.log('📦 Fetching products with params:', getApiParams);
+      return getProducts(getApiParams);
+    },
     placeholderData: keepPreviousData,
   });
 
@@ -488,7 +497,7 @@ export default function ProductsClient() {
    */
   if (isLoading && !data) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+      <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
         <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pt-8 md:pt-12 lg:pt-16">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[...Array(6)].map((_, i) => (
@@ -510,11 +519,11 @@ export default function ProductsClient() {
    */
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-gray-950">
         <div className="text-center p-8 max-w-md">
           <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Failed to load products</h2>
-          <p className="text-gray-600 mb-6">Please check your connection and try again</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Failed to load products</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">Please check your connection and try again</p>
           <button
             onClick={() => refetch()}
             className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
@@ -531,7 +540,7 @@ export default function ProductsClient() {
   // --------------------------------------------------------------------------
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
       <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pt-8 md:pt-12 lg:pt-16">
         
         {/* ====================================================================
@@ -592,7 +601,7 @@ export default function ProductsClient() {
                   </div>
                 </div>
 
-                {/* Brand Filter Dropdown */}
+                {/* Brand Filter Dropdown - FIXED */}
                 <div className="relative group">
                   <button className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-medium hover:border-blue-500 transition-colors">
                     {selectedBrand === 'all' ? 'All Brands' : selectedBrand.length > 20 ? selectedBrand.slice(0, 18) + '...' : selectedBrand}
@@ -791,8 +800,8 @@ export default function ProductsClient() {
           // Empty State
           <div className="text-center py-16">
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No products found</h3>
-            <p className="text-gray-600 mb-4">Try adjusting your search or filters</p>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No products found</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">Try adjusting your search or filters</p>
             <button
               onClick={clearAllFilters}
               className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
@@ -871,7 +880,7 @@ export default function ProductsClient() {
           <div className="fixed bottom-6 right-6 z-50">
             <Link
               href="/cart"
-              className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-xl shadow-xl transition-all transform hover:scale-105 active:scale-95"
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 px-6 rounded-xl shadow-xl transition-all transform hover:scale-105 active:scale-95"
               aria-label={`View cart with ${cartItemsCount} items`}
             >
               <ShoppingCart className="w-4 h-4" />

@@ -40,11 +40,7 @@ const OrderStatusBadge = ({ status }: { status: Order['status'] }) => {
 };
 
 // Invoice/Receipt Content Component
-// Invoice/Receipt Content Component - Compact & Multi-Page Ready
-// Update the DocumentContent component to handle sellingPrice instead of price
-
 const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; settings: any; logoUrl: string | null; isPaid: boolean }) => {
-  // Helper function to safely get price from order item
   const getItemPrice = (item: any) => {
     return item.sellingPrice || item.price || 0;
   };
@@ -67,7 +63,6 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
   const customerEmail = order.user?.email || order.guestInfo?.email || order.shippingAddress?.email || '';
   const customerPhone = order.guestInfo?.phone || order.shippingAddress?.phone || '';
 
-  // Split items into chunks for multi-page support (15 items per page)
   const itemsPerPage = 15;
   const itemChunks = [];
   for (let i = 0; i < order.items.length; i += itemsPerPage) {
@@ -78,9 +73,7 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
 
   return (
     <div className="bg-white" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
-      {/* Page 1 */}
       <div className="p-6" style={{ padding: '1.5cm' }}>
-        {/* Header - Logo and Title */}
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
@@ -120,7 +113,6 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
           </div>
         </div>
 
-        {/* Customer Info - Bill To & Ship To Side by Side */}
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: '1fr 1fr', 
@@ -128,7 +120,6 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
           marginBottom: '20px',
           fontSize: '9pt'
         }}>
-          {/* Bill To */}
           <div>
             <div style={{ fontWeight: 'bold', color: '#1a472a', borderBottom: '1px solid #e0e0e0', paddingBottom: '4px', marginBottom: '6px' }}>
               BILL TO
@@ -143,7 +134,6 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
             </div>
           </div>
 
-          {/* Ship To */}
           <div>
             <div style={{ fontWeight: 'bold', color: '#1a472a', borderBottom: '1px solid #e0e0e0', paddingBottom: '4px', marginBottom: '6px' }}>
               SHIP TO
@@ -159,7 +149,6 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
           </div>
         </div>
 
-        {/* Order Items Table - First Page */}
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt', marginBottom: '10px' }}>
           <thead>
             <tr style={{ backgroundColor: '#f5f5f0', borderBottom: '2px solid #1a472a' }}>
@@ -192,7 +181,6 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
           </tbody>
         </table>
 
-        {/* Summary */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
           <div style={{ width: '220px', fontSize: '9pt' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
@@ -243,7 +231,6 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
           </div>
         </div>
 
-        {/* Payment Info */}
         <div style={{ 
           display: 'flex', 
           gap: '20px', 
@@ -258,13 +245,13 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
           }</div>
           <div>
             <span style={{ fontWeight: 'bold' }}>Status:</span>{' '}
-<span style={{ 
-  color: (order.paymentStatus as string) === 'paid' ? '#1a472a' : 
-         (order.paymentStatus as string) === 'refunded' ? '#dc2626' : '#d97706',
-  fontWeight: 'bold'
-}}>
-  {order.paymentStatus?.toUpperCase() || 'PENDING'}
-</span>
+            <span style={{ 
+              color: (order.paymentStatus as string) === 'paid' ? '#1a472a' : 
+                     (order.paymentStatus as string) === 'refunded' ? '#dc2626' : '#d97706',
+              fontWeight: 'bold'
+            }}>
+              {order.paymentStatus?.toUpperCase() || 'PENDING'}
+            </span>
           </div>
           {order.paymentDetails?.transactionId && (
             <div><span style={{ fontWeight: 'bold' }}>Txn:</span> <span style={{ fontFamily: 'monospace', fontSize: '7pt' }}>{order.paymentDetails.transactionId}</span></div>
@@ -274,7 +261,6 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
           )}
         </div>
 
-        {/* Footer */}
         <div style={{ 
           marginTop: '20px',
           paddingTop: '12px',
@@ -297,10 +283,8 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
         </div>
       </div>
 
-      {/* Subsequent Pages */}
       {itemChunks.slice(1).map((chunk, pageIndex) => (
         <div key={pageIndex} style={{ pageBreakBefore: 'always', padding: '1.5cm' }}>
-          {/* Mini Header */}
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -321,7 +305,6 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
             </div>
           </div>
 
-          {/* Items Table - Continued */}
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
             <thead>
               <tr style={{ backgroundColor: '#f5f5f0', borderBottom: '2px solid #1a472a' }}>
@@ -354,7 +337,6 @@ const DocumentContent = ({ order, settings, logoUrl, isPaid }: { order: Order; s
             </tbody>
           </table>
 
-          {/* Footer for continuation pages */}
           <div style={{ textAlign: 'center', fontSize: '7pt', color: '#aaa', marginTop: '20px' }}>
             Continued from previous page...
           </div>
@@ -535,7 +517,7 @@ export default function UserOrderDetails() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
+      <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
           <div className="animate-pulse space-y-8">
             <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-xl w-64"></div>
@@ -556,7 +538,7 @@ export default function UserOrderDetails() {
 
   if (!order) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
+      <div className="min-h-screen flex items-center justify-center p-8 bg-slate-50 dark:bg-gray-950">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -572,7 +554,7 @@ export default function UserOrderDetails() {
           <p className="text-gray-600 dark:text-gray-300 mb-8">The order you're looking for doesn't exist or you don't have permission to view it.</p>
           <Link 
             href="/orders"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-bold rounded-2xl shadow-xl transition-all duration-300 transform hover:scale-105"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl shadow-xl transition-all duration-300 transform hover:scale-105"
           >
             <ArrowLeft className="w-5 h-5" />
             Back to Orders
@@ -590,7 +572,7 @@ export default function UserOrderDetails() {
   const customerPhone = order.guestInfo?.phone || order.shippingAddress?.phone || ''
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
       {/* Hidden Document Template for PDF/PNG */}
       <div className="fixed left-[-9999px] top-0">
         <div ref={invoiceRef}>
@@ -600,10 +582,7 @@ export default function UserOrderDetails() {
 
       {/* Header */}
       <div className="relative overflow-hidden border-b border-gray-200/50 dark:border-gray-800/50">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-blue-500/5 to-purple-500/10"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
-
-
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
               <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -633,7 +612,7 @@ export default function UserOrderDetails() {
             >
               <div className="text-right">
                 <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Total Amount</div>
-                <div className="text-2xl sm:text-3xl lg:text-4xl font-black bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+                <div className="text-2xl sm:text-3xl lg:text-4xl font-black text-emerald-600 dark:text-emerald-400">
                   Ksh {order.total.toLocaleString()}
                 </div>
               </div>
@@ -661,7 +640,7 @@ export default function UserOrderDetails() {
                     whileTap={{ scale: 0.95 }}
                     onClick={handleDownloadPDF}
                     disabled={isGeneratingPDF}
-                    className="flex-1 p-2 sm:p-3 rounded-xl bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white transition-all duration-300 shadow-lg group relative text-xs"
+                    className="flex-1 p-2 sm:p-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white transition-all duration-300 shadow-lg group relative text-xs"
                   >
                     {isGeneratingPDF ? (
                       <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 animate-spin mx-auto" />
@@ -676,7 +655,7 @@ export default function UserOrderDetails() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleDownloadPNG}
-                    className="p-2 sm:p-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white transition-all duration-300 shadow-lg group relative text-xs"
+                    className="p-2 sm:p-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white transition-all duration-300 shadow-lg group relative text-xs"
                   >
                     <FileImage className="w-3 h-3 sm:w-4 sm:h-4 mx-auto group-hover:scale-110 transition-transform duration-300" />
                   </motion.button>
@@ -728,44 +707,43 @@ export default function UserOrderDetails() {
                     className="p-4 sm:p-6 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-all duration-300"
                   >
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                       <div className="relative flex-shrink-0 w-40 h-40 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-50/70 via-white to-gray-50/70 dark:from-slate-800/50 dark:via-gray-900/20 dark:to-slate-800/50 shadow-lg ring-1 ring-gray-200/50 dark:ring-gray-700/50 hover:shadow-2xl hover:ring-emerald-200/50 dark:hover:ring-emerald-400/30 group/image transition-all duration-500 hover:scale-105 hover:rotate-1 hover:shadow-emerald-500/10 mx-auto sm:mx-0">
-  {(() => {
-    // Safely get image URL (handle both string and object)
-    let imageUrl = '/logo.png';
-    try {
-      if (item.image) {
-        if (typeof item.image === 'string') {
-          imageUrl = item.image;
-        } else {
-          const img = item.image as any;
-          if (img?.url) {
-            imageUrl = img.url;
-          } else if (img?.fileId) {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            imageUrl = `${apiUrl}/products/image/${img.fileId}`;
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error getting image URL:', error);
-      imageUrl = '/logo.png';
-    }
-    return (
-      <Image
-        src={imageUrl}
-        alt={item.name}
-        fill
-        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 224px, 224px"
-        className="object-cover transition-transform duration-500 group-hover/image:scale-110"
-        priority={index === 0}
-        onError={(e) => {
-          (e.target as HTMLImageElement).src = '/logo.png';
-        }}
-        unoptimized={true}
-      />
-    );
-  })()}
-</div>
+                      <div className="relative flex-shrink-0 w-40 h-40 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-gray-50 dark:bg-slate-800 shadow-lg ring-1 ring-gray-200/50 dark:ring-gray-700/50 hover:shadow-2xl hover:ring-emerald-200/50 dark:hover:ring-emerald-400/30 group/image transition-all duration-500 hover:scale-105 hover:rotate-1 mx-auto sm:mx-0">
+                        {(() => {
+                          let imageUrl = '/logo.png';
+                          try {
+                            if (item.image) {
+                              if (typeof item.image === 'string') {
+                                imageUrl = item.image;
+                              } else {
+                                const img = item.image as any;
+                                if (img?.url) {
+                                  imageUrl = img.url;
+                                } else if (img?.fileId) {
+                                  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+                                  imageUrl = `${apiUrl}/products/image/${img.fileId}`;
+                                }
+                              }
+                            }
+                          } catch (error) {
+                            console.error('Error getting image URL:', error);
+                            imageUrl = '/logo.png';
+                          }
+                          return (
+                            <Image
+                              src={imageUrl}
+                              alt={item.name}
+                              fill
+                              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 224px, 224px"
+                              className="object-cover transition-transform duration-500 group-hover/image:scale-110"
+                              priority={index === 0}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/logo.png';
+                              }}
+                              unoptimized={true}
+                            />
+                          );
+                        })()}
+                      </div>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -794,8 +772,8 @@ export default function UserOrderDetails() {
                 ))}
               </div>
 
-              <div className="p-4 sm:p-6 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/30 dark:to-gray-900/30 border-t border-gray-200/50 dark:border-gray-700">
-                  <div className="space-y-2 max-w-md ml-auto">
+              <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-800/30 border-t border-gray-200/50 dark:border-gray-700">
+                <div className="space-y-2 max-w-md ml-auto">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
                     <span className="font-medium">Ksh {(order.subtotal || order.total).toLocaleString()}</span>
@@ -825,7 +803,7 @@ export default function UserOrderDetails() {
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex justify-between text-lg sm:text-xl font-black">
                       <span className="text-gray-900 dark:text-white">Total</span>
-                      <span className="bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+                      <span className="text-emerald-600 dark:text-emerald-400">
                         Ksh {order.total.toLocaleString()}
                       </span>
                     </div>
@@ -834,38 +812,36 @@ export default function UserOrderDetails() {
               </div>
             </div>
 
-         {/* Action Buttons */}
-<div className="no-print grid grid-cols-2 gap-3 sm:gap-4">
-  {/* Back to Orders Button */}
+            {/* Action Buttons */}
+            <div className="no-print grid grid-cols-2 gap-3 sm:gap-4">
               <Link href="/orders" className="w-full">
-    <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      className="w-full flex items-center justify-center gap-2 px-4 py-3 sm:p-4 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:shadow-blue-500/25 transition-all duration-300 text-sm sm:text-base"
-    >
-      <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-      Back to Orders
-    </motion.button>
-  </Link>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 sm:p-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 text-sm sm:text-base"
+                >
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Back to Orders
+                </motion.button>
+              </Link>
 
-  {/* Cancel Order Button (only if cancellable) */}
-  {canCancel && (
-    <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={handleCancelOrder}
-      disabled={isCancelling}
-      className="flex items-center justify-center gap-2 px-4 py-3 sm:p-4 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-semibold rounded-xl border border-red-200 dark:border-red-800 transition-all duration-300 disabled:opacity-50 text-sm sm:text-base"
-    >
-      {isCancelling ? (
-        <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-      ) : (
-        <XCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-      )}
-      Cancel Order
-    </motion.button>
-  )}
-</div>
+              {canCancel && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleCancelOrder}
+                  disabled={isCancelling}
+                  className="flex items-center justify-center gap-2 px-4 py-3 sm:p-4 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-semibold rounded-xl border border-red-200 dark:border-red-800 transition-all duration-300 disabled:opacity-50 text-sm sm:text-base"
+                >
+                  {isCancelling ? (
+                    <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                  ) : (
+                    <XCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                  )}
+                  Cancel Order
+                </motion.button>
+              )}
+            </div>
           </motion.div>
 
           {/* Sidebar */}

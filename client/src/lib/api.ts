@@ -32,11 +32,6 @@ import type { ShippingArea, CreateShippingAreaRequest, UpdateShippingAreaRequest
 import type { PromoCode } from '@/types/order';
 import type { PeriodInfo, SalesCustomer, Supplier } from './sales';
 
-// src/lib/api.ts
-
-// ========== ADD THIS AFTER ALL IMPORTS ==========
-
-// List of reserved/placeholder names that should NOT be treated as product slugs
 const RESERVED_PLACEHOLDERS = [
   'placeholder-product.png',
   'placeholder-product.jpg',
@@ -80,10 +75,8 @@ const isValidProductIdentifier = (idOrSlug: string): boolean => {
   return true;
 };
 
-// ✅ FIX 1: Detect server vs client
 const isServer = typeof window === 'undefined';
 
-// ✅ FIX 2: Use different URL for server vs client
 const API_URL = isServer 
   ? process.env.API_BASE_URL || 'http://localhost:4000/api'
   : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';

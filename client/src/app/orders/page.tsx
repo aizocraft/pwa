@@ -20,21 +20,21 @@ interface GuestOrder extends Order {
 const getStatusConfig = (status: Order['status']) => {
   switch (status) {
     case 'pending': 
-      return { icon: Clock, color: 'bg-amber-500/10 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30', label: 'Pending', gradient: 'from-amber-500 to-orange-500' };
+      return { icon: Clock, color: 'bg-amber-500/10 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30', label: 'Pending' };
     case 'processing': 
-      return { icon: Package, color: 'bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30', label: 'Processing', gradient: 'from-blue-500 to-cyan-500' };
+      return { icon: Package, color: 'bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30', label: 'Processing' };
     case 'paid': 
-      return { icon: CheckCircle, color: 'bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30', label: 'Paid', gradient: 'from-emerald-500 to-teal-500' };
+      return { icon: CheckCircle, color: 'bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30', label: 'Paid' };
     case 'shipped': 
-      return { icon: Truck, color: 'bg-purple-500/10 text-purple-600 border-purple-200 dark:bg-purple-500/20 dark:text-purple-400 dark:border-purple-500/30', label: 'Shipped', gradient: 'from-purple-500 to-pink-500' };
+      return { icon: Truck, color: 'bg-purple-500/10 text-purple-600 border-purple-200 dark:bg-purple-500/20 dark:text-purple-400 dark:border-purple-500/30', label: 'Shipped' };
     case 'delivered': 
-      return { icon: CheckCircle, color: 'bg-green-500/10 text-green-600 border-green-200 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30', label: 'Delivered', gradient: 'from-green-500 to-emerald-500' };
+      return { icon: CheckCircle, color: 'bg-green-500/10 text-green-600 border-green-200 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30', label: 'Delivered' };
     case 'cancelled': 
-      return { icon: Clock, color: 'bg-red-500/10 text-red-600 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30', label: 'Cancelled', gradient: 'from-red-500 to-rose-500' };
+      return { icon: Clock, color: 'bg-red-500/10 text-red-600 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30', label: 'Cancelled' };
     case 'refunded': 
-      return { icon: DollarSign, color: 'bg-gray-500/10 text-gray-600 border-gray-200 dark:bg-gray-500/20 dark:text-gray-400 dark:border-gray-500/30', label: 'Refunded', gradient: 'from-gray-500 to-slate-500' };
+      return { icon: DollarSign, color: 'bg-gray-500/10 text-gray-600 border-gray-200 dark:bg-gray-500/20 dark:text-gray-400 dark:border-gray-500/30', label: 'Refunded' };
     default: 
-      return { icon: Clock, color: 'bg-gray-500/10 text-gray-600 border-gray-200 dark:bg-gray-500/20 dark:text-gray-400 dark:border-gray-500/30', label: 'Unknown', gradient: 'from-gray-500 to-slate-500' };
+      return { icon: Clock, color: 'bg-gray-500/10 text-gray-600 border-gray-200 dark:bg-gray-500/20 dark:text-gray-400 dark:border-gray-500/30', label: 'Unknown' };
   }
 };
 
@@ -194,7 +194,7 @@ export default function OrdersPage() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
+      <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <div className="relative inline-block">
@@ -210,14 +210,13 @@ export default function OrdersPage() {
   // Guest mode login form
   if (!isLoggedIn && !isGuestMode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
+      <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
         <div className="max-w-md mx-auto px-4 py-16">
           <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition duration-1000"></div>
-            <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl p-8 border border-white/50 shadow-xl">
+            <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl p-8 border border-gray-200 dark:border-gray-700 shadow-xl">
               <div className="text-center mb-6">
                 <Package className="w-16 h-16 text-emerald-500 mx-auto mb-3" strokeWidth={1.5} />
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-emerald-800 dark:from-white dark:to-emerald-400 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Order History
                 </h1>
               </div>
@@ -225,7 +224,7 @@ export default function OrdersPage() {
               <div className="space-y-3">
                 <button
                   onClick={() => router.push('/auth/login')}
-                  className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
                 >
                   Sign In
                 </button>
@@ -257,13 +256,12 @@ export default function OrdersPage() {
   // Guest info form
   if (!isLoggedIn && isGuestMode && (!guestEmail || !guestPhone) && rawOrders.length === 0 && !loadingOrders) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
+      <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
         <div className="max-w-md mx-auto px-4 py-16">
           <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition duration-1000"></div>
-            <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl p-8 border border-white/50 shadow-xl">
+            <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl p-8 border border-gray-200 dark:border-gray-700 shadow-xl">
               <div className="text-center mb-6">
-                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-emerald-100 to-blue-100 dark:from-emerald-950/50 dark:to-blue-950/50 rounded-full flex items-center justify-center">
+                <div className="w-16 h-16 mx-auto mb-3 bg-emerald-100 dark:bg-emerald-950/50 rounded-full flex items-center justify-center">
                   <Eye className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Find Orders</h1>
@@ -315,7 +313,7 @@ export default function OrdersPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg text-sm"
+                    className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg text-sm"
                   >
                     View Orders
                   </button>
@@ -330,7 +328,7 @@ export default function OrdersPage() {
 
   if (loadingOrders) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
+      <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <div className="relative inline-block">
@@ -345,11 +343,10 @@ export default function OrdersPage() {
 
   if (error && rawOrders.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
+      <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
         <div className="max-w-md mx-auto px-4 py-16">
           <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-3xl blur-xl opacity-30"></div>
-            <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl p-8 border border-white/50 shadow-xl text-center">
+            <div className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl p-8 border border-gray-200 dark:border-gray-700 shadow-xl text-center">
               <Package className="w-16 h-16 text-red-500 mx-auto mb-3" />
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Error</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{error}</p>
@@ -363,7 +360,7 @@ export default function OrdersPage() {
                     setGuestPhone('');
                   }
                 }}
-                className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-semibold text-sm hover:shadow-lg transition-all"
+                className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold text-sm shadow-lg transition-all"
               >
                 Try Again
               </button>
@@ -376,11 +373,11 @@ export default function OrdersPage() {
 
   if (filteredOrders.length === 0 && !searchQuery && filterStatus === 'all') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
+      <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
             <ShoppingCart className="mx-auto h-24 w-24 text-gray-400 dark:text-gray-600 mb-4" strokeWidth={1.5} />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-emerald-800 dark:from-white dark:to-emerald-400 bg-clip-text text-transparent mb-3">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
               No Orders Yet
             </h1>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
@@ -390,7 +387,7 @@ export default function OrdersPage() {
             </p>
             <Link
               href="/products"
-              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
+              className="inline-flex items-center px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
             >
               Start Shopping
               <ShoppingCart className="ml-2 w-4 h-4" />
@@ -402,7 +399,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-gray-950 dark:via-slate-900 dark:to-emerald-950/30">
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
       {/* Compact Header */}
       <div className="relative border-b border-gray-200/50 dark:border-gray-800/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -411,14 +408,14 @@ export default function OrdersPage() {
               <Star className="w-3 h-3 fill-current" />
               <span>Order History</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-900 to-emerald-800 dark:from-white dark:to-emerald-400 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
               My Orders
             </h1>
           </div>
 
           {/* Compact Stats Cards - Auto width */}
           <div className="flex flex-wrap gap-3 justify-center mt-6">
-            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl px-4 py-2 border border-white/50 shadow-sm hover:shadow-md transition-all">
+            <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl px-4 py-2 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-center gap-2">
                 <span className="text-xl font-black text-gray-900 dark:text-white">{stats.total}</span>
                 <span className="text-xs text-gray-600 dark:text-gray-400">Total</span>
@@ -464,7 +461,7 @@ export default function OrdersPage() {
                 </div>
               </div>
             )}
-            <div className="bg-gradient-to-r from-emerald-500/10 to-blue-500/10 rounded-xl px-4 py-2 border border-emerald-200/50 dark:border-emerald-800/30 shadow-sm">
+            <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-xl px-4 py-2 border border-emerald-200 dark:border-emerald-800/30 shadow-sm">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
                 <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
@@ -478,7 +475,7 @@ export default function OrdersPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Search and Filters */}
-        <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 border border-white/50 shadow-lg mb-6">
+        <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-lg mb-6">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -529,7 +526,7 @@ export default function OrdersPage() {
                   onClick={() => setFilterStatus(status === 'all' ? 'all' : status)}
                   className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-all duration-200 flex items-center gap-1.5 ${
                     isActive
-                      ? 'bg-gradient-to-r from-emerald-500 to-blue-500 text-white shadow-md'
+                      ? 'bg-emerald-500 text-white shadow-md'
                       : 'bg-white/50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-white/70 border border-gray-200/50 dark:border-gray-700'
                   }`}
                 >
@@ -544,10 +541,10 @@ export default function OrdersPage() {
 
         {/* Orders Display */}
         {viewMode === 'table' ? (
-          <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl border border-white/50 shadow-lg overflow-hidden">
+          <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Order</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 hidden md:table-cell">
@@ -596,7 +593,7 @@ export default function OrdersPage() {
                           <div className="text-base font-bold text-gray-900 dark:text-white">Ksh.{order.total?.toFixed(2) || '0'}</div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-right">
-                          <Link href={`/orders/${order._id}`} className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white text-xs font-medium rounded-lg transition-all shadow-md hover:shadow-lg">
+                          <Link href={`/orders/${order._id}`} className="inline-flex items-center px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg transition-all shadow-md hover:shadow-lg">
                             View
                             <ChevronRight className="ml-1 w-3 h-3" />
                           </Link>
@@ -611,10 +608,10 @@ export default function OrdersPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredOrders.map((order) => {
-              const { color, label, gradient } = getStatusConfig(order.status);
+              const { color, label } = getStatusConfig(order.status);
               return (
-                <div key={order._id || order.orderNumber} className="group relative bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl border border-white/50 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden">
-                  <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${gradient}`}></div>
+                <div key={order._id || order.orderNumber} className="group relative bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500"></div>
                   <div className="p-4">
                     <div className="flex justify-between items-start mb-3">
                       <div>
@@ -637,13 +634,13 @@ export default function OrdersPage() {
                       </div>
                       <div className="flex justify-between items-end">
                         <span className="text-gray-600 dark:text-gray-400 text-sm">Total:</span>
-                        <span className="text-lg font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+                        <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
                           Ksh.{order.total?.toFixed(2) || '0'}
                         </span>
                       </div>
                     </div>
 
-                    <Link href={`/orders/${order._id}`} className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white text-xs font-medium rounded-lg transition-all shadow-md hover:shadow-lg">
+                    <Link href={`/orders/${order._id}`} className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg transition-all shadow-md hover:shadow-lg">
                       View Details
                       <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                     </Link>
