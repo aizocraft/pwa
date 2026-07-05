@@ -239,7 +239,7 @@ export default function SalesLayout({
 
   if (!user || !hasSalesAccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-gray-950">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
       </div>
     );
@@ -251,7 +251,7 @@ export default function SalesLayout({
   const isDashboardActive = pathname === '/sales' || pathname === '/sales/overview';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 shadow-[0_8px_30px_rgba(15,23,42,0.06)] backdrop-blur-2xl dark:border-slate-800/70 dark:bg-slate-900/90">
         <div className="px-4 py-3 sm:px-6">
@@ -292,7 +292,7 @@ export default function SalesLayout({
                       href={item.href}
                       className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 transition-all duration-200 relative min-w-0 ${
                         isActive
-                          ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-600/20 ring-1 ring-cyan-500/20'
+                          ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20 ring-1 ring-cyan-500/20'
                           : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-white'
                       }`}
                     >
@@ -438,7 +438,7 @@ export default function SalesLayout({
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                  <div className="w-8 h-8 bg-cyan-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
                     {userInitial}
                   </div>
                   <div className="hidden md:block text-left">
@@ -557,7 +557,7 @@ export default function SalesLayout({
               {/* Mobile User Info */}
               <div className="border-t border-gray-200 dark:border-gray-800 pt-3 mt-3">
                 <div className="flex items-center gap-3 px-3 py-2">
-                  <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                  <div className="w-10 h-10 bg-cyan-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
                     {userInitial}
                   </div>
                   <div className="flex-1">
@@ -599,7 +599,6 @@ export default function SalesLayout({
             <div className="flex items-center gap-4">
               <Link href="/privacy" className="hover:text-gray-700 dark:hover:text-gray-300">Privacy</Link>
               <Link href="/terms" className="hover:text-gray-700 dark:hover:text-gray-300">Terms</Link>
-
             </div>
           </div>
         </div>
