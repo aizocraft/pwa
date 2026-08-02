@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, type ReactNode, useCallback } from 'react';
-import { Sun, Droplets, Battery, Zap, MapPin, X, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
+import { Sun, Droplets, Battery, Zap, MapPin, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import Hero from './Hero';
 import Image from 'next/image';
 
@@ -13,7 +13,6 @@ interface Project {
   category: string;
   description: string;
   images: string[];
-  videos?: string[];
 }
 
 interface MasonryItem {
@@ -22,7 +21,6 @@ interface MasonryItem {
   project: Project;
   imageIndex: number;
   precalculatedHeight: number;
-  isVideo?: boolean;
 }
 
 // ============= PROJECT DATA =============
@@ -40,16 +38,6 @@ const PROJECTS: Project[] = [
       '/images/solar-image4.jpg',
       '/images/solar-4.jpg',
       '/images/solar.jpg',
-      '/images/solar1.jpg',
-      '/images/solar2.jpg',
-      '/images/solar3.jpg',
-      '/images/solar4.jpg',
-      '/images/solar5.jpg',
-    ],
-    videos: [
-      '/videos/inv00.mp4',
-      '/videos/inv01.mp4',
-      '/videos/inv02.mp4',
     ],
   },
   {
@@ -142,50 +130,6 @@ const Badge = ({ children, className }: { children: ReactNode; className?: strin
     {children}
   </span>
 );
-
-// Video Player Component
-const VideoPlayer = ({ src, className }: { src: string; className?: string }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  const togglePlay = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  return (
-    <div className="relative group">
-      <video
-        ref={videoRef}
-        src={src}
-        className={`w-full h-auto object-cover ${className}`}
-        loop
-        muted
-        playsInline
-        onClick={togglePlay}
-      />
-      <button
-        onClick={togglePlay}
-        className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-      >
-        <div className="w-16 h-16 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center">
-          {isPlaying ? (
-            <Pause className="w-8 h-8 text-gray-800" />
-          ) : (
-            <Play className="w-8 h-8 text-gray-800 ml-1" />
-          )}
-        </div>
-      </button>
-    </div>
-  );
-};
 
 // ============= MASONRY GRID =============
 const Masonry = ({
@@ -296,7 +240,7 @@ const Masonry = ({
 // ============= MAIN COMPONENT =============
 export default function ProjectsPageContent() {
   const [activeCategory, setActiveCategory] = useState('All');
-  const [selectedImage, setSelectedImage] = useState<{ project: Project; imageIndex: number; isVideo?: boolean } | null>(null);
+  const [selectedImage, setSelectedImage] = useState<{ project: Project; imageIndex: number } | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [filteredItems, setFilteredItems] = useState<MasonryItem[]>([]);
 
@@ -306,35 +250,15 @@ export default function ProjectsPageContent() {
       ? PROJECTS 
       : PROJECTS.filter(project => project.category === activeCategory);
 
-    const items: MasonryItem[] = [];
-
-    filtered.forEach((project) => {
-      // Add images
-      project.images.forEach((image: string, imageIndex: number) => {
-        items.push({
-          id: `${project.id}-img-${imageIndex}`,
-          img: image,
-          project,
-          imageIndex,
-          precalculatedHeight: Math.floor(Math.random() * 200) + 320,
-          isVideo: false,
-        });
-      });
-
-      // Add videos
-      if (project.videos) {
-        project.videos.forEach((video: string, videoIndex: number) => {
-          items.push({
-            id: `${project.id}-vid-${videoIndex}`,
-            img: video,
-            project,
-            imageIndex: videoIndex,
-            precalculatedHeight: Math.floor(Math.random() * 200) + 350,
-            isVideo: true,
-          });
-        });
-      }
-    });
+    const items = filtered.flatMap((project) =>
+      project.images.map((image: string, imageIndex: number) => ({
+        id: `${project.id}-${imageIndex}`,
+        img: image,
+        project,
+        imageIndex,
+        precalculatedHeight: Math.floor(Math.random() * 200) + 320,
+      }))
+    );
 
     setFilteredItems(items);
   }, [activeCategory]);
@@ -355,32 +279,16 @@ export default function ProjectsPageContent() {
       
       if (e.key === 'Escape') {
         setSelectedImage(null);
-      } else if (e.key === 'ArrowLeft') {
-        const allMedia = getAllMedia(selectedImage.project);
-        const currentIndex = allMedia.findIndex(
-          m => m.index === selectedImage.imageIndex && m.isVideo === selectedImage.isVideo
-        );
-        if (currentIndex > 0) {
-          const prev = allMedia[currentIndex - 1];
-          setSelectedImage({
-            project: selectedImage.project,
-            imageIndex: prev.index,
-            isVideo: prev.isVideo,
-          });
-        }
-      } else if (e.key === 'ArrowRight') {
-        const allMedia = getAllMedia(selectedImage.project);
-        const currentIndex = allMedia.findIndex(
-          m => m.index === selectedImage.imageIndex && m.isVideo === selectedImage.isVideo
-        );
-        if (currentIndex < allMedia.length - 1) {
-          const next = allMedia[currentIndex + 1];
-          setSelectedImage({
-            project: selectedImage.project,
-            imageIndex: next.index,
-            isVideo: next.isVideo,
-          });
-        }
+      } else if (e.key === 'ArrowLeft' && selectedImage.imageIndex > 0) {
+        setSelectedImage({
+          project: selectedImage.project,
+          imageIndex: selectedImage.imageIndex - 1,
+        });
+      } else if (e.key === 'ArrowRight' && selectedImage.imageIndex < selectedImage.project.images.length - 1) {
+        setSelectedImage({
+          project: selectedImage.project,
+          imageIndex: selectedImage.imageIndex + 1,
+        });
       }
     };
 
@@ -388,21 +296,8 @@ export default function ProjectsPageContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedImage]);
 
-  const getAllMedia = (project: Project) => {
-    const media: { index: number; isVideo: boolean }[] = [];
-    project.images.forEach((_, i) => media.push({ index: i, isVideo: false }));
-    if (project.videos) {
-      project.videos.forEach((_, i) => media.push({ index: i, isVideo: true }));
-    }
-    return media;
-  };
-
   const handleMasonryClick = useCallback((item: MasonryItem) => {
-    setSelectedImage({ 
-      project: item.project, 
-      imageIndex: item.imageIndex,
-      isVideo: item.isVideo,
-    });
+    setSelectedImage({ project: item.project, imageIndex: item.imageIndex });
   }, []);
 
   const handleCategoryChange = useCallback((category: string) => {
@@ -462,38 +357,19 @@ export default function ProjectsPageContent() {
               gap={16}
               renderItem={(item) => (
                 <div className="relative group cursor-pointer overflow-hidden rounded-xl sm:rounded-2xl bg-white dark:bg-gray-800 shadow-lg hover:shadow-2xl transition-all duration-500">
-                  {/* Media Container */}
+                  {/* Image Container */}
                   <div className="relative overflow-hidden">
-                    {item.isVideo ? (
-                      <video
-                        src={item.img}
-                        className="w-full h-auto object-cover"
-                        muted
-                        loop
-                        playsInline
-                      />
-                    ) : (
-                      <img
-                        src={item.img}
-                        alt={`${item.project.title} - ${item.imageIndex + 1}`}
-                        className="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-110"
-                        loading="lazy"
-                      />
-                    )}
+                    <img
+                      src={item.img}
+                      alt={`${item.project.title} - ${item.imageIndex + 1}`}
+                      className="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-110"
+                      loading="lazy"
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   </div>
 
-                  {/* Video Badge */}
-                  {item.isVideo && (
-                    <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10">
-                      <Badge className="bg-red-500/90 text-white shadow-lg text-xs sm:text-sm">
-                        <Play className="w-3 h-3 mr-1" /> Video
-                      </Badge>
-                    </div>
-                  )}
-
                   {/* Category Badge */}
-                  <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10">
+                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10">
                     <Badge className={`bg-gradient-to-r ${getCategoryColor(item.project.category)} text-white shadow-lg text-xs sm:text-sm`}>
                       {getCategoryShortName(item.project.category)}
                     </Badge>
@@ -540,41 +416,26 @@ export default function ProjectsPageContent() {
         </div>
       </section>
 
-      {/* Image/Video Modal */}
+      {/* Image Modal */}
       {selectedImage && (
         <div
           className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-3 sm:p-4 animate-fadeIn"
           onClick={() => setSelectedImage(null)}
         >
           <div className="relative max-w-[90vw] sm:max-w-5xl max-h-[90vh]">
-            {selectedImage.isVideo ? (
-              <video
-                src={selectedImage.project.videos?.[selectedImage.imageIndex]}
-                className="max-w-full max-h-[80vh] rounded-xl sm:rounded-2xl shadow-2xl"
-                controls
-                autoPlay
-                playsInline
-              />
-            ) : (
-              <img
-                src={selectedImage.project.images[selectedImage.imageIndex]}
-                alt={selectedImage.project.title}
-                className="max-w-full max-h-[80vh] object-contain rounded-xl sm:rounded-2xl shadow-2xl"
-              />
-            )}
+            <img
+              src={selectedImage.project.images[selectedImage.imageIndex]}
+              alt={selectedImage.project.title}
+              className="max-w-full max-h-[80vh] object-contain rounded-xl sm:rounded-2xl shadow-2xl"
+            />
 
-            {/* Media Info */}
+            {/* Image Info */}
             <div className="absolute bottom-3 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6">
               <div className="bg-black/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-4 sm:p-6 text-white border border-white/10">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
                   <Badge className={`bg-gradient-to-r ${getCategoryColor(selectedImage.project.category)} text-white text-xs sm:text-sm`}>
                     {selectedImage.project.category}
                   </Badge>
-                  {selectedImage.isVideo && (
-                    <Badge className="bg-red-500 text-white text-xs sm:text-sm">
-                      <Play className="w-3 h-3 mr-1" /> Video
-                    </Badge>
-                  )}
                   <div className="flex items-center gap-1.5 sm:gap-2 text-blue-200 text-xs sm:text-sm">
                     <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
                     <span>{selectedImage.project.location}</span>
@@ -582,11 +443,7 @@ export default function ProjectsPageContent() {
                 </div>
                 <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2">{selectedImage.project.title}</h3>
                 <p className="text-blue-100 text-sm sm:text-base">
-                  {selectedImage.isVideo ? 'Video' : 'Image'} {selectedImage.imageIndex + 1} of {
-                    selectedImage.isVideo 
-                      ? selectedImage.project.videos?.length || 0
-                      : selectedImage.project.images.length
-                  }
+                  Image {selectedImage.imageIndex + 1} of {selectedImage.project.images.length}
                 </p>
               </div>
             </div>
@@ -600,61 +457,35 @@ export default function ProjectsPageContent() {
             </button>
 
             {/* Navigation Buttons */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const allMedia = getAllMedia(selectedImage.project);
-                const currentIndex = allMedia.findIndex(
-                  m => m.index === selectedImage.imageIndex && m.isVideo === selectedImage.isVideo
-                );
-                if (currentIndex > 0) {
-                  const prev = allMedia[currentIndex - 1];
+            {selectedImage.imageIndex > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
                   setSelectedImage({
                     project: selectedImage.project,
-                    imageIndex: prev.index,
-                    isVideo: prev.isVideo,
+                    imageIndex: selectedImage.imageIndex - 1,
                   });
-                }
-              }}
-              className={`absolute left-3 sm:left-6 top-1/2 transform -translate-y-1/2 bg-black/50 backdrop-blur-sm rounded-full p-2 sm:p-3 hover:bg-black/70 transition-all ${
-                getAllMedia(selectedImage.project).findIndex(
-                  m => m.index === selectedImage.imageIndex && m.isVideo === selectedImage.isVideo
-                ) === 0 ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              disabled={getAllMedia(selectedImage.project).findIndex(
-                m => m.index === selectedImage.imageIndex && m.isVideo === selectedImage.isVideo
-              ) === 0}
-            >
-              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-            </button>
+                }}
+                className="absolute left-3 sm:left-6 top-1/2 transform -translate-y-1/2 bg-black/50 backdrop-blur-sm rounded-full p-2 sm:p-3 hover:bg-black/70 transition-all"
+              >
+                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              </button>
+            )}
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const allMedia = getAllMedia(selectedImage.project);
-                const currentIndex = allMedia.findIndex(
-                  m => m.index === selectedImage.imageIndex && m.isVideo === selectedImage.isVideo
-                );
-                if (currentIndex < allMedia.length - 1) {
-                  const next = allMedia[currentIndex + 1];
+            {selectedImage.imageIndex < selectedImage.project.images.length - 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
                   setSelectedImage({
                     project: selectedImage.project,
-                    imageIndex: next.index,
-                    isVideo: next.isVideo,
+                    imageIndex: selectedImage.imageIndex + 1,
                   });
-                }
-              }}
-              className={`absolute right-3 sm:right-6 top-1/2 transform -translate-y-1/2 bg-black/50 backdrop-blur-sm rounded-full p-2 sm:p-3 hover:bg-black/70 transition-all ${
-                getAllMedia(selectedImage.project).findIndex(
-                  m => m.index === selectedImage.imageIndex && m.isVideo === selectedImage.isVideo
-                ) === getAllMedia(selectedImage.project).length - 1 ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              disabled={getAllMedia(selectedImage.project).findIndex(
-                m => m.index === selectedImage.imageIndex && m.isVideo === selectedImage.isVideo
-              ) === getAllMedia(selectedImage.project).length - 1}
-            >
-              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-            </button>
+                }}
+                className="absolute right-3 sm:right-6 top-1/2 transform -translate-y-1/2 bg-black/50 backdrop-blur-sm rounded-full p-2 sm:p-3 hover:bg-black/70 transition-all"
+              >
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              </button>
+            )}
           </div>
         </div>
       )}
