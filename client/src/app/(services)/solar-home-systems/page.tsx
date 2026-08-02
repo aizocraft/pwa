@@ -24,7 +24,8 @@ import {
   Heart,
   Calendar,
   Settings,
-  Headphones
+  Headphones,
+  Play
 } from 'lucide-react';
 import CircularGallery from '@/components/CircularGallery';
 
@@ -34,20 +35,20 @@ export const metadata: Metadata = {
   keywords: 'solar panels for homes Kenya, residential solar system, home solar installation, solar power Nairobi',
 };
 
-const homeSolarImages = [
-  { image: '/images/solar-image1.jpg', text: '', subtext: '' },
-  { image: '/images/solar-image2.jpg', text: '', subtext: '' },
-  { image: '/images/solar-image3.jpg', text: '', subtext: '' },
-  { image: '/images/solar-image4.jpg', text: '', subtext: '' },
-  { image: '/images/solar.jpg', text: '', subtext: '' },
-  { image: '/images/solar-4.jpg', text: '', subtext: '' },
+// Gallery items (CircularGallery supports { image: string; text: string }[])
+const formattedGalleryItems: { image: string; text: string }[] = [
+  { image: '/images/solar-image1.jpg', text: 'Solar Installation' },
+  { image: '/images/solar-image2.jpg', text: 'Solar Installation' },
+  { image: '/images/solar-image3.jpg', text: 'Solar Installation' },
+  { image: '/images/solar-image4.jpg', text: 'Solar Installation' },
+  { image: '/images/solar.jpg', text: 'Solar Installation' },
+  { image: '/images/solar-4.jpg', text: 'Solar Installation' },
+  { image: '/images/solar1.jpg', text: 'Solar Installation' },
+  { image: '/images/solar2.jpg', text: 'Solar Installation' },
+  { image: '/images/solar3.jpg', text: 'Solar Installation' },
+  { image: '/images/solar4.jpg', text: 'Solar Installation' },
+  { image: '/images/solar5.jpg', text: 'Solar Installation' },
 ];
-
-// Format gallery items with line break using \n
-const formattedGalleryItems = homeSolarImages.map(item => ({
-  image: item.image,
-  text: `${item.text}\n${item.subtext}`
-}));
 
 const packageDetails = [
   {
@@ -163,13 +164,18 @@ export default function SolarHomeSystemsPage() {
             
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-xl">
-                <Image
-                  src="/images/solar-image1.jpg"
-                  alt="Solar panels on a modern home"
-                  fill
-                  className="object-cover"
+                <video
+                  src="/videos/inv00.mp4"
+                  className="w-full h-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-sm font-medium flex items-center gap-2">
+                  <Play className="w-4 h-4" /> Watch Installation
+                </div>
               </div>
             </div>
           </div>
@@ -275,18 +281,23 @@ export default function SolarHomeSystemsPage() {
         </div>
       </section>
 
-      {/* Save Money Section - Image Left */}
+      {/* Save Money Section - Video Left */}
       <section className="py-20 lg:py-24 bg-gray-50 dark:bg-gray-900/30">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="relative h-[400px] rounded-xl overflow-hidden shadow-xl order-2 lg:order-1">
-              <Image
-                src="/images/solar-installation-kenya.png"
-                alt="Solar panel installation"
-                fill
-                className="object-cover"
+              <video
+                src="/videos/inv01.mp4"
+                className="w-full h-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
               />
               <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent" />
+              <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-sm font-medium flex items-center gap-2">
+                <Play className="w-4 h-4" /> Watch Installation Process
+              </div>
             </div>
             
             <div className="order-1 lg:order-2">
@@ -396,10 +407,10 @@ export default function SolarHomeSystemsPage() {
                 Request Free Quote
               </Link>
               <Link 
-                href="tel:+254 728 749 722 " 
+                href="tel:+254728749722" 
                 className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white px-6 py-3 rounded-lg font-semibold text-base transition-all"
               >
-                Call: 0728 749 722 
+                Call: 0728 749 722
               </Link>
             </div>
           </div>
@@ -408,3 +419,4 @@ export default function SolarHomeSystemsPage() {
     </div>
   );
 }
+

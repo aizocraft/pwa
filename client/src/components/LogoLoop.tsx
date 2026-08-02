@@ -194,7 +194,7 @@ const useAnimationLoop = (
 
 export const LogoLoop = memo<LogoLoopProps>(({
   logos,
-  speed = 120,
+  speed = 180,
   direction = 'left',
   width = '100%',
   logoHeight = 28,

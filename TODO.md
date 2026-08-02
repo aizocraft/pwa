@@ -1,8 +1,10 @@
-# TODO - Sales by Category accuracy
+# TODO
 
-- [x] Update backend `charts.categorySales` to include `percentage` for each category.
-- [x] Add UI fallback to compute percentage when backend doesn’t provide it.
-- [ ] Manual verify in browser: pie chart + category cards show consistent percentages summing ~100%.
+- [x] Rewrite `DOCUMENTATION.md` with modern “Customer Sales Admin API” docs (base `/api/sales`), including auth/roles, common query params, endpoint tables, and example request bodies.
+- [x] Add a concise core flow section: Customer → Quotation → Invoice → Payment → Auto Order.
+- [x] Update `README.md` to link to the new docs and add a short “Sales Admin API” pointer.
+- [x] Sanity-check that endpoint paths, params, and enums match `server/routes/sales.routes.ts` and related models.
+
 
 
 

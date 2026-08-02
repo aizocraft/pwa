@@ -18,7 +18,8 @@ import {
   Leaf,
   Award,
   Users,
-  Settings
+  Settings,
+  Play
 } from 'lucide-react';
 import CircularGallery from '@/components/CircularGallery';
 import { useTheme } from '@/context/ThemeContext';
@@ -108,8 +109,18 @@ export default function CommercialSystemsClient() {
             
             <div className="relative">
               <div className="relative h-[400px] rounded-xl overflow-hidden shadow-xl">
-                <Image src="/images/commercial-ground-mount-system.webp" alt="Commercial solar installation" fill className="object-cover" />
+                <video
+                  src="/videos/inv01.mp4"
+                  className="w-full h-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-sm font-medium flex items-center gap-2">
+                  <Play className="w-4 h-4" /> Watch Installation
+                </div>
               </div>
             </div>
           </div>
@@ -152,6 +163,17 @@ export default function CommercialSystemsClient() {
               <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6">
                 Cut Electricity Costs And <span className="text-blue-600 dark:text-blue-400">Increase Profits</span>
               </h2>
+              <div className="relative h-[300px] rounded-xl overflow-hidden shadow-xl mb-6">
+                <video
+                  src="/videos/inv01.mp4"
+                  className="w-full h-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent" />
+              </div>
               <p className="text-lg text-gray-600 dark:text-gray-400 mb-5 leading-relaxed">
                 High electricity bills and frequent power outages are some of the things that can disrupt your business operations in Kenya. The rising cost and unreliability of grid power can hinder your company's productivity and profitability. It's time to consider a dependable and cost-effective energy solution that keeps your business running smoothly.
               </p>
