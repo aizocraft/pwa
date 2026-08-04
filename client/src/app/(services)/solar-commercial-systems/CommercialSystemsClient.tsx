@@ -165,7 +165,7 @@ export default function CommercialSystemsClient() {
               </h2>
               <div className="relative h-[300px] rounded-xl overflow-hidden shadow-xl mb-6">
                 <video
-                  src="/videos/inv01.mp4"
+                  src="/videos/solar01.mp4"
                   className="w-full h-full object-cover"
                   autoPlay
                   muted
@@ -177,12 +177,7 @@ export default function CommercialSystemsClient() {
               <p className="text-lg text-gray-600 dark:text-gray-400 mb-5 leading-relaxed">
                 High electricity bills and frequent power outages are some of the things that can disrupt your business operations in Kenya. The rising cost and unreliability of grid power can hinder your company's productivity and profitability. It's time to consider a dependable and cost-effective energy solution that keeps your business running smoothly.
               </p>
-              <p className="text-lg text-gray-600 dark:text-gray-400 mb-5 leading-relaxed">
-                Commercial solar systems in Kenya are the ideal solution to your energy challenges. Our commercial solar installations utilize the abundant sunlight, transforming it into clean, reliable energy. By adopting solar power, you can drastically cut down on electricity costs and achieve long-term financial savings.
-              </p>
-              <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
-                Join the increasing number of Kenyan businesses that are making the smart switch to solar energy. Embrace sustainability, reduce your operational costs, and ensure a consistent and reliable power supply for your commercial enterprise.
-              </p>
+
             </div>
           </div>
         </div>
